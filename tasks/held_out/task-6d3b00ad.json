@@ -1,0 +1,20 @@
+{
+  "task_id": "task-6d3b00ad",
+  "source_package": "cli",
+  "source_file": "R/ansi-hyperlink.R",
+  "difficulty": "hard",
+  "instruction": "Add comprehensive edge case tests for `parse_file_link_params`.\n\n\nExisting tests for reference:\n```r\n\n```\n```r\n\n```\n\n\nThe existing tests cover basic functionality. Add tests for:\n1. NULL inputs to each argument\n2. Empty vectors/strings: character(0), \"\", integer(0)\n3. Boundary values: 0, 1, -1, NA, NaN, Inf\n4. Invalid input types (passing numeric where character expected, etc.)\n5. Missing arguments (use expect_error with class matching)\n6. Very long inputs (strings > 1000 chars, vectors > 10000 elements)\n",
+  "context": "Package: cli v3.6.5.9000\nDescription: Helpers for Developing Command Line Interfaces\nFunction: parse_file_link_params\nParameters: txt\nTest patterns used: test_that\nExpectations used: expect_equal\n\nFunction Code:\n```r\nparse_file_link_params <- function(txt) {\n  pattern <- \"^(?<path>.*?)(?::(?<line>\\\\d*))?(?::(?<column>\\\\d*))?$\"\n  matches <- re_match(txt, pattern)\n  ret <- as.list(matches)\n  ret[!nzchar(ret)] <- list(NULL)\n  if (is.null(ret[[\"path\"]])) ret[[\"path\"]] <- \"\"\n  ret\n}\n```",
+  "reference_test": "# No substantive reference patterns available",
+  "test_type": "unit",
+  "patterns": [
+    "test_that"
+  ],
+  "dependencies": [
+    "testthat"
+  ],
+  "split": "held_out",
+  "function_name": "parse_file_link_params",
+  "quality_score": 0.56,
+  "constraints": {}
+}

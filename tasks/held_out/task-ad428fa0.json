@@ -1,0 +1,20 @@
+{
+  "task_id": "task-ad428fa0",
+  "source_package": "cli",
+  "source_file": "R/ansi-hyperlink.R",
+  "difficulty": "medium",
+  "instruction": "Refactor the existing tests for `ansi_has_hyperlink_support` to follow better testing practices.\n\n\nCurrent test patterns to refactor:\n- test_that at tests/testthat/test-ansi-hyperlink.R:302\n- test_that at tests/testthat/test-ansi-hyperlink.R:311\n- test_that at tests/testthat/test-ansi-hyperlink.R:322\n- test_that at tests/testthat/test-ansi-hyperlink.R:336\n- test_that at tests/testthat/test-ansi-hyperlink.R:350\n\n\nGoals:\n1. Use describe()/it() blocks for better organization where appropriate\n2. Reduce code duplication with helper functions or local fixtures\n3. Improve test descriptions to be specific about what behavior is verified\n4. Extract common setup into withr::local_* fixtures\n5. Each test should have a single responsibility\n",
+  "context": "Package: cli v3.6.5.9000\nDescription: Helpers for Developing Command Line Interfaces\nFunction: ansi_has_hyperlink_support\nTest patterns used: test_that\nExpectations used: expect_false, expect_true\n\nFunction Code:\n```r\nansi_has_hyperlink_support <- function() {\n  ## Hyperlinks forced?\n  enabled <- getOption(\"cli.hyperlink\", getOption(\"crayon.hyperlink\"))\n  if (!is.null(enabled)) {\n    return(isTRUE(enabled))\n  }\n\n  ## forced by environment variable\n  enabled <- Sys.getenv(\"R_CLI_HYPERLINKS\", \"\")\n  if (isTRUE(as.logical(enabled))) {\n    return(TRUE)\n  }\n\n  ## If ANSI support is off, then this is off as well\n  if (num_ansi_colors() == 1) return(FALSE)\n\n  ## Are we in RStudio?\n  rstudio <- rstudio_detect()\n  if (rstudio$type != \"not_rstudio\") {\n    return(rstudio$hyperlink)\n  }\n\n  ## Are we in a terminal? No?\n  if (!isatty(stdout())) {\n    return(FALSE)\n  }\n\n  ## Are we in a windows terminal?\n  if (is_windows() && Sys.getenv(\"WT_SESSION\") != \"\") {\n    return(TRUE)\n  }\n\n  ## Better to avoid it in CIs\n  if (\n    nzchar(Sys.getenv(\"CI\")) ||\n      nzchar(Sys.getenv(\"TEAMCITY_VERSION\"))\n  ) {\n    return(FALSE)\n  }\n\n  ## iTerm\n  if (nzchar(TERM_PROGRAM <- Sys.getenv(\"TERM_PROGRAM\"))) {\n    version <- package_version(\n      Sys.getenv(\"TERM_PROGRAM_VERSION\"),\n      strict = FALSE\n    )\n\n    if (TERM_PROGRAM == \"iTerm.app\") {\n      if (!is.na(version) && version >= \"3.1\") return(TRUE)\n    }\n  }\n\n  if (nzchar(VTE_VERSION <- Sys.getenv(\"VTE_VERSION\"))) {\n    # See #441 -- some apparent heterogeneity in how the version gets\n    #   encoded to this env variable. Accept either form.\n    if (grepl(\"^\\\\d{4}$\", VTE_VERSION)) {\n      VTE_VERSION <- sprintf(\"%2.02f\", as.numeric(VTE_VERSION) / 100)\n      VTE_VERSION <- package_version(list(major = \"0\", minor = VTE_VERSION))\n    } else {\n      VTE_VERSION <- package_version(VTE_VERSION, strict = FALSE)\n      if (is.na(VTE_VERSION)) {\n        VTE_VERSION <- package_version(\"0.1.0\")\n      }\n    }\n    if (VTE_VERSION >= \"0.50.1\") return(TRUE)\n  }\n\n  FALSE\n}\n```",
+  "reference_test": "# No substantive reference patterns available",
+  "test_type": "unit",
+  "patterns": [
+    "test_that"
+  ],
+  "dependencies": [
+    "testthat"
+  ],
+  "split": "held_out",
+  "function_name": "ansi_has_hyperlink_support",
+  "quality_score": 0.51,
+  "constraints": {}
+}

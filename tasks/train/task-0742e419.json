@@ -1,0 +1,20 @@
+{
+  "task_id": "task-0742e419",
+  "source_package": "cli",
+  "source_file": "R/ansi-hyperlink.R",
+  "difficulty": "easy",
+  "instruction": "A test for `construct_file_link` is failing. Diagnose and fix the issue.\n\n\nFailing test:\n```r\n\n```\n\n\nSteps:\n1. Read the function source code to understand expected behavior\n2. Compare the test expectations with actual function behavior\n3. Fix the test if expectations are wrong, or fix the function if it has a bug\n4. Ensure the fix maintains backward compatibility\n5. Run the tests to verify the fix\n",
+  "context": "Package: cli v3.6.5.9000\nDescription: Helpers for Developing Command Line Interfaces\nFunction: construct_file_link\nParameters: params\nTest patterns used: test_that\nExpectations used: expect_equal\n\nFunction Code:\n```r\nconstruct_file_link <- function(params) {\n  fmt <- get_config_chr(\"hyperlink_file_url_format\")\n\n  if (is.null(fmt)) {\n    return(construct_file_link_OG(params))\n  }\n\n  params$path <- sub(\"^file://\", \"\", params$path)\n  params$path <- path.expand(params$path)\n\n  looks_absolute <- function(path) {\n    grepl(\"^/\", params$path) ||\n      (is_windows() && grepl(\"^[a-zA-Z]:\", params$path))\n  }\n  if (!looks_absolute(params$path)) {\n    params$path <- file.path(getwd(), params$path)\n  }\n  if (!grepl(\"^/\", params$path)) {\n    params$path <- paste0(\"/\", params$path)\n  }\n\n  res <- interpolate_parts(fmt, params)\n  list(url = res)\n}\n```",
+  "reference_test": "# No substantive reference patterns available",
+  "test_type": "unit",
+  "patterns": [
+    "test_that"
+  ],
+  "dependencies": [
+    "testthat"
+  ],
+  "split": "train",
+  "function_name": "construct_file_link",
+  "quality_score": 0.51,
+  "constraints": {}
+}

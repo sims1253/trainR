@@ -1,0 +1,20 @@
+{
+  "task_id": "task-8d4d5539",
+  "source_package": "cli",
+  "source_file": "R/ansi-utils.R",
+  "difficulty": "medium",
+  "instruction": "Write a complete testthat test file for `cli::re_table`.\n\nPackage: cli v3.6.5.9000\nDescription: Helpers for Developing Command Line Interfaces\nFunction: re_table\nTest patterns used: test_that\nExpectations used: expect_snapshot\n\nFunction Code:\n```r\nre_table <- function(...) {\n  lapply(gregexpr(...), function(x) {\n    res <- cbind(\n      start = x,\n      end = x + attr(x, \"match.length\") - 1,\n      length = attr(x, \"match.length\")\n    )\n    res <- res[res[, \"start\"] != -1, , drop = FALSE]\n  })\n}\n```\n\nRequirements:\n1. Use test_that() blocks with descriptive names that reference `re_table`\n2. Test basic functionality using appropriate expectations (expect_snapshot)\n3. Test edge cases: NULL input, empty strings, missing arguments\n4. Test error conditions with expect_error()\n5. Each test_that() block should test one logical behavior\n",
+  "context": "Package: cli v3.6.5.9000\nDescription: Helpers for Developing Command Line Interfaces\nFunction: re_table\nTest patterns used: test_that\nExpectations used: expect_snapshot\n\nFunction Code:\n```r\nre_table <- function(...) {\n  lapply(gregexpr(...), function(x) {\n    res <- cbind(\n      start = x,\n      end = x + attr(x, \"match.length\") - 1,\n      length = attr(x, \"match.length\")\n    )\n    res <- res[res[, \"start\"] != -1, , drop = FALSE]\n  })\n}\n```",
+  "reference_test": "# No substantive reference patterns available",
+  "test_type": "unit",
+  "patterns": [
+    "test_that"
+  ],
+  "dependencies": [
+    "testthat"
+  ],
+  "split": "train",
+  "function_name": "re_table",
+  "quality_score": 0.585,
+  "constraints": {}
+}

@@ -1,0 +1,123 @@
+# GEPA Optimization Configuration
+# Settings for the Gradient-free Evolutionary Prompt Algorithm
+
+# GEPA Core Settings
+gepa:
+  # Population size - number of skill candidates per generation
+  population_size: 20
+  
+  # Maximum number of generations to run
+  max_generations: 50
+  
+  # Mutation rate (0.0 - 1.0) - probability of mutation per component
+  mutation_rate: 0.15
+  
+  # Crossover rate (0.0 - 1.0) - probability of crossover between parents
+  crossover_rate: 0.7
+  
+  # Elite size - number of top performers preserved unchanged
+  elite_size: 4
+  
+  # Tournament size for selection
+  tournament_size: 3
+  
+  # Random seed for reproducibility (null for random)
+  seed: null
+
+# Evaluation Settings
+evaluation:
+  # Number of tasks to evaluate in parallel
+  batch_size: 10
+  
+  # Timeout per task in seconds
+  timeout_per_task: 300
+  
+  # Number of parallel Docker workers
+  parallel_workers: 4
+  
+  # Maximum retries for failed evaluations
+  max_retries: 2
+  
+  # Use caching for repeated evaluations
+  use_cache: true
+  
+  # Cache directory
+  cache_dir: "./.cache/evaluations"
+
+# Skill Constraints
+constraints:
+  # Maximum ratio of content that can be mutated (0.0 - 1.0)
+  max_mutation_ratio: 0.3
+  
+  # Sections that must be preserved during mutation
+  preserve_sections:
+    - "## Required Packages"
+    - "## Environment Setup"
+    - "## Quick Start"
+  
+  # Patterns that should NOT be added
+  forbidden_additions:
+    - "skip_if_not_installed"
+    - "@not_tested"
+    - "expect_true(FALSE)"
+  
+  # Minimum instruction length
+  min_instruction_length: 50
+  
+  # Maximum skill file size in characters
+  max_skill_size: 50000
+
+# LLM Settings for Mutation
+llm:
+  # Model to use for reflection and mutation
+  model: "claude-3-5-sonnet-20241022"
+  
+  # Temperature for mutation generation
+  temperature: 0.8
+  
+  # Max tokens for mutation suggestions
+  max_tokens: 2000
+  
+  # System prompt for reflection
+  reflection_prompt: |
+    Analyze the test failure and suggest specific improvements to the skill prompt.
+    Focus on actionable changes that would help Claude generate better tests.
+
+# Early Stopping
+early_stopping:
+  # Enable early stopping
+  enabled: true
+  
+  # Number of generations without improvement before stopping
+  patience: 10
+  
+  # Minimum improvement threshold
+  min_improvement: 0.01
+  
+  # Minimum score to consider converged
+  convergence_threshold: 0.95
+
+# Checkpointing
+checkpoint:
+  # Save checkpoints every N generations
+  save_every: 5
+  
+  # Checkpoint directory
+  dir: "./checkpoints"
+  
+  # Keep last N checkpoints
+  keep_last: 3
+
+# Logging
+logging:
+  # Log level: DEBUG, INFO, WARNING, ERROR
+  level: "INFO"
+  
+  # Log file path
+  file: "./logs/optimization.log"
+  
+  # Log to console
+  console: true
+  
+  # Log detailed evaluation results
+  detailed: false

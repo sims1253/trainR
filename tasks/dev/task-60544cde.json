@@ -1,0 +1,20 @@
+{
+  "task_id": "task-60544cde",
+  "source_package": "cli",
+  "source_file": "R/ansi-utils.R",
+  "difficulty": "hard",
+  "instruction": "Add comprehensive edge case tests for `re_table`.\n\n\nExisting tests for reference:\n```r\n\n```\n\n\nThe existing tests cover basic functionality. Add tests for:\n1. NULL inputs to each argument\n2. Empty vectors/strings: character(0), \"\", integer(0)\n3. Boundary values: 0, 1, -1, NA, NaN, Inf\n4. Invalid input types (passing numeric where character expected, etc.)\n5. Missing arguments (use expect_error with class matching)\n6. Very long inputs (strings > 1000 chars, vectors > 10000 elements)\n",
+  "context": "Package: cli v3.6.5.9000\nDescription: Helpers for Developing Command Line Interfaces\nFunction: re_table\nTest patterns used: test_that\nExpectations used: expect_snapshot\n\nFunction Code:\n```r\nre_table <- function(...) {\n  lapply(gregexpr(...), function(x) {\n    res <- cbind(\n      start = x,\n      end = x + attr(x, \"match.length\") - 1,\n      length = attr(x, \"match.length\")\n    )\n    res <- res[res[, \"start\"] != -1, , drop = FALSE]\n  })\n}\n```",
+  "reference_test": "# No substantive reference patterns available",
+  "test_type": "unit",
+  "patterns": [
+    "test_that"
+  ],
+  "dependencies": [
+    "testthat"
+  ],
+  "split": "dev",
+  "function_name": "re_table",
+  "quality_score": 0.56,
+  "constraints": {}
+}

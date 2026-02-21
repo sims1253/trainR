@@ -1,0 +1,20 @@
+{
+  "task_id": "task-c8be8abb",
+  "source_package": "cli",
+  "source_file": "R/ansiex.R",
+  "difficulty": "medium",
+  "instruction": "Add proper test fixtures to the tests for `ansi_substring` using the withr package.\n\n\n\nRequirements:\n1. Identify tests that modify global state (options, env vars, working directory)\n2. Wrap state modifications with withr::local_* for automatic cleanup:\n   - withr::local_options() for R options\n   - withr::local_envvar() for environment variables\n   - withr::local_tempdir() for temporary directories\n   - withr::local_file() for temporary files\n3. Ensure tests can run in any order without side effects\n4. Use local_* (not with_*) inside test_that() blocks\n",
+  "context": "Package: cli v3.6.5.9000\nDescription: Helpers for Developing Command Line Interfaces\nFunction: ansi_substring\nParameters: text, first, last\nTest patterns used: test_that\nExpectations used: expect_identical\n\nFunction Code:\n```r\nansi_substring <- function(text, first, last = 1000000L) {\n  if (!is.character(text)) text <- as.character(text)\n  n <- max(lt <- length(text), length(first), length(last))\n  if (lt && lt < n) text <- rep_len(text, length.out = n)\n  text <- enc2utf8(text)\n  first <- rep_len(as.integer(first), n)\n  last <- rep_len(as.integer(last), n)\n  .Call(clic_ansi_substr, text, first, last)\n}\n```",
+  "reference_test": "# No substantive reference patterns available",
+  "test_type": "unit",
+  "patterns": [
+    "test_that"
+  ],
+  "dependencies": [
+    "testthat"
+  ],
+  "split": "dev",
+  "function_name": "ansi_substring",
+  "quality_score": 0.51,
+  "constraints": {}
+}

@@ -1,0 +1,49 @@
+# Minimal evaluation image for R package testing
+FROM rocker/r-ver:4.5.2
+
+LABEL maintainer="trainR"
+LABEL description="Evaluation sandbox for trainR skill optimization"
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# ── Layer 1: System deps (rarely changes) ──────────────────────────────────
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    curl \
+    wget \
+    gettext-base \
+    libcurl4-openssl-dev \
+    libssl-dev \
+    libxml2-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# ── Layer 2: R packages (slowest, changes least) ───────────────────────────
+RUN Rscript -e "install.packages('pak')"
+RUN Rscript -e "pak::pak(c('testthat', 'devtools', 'covr', 'withr', 'mockr', 'jsonlite'))"
+RUN Rscript -e "pak::pak('cli')"
+
+# ── Layer 3: Node.js (changes rarely) ──────────────────────────────────────
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
+# ── Layer 4: cc-mirror only (no standalone Claude CLI needed) ──────────────
+RUN npm install -g cc-mirror@latest
+
+# ── Layer 5: Non-root user (Claude CLI refuses --dangerously-skip-permissions as root)
+RUN useradd -m -s /bin/bash trainr \
+    && mkdir -p /home/trainr/.local/bin \
+    && mkdir -p /workspace/.claude/skills/testing-r-packages \
+    && mkdir -p /workspace/packages \
+    && chown -R trainr:trainr /workspace /home/trainr
+
+# ── Layer 6: Workspace + entrypoint (changes most often) ───────────────────
+ENV PATH="/home/trainr/.local/bin:${PATH}"
+
+COPY docker/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+WORKDIR /workspace
+
+ENTRYPOINT ["/entrypoint.sh"]
+CMD []

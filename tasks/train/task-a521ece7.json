@@ -1,0 +1,21 @@
+{
+  "task_id": "task-a521ece7",
+  "source_package": "cli",
+  "source_file": "R/aaa-utils.R",
+  "difficulty": "easy",
+  "instruction": "Add snapshot tests for `cli::abbrev` to capture complex output.\n\n\nExisting snapshot tests in this package:\n```r\nexpect_snapshot({\n    abbrev(\"123456789012345\")\n    abbrev(\"12345678901\")\n    abbrev(\"1234567890\")\n    abbrev(\"123456789\")\n    abbrev(\"12345\")\n    abbrev(\"1\")\n    abbrev(\"\")\n    abbrev(\"\\033[31m1234567890\\033[39m\")\n    abbrev(c(\"\\033[31m1234567890\\033[39m\", \"\", \"1234567890123\"), 5)\n    abbrev(rep(\"\\033[31m1234567890\\033[39m\", 5), 5)\n  })\n```\n\n\nSnapshot testing is appropriate when the function produces:\n- Formatted text output (messages, errors, warnings)\n- Complex data structures that are hard to test with expect_equal\n- Console output with ANSI formatting\n\nRequirements:\n1. Use expect_snapshot() for capturing printed output\n2. Use expect_snapshot(error = TRUE) for error message snapshots\n3. Use expect_snapshot(transform = ...) if output contains volatile data (timestamps, paths)\n4. Test with representative inputs that exercise different output formats\n",
+  "context": "Package: cli v3.6.5.9000\nDescription: Helpers for Developing Command Line Interfaces\nFunction: abbrev\nParameters: x, len\nTest patterns used: expect_snapshot\nExpectations used: expect_snapshot\n\nFunction Code:\n```r\nabbrev <- function(x, len = 10) {\n  # this is better than strtrim() because it adds ...\n  ansi_strtrim(x, len)\n}\n```",
+  "reference_test": "expect_snapshot({\n    abbrev(\"123456789012345\")\n    abbrev(\"12345678901\")\n    abbrev(\"1234567890\")\n    abbrev(\"123456789\")\n    abbrev(\"12345\")\n    abbrev(\"1\")\n    abbrev(\"\")\n    abbrev(\"\\033[31m1234567890\\033[39m\")\n    abbrev(c(\"\\033[31m1234567890\\033[39m\", \"\", \"1234567890123\"), 5)\n    abbrev(rep(\"\\033[31m1234567890\\033[39m\", 5), 5)\n  })",
+  "test_type": "snapshot",
+  "patterns": [
+    "expect_snapshot"
+  ],
+  "dependencies": [
+    "ps",
+    "testthat"
+  ],
+  "split": "train",
+  "function_name": "abbrev",
+  "quality_score": 0.675,
+  "constraints": {}
+}

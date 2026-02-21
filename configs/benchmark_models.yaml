@@ -1,0 +1,53 @@
+# Model configuration matrix for benchmarking
+# Each model is tested across the full task set
+#
+# provider: how the model is accessed
+# env: environment variables needed for this model
+# cc_mirror_provider: provider name for cc-mirror variant creation
+
+models:
+  - name: glm-4.7-flash
+    provider: zai
+    cc_mirror_provider: zai
+    env:
+      ANTHROPIC_BASE_URL: "https://api.z.ai/api/anthropic"
+    description: "Fast z.ai model for task generation"
+
+  - name: glm-4.7
+    provider: zai
+    cc_mirror_provider: zai
+    env:
+      ANTHROPIC_BASE_URL: "https://api.z.ai/api/anthropic"
+    description: "Standard z.ai model"
+
+  - name: glm-5
+    provider: zai
+    cc_mirror_provider: zai
+    env:
+      ANTHROPIC_BASE_URL: "https://api.z.ai/api/anthropic"
+    description: "Strongest z.ai model"
+
+# Uncomment to add direct Anthropic models (requires ANTHROPIC_API_KEY):
+#  - name: claude-sonnet-4
+#    provider: anthropic
+#    cc_mirror_provider: anthropic
+#    env:
+#      ANTHROPIC_BASE_URL: "https://api.anthropic.com"
+#    description: "Claude Sonnet 4 via Anthropic direct"
+
+# Benchmark settings
+settings:
+  # Number of times to run each task-model pair (for variance estimation)
+  repeats: 1
+  # Timeout per evaluation in seconds
+  timeout: 600
+  # Docker image to use
+  docker_image: "posit-gskill-eval:latest"
+  # Task splits to benchmark (usually dev or held_out)
+  task_splits:
+    - dev
+    - held_out
+  # Directory for results
+  results_dir: "results/benchmarks"
+  # Save full agent trajectories
+  save_trajectories: true

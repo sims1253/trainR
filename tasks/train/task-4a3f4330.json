@@ -1,0 +1,20 @@
+{
+  "task_id": "task-4a3f4330",
+  "source_package": "cli",
+  "source_file": "R/ansi-hyperlink.R",
+  "difficulty": "hard",
+  "instruction": "Add comprehensive edge case tests for `interpolate_parts`.\n\n\nExisting tests for reference:\n```r\n\n```\n```r\n\n```\n\n\nThe existing tests cover basic functionality. Add tests for:\n1. NULL inputs to each argument\n2. Empty vectors/strings: character(0), \"\", integer(0)\n3. Boundary values: 0, 1, -1, NA, NaN, Inf\n4. Invalid input types (passing numeric where character expected, etc.)\n5. Missing arguments (use expect_error with class matching)\n6. Very long inputs (strings > 1000 chars, vectors > 10000 elements)\n",
+  "context": "Package: cli v3.6.5.9000\nDescription: Helpers for Developing Command Line Interfaces\nFunction: interpolate_parts\nParameters: fmt, params\nTest patterns used: test_that\nExpectations used: expect_equal\n\nFunction Code:\n```r\ninterpolate_parts <- function(fmt, params) {\n  res <- interpolate_part(fmt, \"column\", params$column)\n  res <- interpolate_part(res, \"line\", params$line)\n  interpolate_part(res, \"path\", params$path)\n}\n```",
+  "reference_test": "# No substantive reference patterns available",
+  "test_type": "unit",
+  "patterns": [
+    "test_that"
+  ],
+  "dependencies": [
+    "testthat"
+  ],
+  "split": "train",
+  "function_name": "interpolate_parts",
+  "quality_score": 0.56,
+  "constraints": {}
+}

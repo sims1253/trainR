@@ -1,0 +1,193 @@
+# GEPA Optimization Configuration v1.1
+# Revised MVP settings with smaller parameters for faster iteration
+# Based on architect feedback for initial experiments
+
+# GEPA Core Settings (Reduced for MVP)
+gepa:
+  # Population size - reduced from 20 to 6 for faster iteration
+  population_size: 6
+  
+  # Maximum generations - reduced from 50 to 5 for MVP
+  max_generations: 5
+  
+  # Mutation rate - slightly increased for smaller population exploration
+  mutation_rate: 0.2
+  
+  # Crossover rate - reduced for more conservative changes
+  crossover_rate: 0.5
+  
+  # Elite size - top 2 candidates preserved unchanged
+  elite_size: 2
+  
+  # Tournament size for parent selection
+  tournament_size: 2
+  
+  # Fixed random seed for reproducibility
+  seed: 42
+
+# Evaluation Settings
+evaluation:
+  # Number of tasks to evaluate in parallel (reduced)
+  batch_size: 5
+  
+  # Timeout per task in seconds
+  timeout_per_task: 300
+  
+  # Number of parallel Docker workers (reduced)
+  parallel_workers: 2
+  
+  # Maximum retries for failed evaluations
+  max_retries: 2
+  
+  # Number of repeats for non-determinism handling
+  num_repeats: 2
+  
+  # Use caching for repeated evaluations
+  use_cache: true
+  
+  # Cache directory
+  cache_dir: "./.cache/evaluations"
+
+# Enhanced Scoring System (Multi-dimensional)
+scoring:
+  # Weight breakdown for final score
+  weights:
+    test_pass: 0.50      # Tests actually pass
+    style: 0.20          # Follows tidyverse style
+    pattern: 0.20        # Uses correct testthat 3+ patterns
+    compile: 0.10        # Code compiles without errors
+  
+  # Style checking options
+  style_checks:
+    check_indentation: true
+    check_naming: true
+    check_line_length: true
+    max_line_length: 100
+  
+  # Pattern compliance checks
+  pattern_checks:
+    require_describe_it: true
+    require_expect_prefix: true
+    check_fixture_usage: true
+
+# Skill Constraints
+constraints:
+  # Maximum ratio of content that can be mutated (0.0 - 1.0)
+  max_mutation_ratio: 0.3
+  
+  # Sections that must be preserved during mutation
+  preserve_sections:
+    - "## Required Packages"
+    - "## Environment Setup"
+    - "## Quick Start"
+  
+  # Patterns that should NOT be added
+  forbidden_additions:
+    - "skip_if_not_installed"
+    - "@not_tested"
+    - "expect_true(FALSE)"
+    - "skip('TODO')"
+  
+  # Minimum instruction length
+  min_instruction_length: 50
+  
+  # Maximum skill file size in characters
+  max_skill_size: 50000
+
+# LLM Settings for GEPA (z.ai Provider)
+llm:
+  # Task execution model (implementing agent)
+  # Using glm-4.7-flash for fast, efficient test generation
+  model_task: "${LLM_MODEL_TASK:-openai/glm-4.7-flash}"
+  
+  # Reflection model (GEPA judge)
+  # Using glm-5 for strong reasoning in optimization
+  model_reflection: "${LLM_MODEL_REFLECTION:-openai/glm-5}"
+  
+  # API settings (base URL only - LiteLLM appends /v1/messages)
+  api_base: "${LLM_API_BASE:-https://api.z.ai}"
+  
+  # Generation settings
+  max_tokens: 4096
+  temperature: 0.7
+  
+  # System prompt for reflection
+  reflection_prompt: |
+    Analyze the test failure and suggest specific improvements to the skill prompt.
+    Focus on actionable changes that would help Claude generate better tests.
+    Consider: error messages, pattern usage, style issues, and missing context.
+
+# Provider-Specific Configuration
+# LiteLLM handles routing automatically based on model prefix
+providers:
+  # z.ai coding plan (default)
+  zai:
+    api_base: "https://api.z.ai/v1"
+    # Models: anthropic/claude-sonnet-4-20250514, openai/gpt-5
+    
+  # OpenRouter
+  openrouter:
+    api_base: "https://openrouter.ai/api/v1"
+    # Models: anthropic/claude-sonnet-4, openai/gpt-5-turbo
+    # Set OPENROUTER_API_KEY env var
+    
+  # Anthropic direct
+  anthropic:
+    # Models: claude-3-5-sonnet-20241022, claude-3-opus-20240229
+    # Set ANTHROPIC_API_KEY env var
+
+# Early Stopping
+early_stopping:
+  # Enable early stopping
+  enabled: true
+  
+  # Number of generations without improvement before stopping
+  patience: 3
+  
+  # Minimum improvement threshold
+  min_improvement: 0.01
+  
+  # Minimum score to consider converged
+  convergence_threshold: 0.95
+
+# Checkpointing
+checkpoint:
+  # Save checkpoints every N generations
+  save_every: 1
+  
+  # Checkpoint directory
+  dir: "./checkpoints"
+  
+  # Keep last N checkpoints
+  keep_last: 5
+
+# Experiment Tracking
+experiment:
+  # Enable experiment tracking
+  enabled: true
+  
+  # Tracking backend (mlflow, local)
+  backend: "mlflow"
+  
+  # Log artifacts (skill snapshots, evaluation results)
+  log_artifacts: true
+  
+  # Log metrics every N evaluations
+  log_interval: 1
+  
+# Logging
+logging:
+  # Log level: DEBUG, INFO, WARNING, ERROR
+  level: "DEBUG"
+  
+  # Log file path
+  file: "./logs/optimization.log"
+  
+  # Log to console
+  console: true
+  
+  # Log detailed evaluation results
+  detailed: true
+  
+  # Log timing information
+  log_timing: true

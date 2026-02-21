@@ -1,0 +1,20 @@
+{
+  "task_id": "task-2d446430",
+  "source_package": "cli",
+  "source_file": "R/ansi-hyperlink.R",
+  "difficulty": "medium",
+  "instruction": "Write a complete testthat test file for `cli::get_hyperlink_format`.\n\nPackage: cli v3.6.5.9000\nDescription: Helpers for Developing Command Line Interfaces\nFunction: get_hyperlink_format\nParameters: type\nTest patterns used: test_that\nExpectations used: expect_equal\n\nFunction Code:\n```r\nget_hyperlink_format <- function(type = c(\"run\", \"help\", \"vignette\")) {\n  type <- match.arg(type)\n\n  key <- glue(\"hyperlink_{type}_url_format\")\n  sprt <- ansi_hyperlink_types()[[type]]\n\n  custom_fmt <- get_config_chr(key)\n  if (is.null(custom_fmt)) {\n    if (identical(attr(sprt, \"type\"), \"rstudio\")) {\n      fmt_type <- \"rstudio\"\n    } else {\n      fmt_type <- \"standard\"\n    }\n  } else {\n    fmt_type <- \"custom\"\n  }\n\n  variable <- c(run = \"code\", help = \"topic\", vignette = \"vignette\")\n  fmt <- switch(\n    fmt_type,\n    custom = custom_fmt,\n    rstudio = glue(\"ide:{type}:{{{variable[type]}}}\"),\n    standard = glue(\"x-r-{type}:{{{variable[type]}}}\")\n  )\n  fmt\n}\n```\n\nRequirements:\n1. Use test_that() blocks with descriptive names that reference `get_hyperlink_format`\n2. Test basic functionality using appropriate expectations (expect_equal)\n3. Test edge cases: NULL input, empty strings, missing arguments\n4. Test error conditions with expect_error()\n5. Each test_that() block should test one logical behavior\n",
+  "context": "Package: cli v3.6.5.9000\nDescription: Helpers for Developing Command Line Interfaces\nFunction: get_hyperlink_format\nParameters: type\nTest patterns used: test_that\nExpectations used: expect_equal\n\nFunction Code:\n```r\nget_hyperlink_format <- function(type = c(\"run\", \"help\", \"vignette\")) {\n  type <- match.arg(type)\n\n  key <- glue(\"hyperlink_{type}_url_format\")\n  sprt <- ansi_hyperlink_types()[[type]]\n\n  custom_fmt <- get_config_chr(key)\n  if (is.null(custom_fmt)) {\n    if (identical(attr(sprt, \"type\"), \"rstudio\")) {\n      fmt_type <- \"rstudio\"\n    } else {\n      fmt_type <- \"standard\"\n    }\n  } else {\n    fmt_type <- \"custom\"\n  }\n\n  variable <- c(run = \"code\", help = \"topic\", vignette = \"vignette\")\n  fmt <- switch(\n    fmt_type,\n    custom = custom_fmt,\n    rstudio = glue(\"ide:{type}:{{{variable[type]}}}\"),\n    standard = glue(\"x-r-{type}:{{{variable[type]}}}\")\n  )\n  fmt\n}\n```",
+  "reference_test": "# No substantive reference patterns available",
+  "test_type": "unit",
+  "patterns": [
+    "test_that"
+  ],
+  "dependencies": [
+    "testthat"
+  ],
+  "split": "train",
+  "function_name": "get_hyperlink_format",
+  "quality_score": 0.585,
+  "constraints": {}
+}
