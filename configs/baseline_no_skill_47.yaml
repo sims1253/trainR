@@ -1,0 +1,21 @@
+# No-Skill Baseline - glm-4.7
+model:
+  task: glm-4.7
+
+workers:
+  count: 4  # glm-4.7 has 5 concurrent limit
+
+skill:
+  no_skill: true
+
+tasks:
+  splits:
+    - dev
+    - held_out
+
+execution:
+  timeout: 600
+
+output:
+  dir: results/baselines
+  save_trajectories: true

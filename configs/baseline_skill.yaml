@@ -1,0 +1,23 @@
+# Current Skill Baseline Configuration
+# Measures performance with hand-authored skill
+
+model:
+  task: glm-4.5
+
+workers:
+  count: 8
+
+skill:
+  path: skills/testing-r-packages-orig.md
+
+tasks:
+  splits:
+    - dev
+    - held_out
+
+execution:
+  timeout: 600
+
+output:
+  dir: results/baselines
+  save_trajectories: true

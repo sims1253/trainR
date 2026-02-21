@@ -1,0 +1,21 @@
+# Skill Baseline - glm-4.7
+model:
+  task: glm-4.7
+
+workers:
+  count: 4
+
+skill:
+  path: skills/testing-r-packages-orig.md
+
+tasks:
+  splits:
+    - dev
+    - held_out
+
+execution:
+  timeout: 600
+
+output:
+  dir: results/baselines
+  save_trajectories: true

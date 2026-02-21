@@ -26,6 +26,7 @@ class EvaluationSandbox:
         task: Any,  # TestingTask from task_generator
         skill_prompt: str,
         package_dir: Path | None = None,
+        model: str = "glm-4.5",
     ) -> EvaluationResult:
         """Evaluate a single task with the given skill.
 
@@ -33,6 +34,7 @@ class EvaluationSandbox:
             task: The testing task to evaluate.
             skill_prompt: The skill prompt to use.
             package_dir: Path to the R package (defaults to packages/{source_package}).
+            model: Model to use for task execution (default: glm-4.5).
 
         Returns:
             EvaluationResult with score and details.
@@ -69,6 +71,7 @@ class EvaluationSandbox:
             task_instruction=task.instruction,
             task_context=task.context,
             package_dir=package_dir,
+            model=model,
         )
 
         # Parse results

@@ -1,0 +1,23 @@
+# No-Skill Baseline Configuration
+# Measures raw model capability without skill guidance
+
+model:
+  task: glm-4.5
+
+workers:
+  count: 8  # glm-4.5 supports 10 concurrent
+
+skill:
+  no_skill: true  # Empty skill content
+
+tasks:
+  splits:
+    - dev
+    - held_out
+
+execution:
+  timeout: 600
+
+output:
+  dir: results/baselines
+  save_trajectories: true

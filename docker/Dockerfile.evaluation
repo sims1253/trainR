@@ -27,8 +27,13 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
-# ── Layer 4: cc-mirror only (no standalone Claude CLI needed) ──────────────
+# ── Layer 4: cc-mirror + Pi CLI ────────────────────────────────────────────
 RUN npm install -g cc-mirror@latest
+
+# ── Layer 4.5: Pi CLI (for sandboxed agent runs) ───────────────────────────
+RUN curl -fsSL https://bun.sh/install | bash \
+    && /root/.bun/bin/bun install -g @mariozechner/pi-coding-agent
+ENV PATH="/root/.bun/bin:${PATH}"
 
 # ── Layer 5: Non-root user (Claude CLI refuses --dangerously-skip-permissions as root)
 RUN useradd -m -s /bin/bash trainr \

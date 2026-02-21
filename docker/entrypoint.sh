@@ -64,17 +64,20 @@ echo "$AGENT_PROMPT" > /tmp/agent_prompt.txt
 chown trainr:trainr /tmp/agent_prompt.txt
 
 # Write env vars for trainr user
+# Model selection via LLM_MODEL env var (default: glm-4.5)
+MODEL_SONNET="${LLM_MODEL:-glm-4.5}"
 cat > /tmp/trainr_env.sh <<EOF
 export ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY"
+export MODEL_SONNET="$MODEL_SONNET"
 export PATH="/home/trainr/.local/bin:\$PATH"
 EOF
 chown trainr:trainr /tmp/trainr_env.sh
 
 # Create cc-mirror variant as trainr user (Claude CLI refuses root)
-log "Setting up cc-mirror trainr-eval variant..."
+log "Setting up cc-mirror trainr-eval variant with model: $MODEL_SONNET"
 su - trainr -s /bin/bash -c "
     source /tmp/trainr_env.sh
-    echo yes | npx cc-mirror quick --provider zai --name trainr-eval --api-key \"\$ANTHROPIC_API_KEY\" --no-tui 2>/dev/null || {
+    echo yes | npx cc-mirror quick --provider zai --name trainr-eval --api-key \"\$ANTHROPIC_API_KEY\" --model-sonnet \"\$MODEL_SONNET\" --no-tui 2>/dev/null || {
         mkdir -p /home/trainr/.local/bin
         printf '#!/bin/bash\nexec claude \"\$@\"\n' > /home/trainr/.local/bin/trainr-eval
         chmod +x /home/trainr/.local/bin/trainr-eval
@@ -97,7 +100,7 @@ AGENT_OUTPUT=$(su - trainr -s /bin/bash -c "
     source /tmp/trainr_env.sh
     cd /workspace
     PROMPT=\$(cat /tmp/agent_prompt.txt)
-    trainr-eval --dangerously-skip-permissions -p \"\$PROMPT\" --max-turns 30 2>&1
+    trainr-eval --dangerously-skip-permissions -p "$PROMPT" --max-turns 50 2>&1
 ")
 AGENT_EXIT_CODE=$?
 set -e

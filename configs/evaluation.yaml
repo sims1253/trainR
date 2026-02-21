@@ -1,0 +1,62 @@
+# Default Evaluation Configuration
+# Used by: make evaluate-batch (default)
+
+# ─────────────────────────────────────────────────────────────
+# Model Selection
+# ─────────────────────────────────────────────────────────────
+model:
+  # Task execution model (agent that writes tests)
+  # glm-4.5: 10 concurrent, good for finding skill signal
+  # glm-4.7: 5 concurrent, stronger reasoning
+  task: glm-4.5
+  
+  # Reflection/judge model (GEPA optimization)
+  reflection: glm-5
+
+# ─────────────────────────────────────────────────────────────
+# Parallelism
+# ─────────────────────────────────────────────────────────────
+workers:
+  # Number of parallel Docker containers
+  # Keep below model concurrency limit
+  # glm-4.5: up to 8-10, glm-4.7: up to 4, glm-5: up to 2
+  count: 5
+  
+  # Auto-detect based on available memory (overrides count if true)
+  auto_detect: false
+
+# ─────────────────────────────────────────────────────────────
+# Skill Configuration
+# ─────────────────────────────────────────────────────────────
+skill:
+  # Path to skill file, or use no_skill: true for baseline
+  path: skills/testing-r-packages-orig.md
+  
+  # Alternative: run without skill (baseline)
+  # no_skill: true
+
+# ─────────────────────────────────────────────────────────────
+# Task Selection
+# ─────────────────────────────────────────────────────────────
+tasks:
+  dir: tasks
+  
+  # Which splits to evaluate
+  splits:
+    - dev
+    - held_out
+
+# ─────────────────────────────────────────────────────────────
+# Execution Settings
+# ─────────────────────────────────────────────────────────────
+execution:
+  timeout: 600
+  docker_image: posit-gskill-eval:latest
+  repeats: 1
+
+# ─────────────────────────────────────────────────────────────
+# Output
+# ─────────────────────────────────────────────────────────────
+output:
+  dir: results/evaluations
+  save_trajectories: true

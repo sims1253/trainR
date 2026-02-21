@@ -51,6 +51,33 @@ def main() -> None:
         help="LiteLLM model for reflection (default: LLM_MODEL_REFLECTION env or openai/glm-5)",
     )
     parser.add_argument(
+        "--model",
+        default="glm-4.5",
+        help="Model for task execution (default: glm-4.5)",
+    )
+    parser.add_argument(
+        "--models",
+        default=None,
+        help="Comma-separated list of models for multi-model optimization (e.g., glm-4.5,glm-4.6,glm-4.7)",
+    )
+    parser.add_argument(
+        "--no-skill",
+        action="store_true",
+        help="Start from empty skill (baseline optimization)",
+    )
+    parser.add_argument(
+        "--aggregation",
+        choices=["min", "mean", "weighted"],
+        default="min",
+        help="Score aggregation for multi-model: min (worst-case), mean, weighted (default: min)",
+    )
+    parser.add_argument(
+        "--parallel",
+        type=lambda x: x.lower() != "false",
+        default=True,
+        help="Enable parallel evaluation (default: true)",
+    )
+    parser.add_argument(
         "--docker-image",
         default="posit-gskill-eval:latest",
         help="Docker image for evaluation",
@@ -64,11 +91,22 @@ def main() -> None:
     )
 
     # Load seed skill
-    seed_path = Path(args.seed_skill)
-    if not seed_path.exists():
-        console.print(f"[red]Seed skill not found: {seed_path}[/red]")
-        sys.exit(1)
-    seed_skill = seed_path.read_text()
+    if args.no_skill:
+        seed_skill = ""  # Empty skill - let GEPA build from scratch
+        seed_skill_name = "no_skill"
+    else:
+        seed_path = Path(args.seed_skill)
+        if not seed_path.exists():
+            console.print(f"[red]Seed skill not found: {seed_path}[/red]")
+            sys.exit(1)
+        seed_skill = seed_path.read_text()
+        seed_skill_name = seed_path.stem
+
+    # Parse models for multi-model optimization
+    models_list = None
+    if args.models:
+        models_list = [m.strip() for m in args.models.split(",")]
+        console.print(f"[dim]Multi-model optimization: {models_list}[/dim]")
 
     # Load tasks
     tasks_dir = Path(args.tasks_dir)
@@ -85,10 +123,14 @@ def main() -> None:
         val_tasks = train_tasks
 
     # Show configuration
-    config_table = f"""Seed Skill: {args.seed_skill}
+    model_display = ", ".join(models_list) if models_list else args.model
+    config_table = f"""Seed Skill: {seed_skill_name}
 Train Tasks: {len(train_tasks)}
 Val Tasks: {len(val_tasks)}
 Max Metric Calls: {args.max_metric_calls}
+Models: {model_display}
+Aggregation: {args.aggregation if models_list else "N/A"}
+Parallel: {args.parallel}
 Reflection LM: {args.reflection_lm}
 Docker Image: {args.docker_image}"""
 
@@ -111,6 +153,10 @@ Docker Image: {args.docker_image}"""
             docker_image=args.docker_image,
             max_metric_calls=args.max_metric_calls,
             reflection_lm=args.reflection_lm,
+            model=args.model,
+            models=models_list,
+            aggregation=args.aggregation,
+            parallel_eval=args.parallel,
             run_dir=str(run_dir),
         )
 
@@ -145,10 +191,13 @@ Docker Image: {args.docker_image}"""
             "total_metric_calls": result.total_metric_calls,
             "num_candidates": len(result.candidates),
             "config": {
-                "seed_skill": str(args.seed_skill),
+                "seed_skill": seed_skill_name,
                 "train_tasks": len(train_tasks),
                 "val_tasks": len(val_tasks),
                 "max_metric_calls": args.max_metric_calls,
+                "models": models_list or [args.model],
+                "aggregation": args.aggregation,
+                "parallel": args.parallel,
                 "reflection_lm": args.reflection_lm,
             },
         }
