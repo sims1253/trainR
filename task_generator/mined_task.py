@@ -266,6 +266,12 @@ class MinedTask(BaseModel):
     solution: TaskSolution = Field(default_factory=TaskSolution, description="Solution hints")
     files: TaskFiles = Field(default_factory=TaskFiles, description="Related files")
 
+    @property
+    def source_package(self) -> str:
+        """Derive the package name from source.repo (e.g., 'tidyverse/readr' -> 'readr')."""
+        repo = self.source.repo
+        return repo.split("/")[-1] if "/" in repo else repo
+
     @classmethod
     def from_pr_and_schema(
         cls,

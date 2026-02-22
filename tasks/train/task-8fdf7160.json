@@ -1,0 +1,20 @@
+{
+  "task_id": "task-8fdf7160",
+  "source_package": "plumber",
+  "source_file": "R/parse-body.R",
+  "difficulty": "hard",
+  "instruction": "Add mocking to isolate `parse_body` from its external dependencies.\n\n\nExisting mocking patterns in this package:\n```r\nlocal_mocked_bindings(\n    parse_body = function(body, content_type = \"unknown\", parsers = NULL) {\n      print(content_type)\n      body\n    }\n  )\n```\n\n\nRequirements:\n1. Identify external dependencies in the function (system calls, file I/O, other packages)\n2. Use testthat::local_mocked_bindings() to mock each dependency\n3. Test both success and failure scenarios via mock return values\n4. Verify the function handles mock errors gracefully\n5. Ensure tests are deterministic (no network calls, no file system side effects)\n",
+  "context": "Package: plumber v1.3.3.9000\nDescription: An API Generator for R\nFunction: parse_body\nParameters: body, content_type, parsers\nTest patterns used: local_mocked_bindings\n\nFunction Code:\n```r\nparse_body <- function(body, content_type = NULL, parsers = NULL) {\n  if (!is.raw(body)) {body <- charToRaw(body)}\n  toparse <- list(value = body, content_type = content_type, parsers = parsers)\n  parse_raw(toparse)\n}\n```",
+  "reference_test": "local_mocked_bindings(\n    parse_body = function(body, content_type = \"unknown\", parsers = NULL) {\n      print(content_type)\n      body\n    }\n  )",
+  "test_type": "integration",
+  "patterns": [
+    "local_mocked_bindings"
+  ],
+  "dependencies": [
+    "testthat"
+  ],
+  "split": "train",
+  "function_name": "parse_body",
+  "quality_score": 0.59,
+  "constraints": {}
+}

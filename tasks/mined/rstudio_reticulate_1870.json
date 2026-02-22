@@ -1,0 +1,51 @@
+{
+  "task_id": "rstudio_reticulate_1870",
+  "source": {
+    "repo": "rstudio/reticulate",
+    "pr_number": 1870,
+    "base_commit": "bc1b0737da54fd39de44c572d85c9f8ff6683819",
+    "head_commit": "c81e95e87584f7b3c0b506011e296a297f362d0e",
+    "merged_commit": "768e60087cfe26487a1ad7071f4173821296568c",
+    "pr_url": "https://github.com/rstudio/reticulate/pull/1870",
+    "merged_at": "2025-12-19T13:31:35+00:00",
+    "issue_url": "https://github.com/rstudio/reticulate/issues/1868"
+  },
+  "problem_statement": {
+    "title": "Fix embedded Python SIGPIPE handling",
+    "body": "\r\nWhen reticulate initializes Python with `Py_InitializeEx(0)`, CPython does not install its default signal dispositions (including ignoring `SIGPIPE`). This can surface as R's `Error: ignoring SIGPIPE signal` when Python code writes to a closed pipe.\r\n\r\n### Changes\r\n- Ignore `SIGPIPE` on Unix immediately after initialization (mirrors CPython default) and restore the previous handler on `py_finalize()`.\r\n- Add a regression test that exercises a broken-pipe write from embedded Python. Closes #1868.",
+    "issue_title": "SIGPIPE error when running PyMC through reticulate",
+    "issue_body": "Hi,\n\nThanks for all your efforts on `reticulate`, it's a great package. I am running into a problem when trying to run some PyMC code using `reticulate`, where I am getting a `SIGPIPE` error. The code works fine if I run through Python directly. I have included a reprex below. (Disclaimer: I am not a native Python user, but have followed the guidance as best as possible.) (This is running on Ubuntu 24.04.)\n\nFirstly, I installed PyMC using `conda` using the installation instructions below. I also found that I had to install a version of R within the same `conda` environment to avoid further errors. (The PyMC documentation strongly recommends using `conda`, hence why I have installed in this way.)\n\n```\nconda create -c conda-forge -n pymc_env \"pymc>=5\"\nconda install -c conda-forge -n pymc_env r-base r-tidyverse r-rms r-reticulate\n```\n\nThen I can activate the environment using\n\n```\nconda activate pymc_env\n```\n\nand then load the conda version of R. I then have a Python script called `reprex.py`, containing:\n\n```\nimport pymc as pm\nimport numpy as np\nimport arviz as az\n\nRANDOM_SEED = 8927\nrng = np.random.default_rng(RANDOM_SEED)\n\nsize = 200\ntrue_intercept = 1\ntrue_slope = 2\n\n## simulate some data\nx = np.linspace(0, 1, size)\ntrue_regression_line = true_intercept + true_slope * x\ny = true_regression_line + rng.normal(scale = 0.5, size = size)\n\nwith pm.Model() as model:\n  # Define priors\n  sigma = pm.HalfCauchy(\"sigma\", beta = 10)\n  intercept = pm.Normal(\"Intercept\", 0, sigma = 20)\n  slope = pm.Normal(\"slope\", 0, sigma = 20)\n\n  # Define likelihood\n  likelihood = pm.Normal(\"y\", mu = intercept + slope * x, sigma = sigma, observed = y)\n  \n  # draw 3000 posterior samples using NUTS sampling\n  idata = pm.sample(3000)\n\n```\n\nand then in R I can run\n\n```\n## load reticulate\nlibrary(reticulate)\nuse_condaenv(\"pymc_env\")\n\n## read Python file\nsource_python(\"reprex.py\")\n```\n\nand this runs the NUTS algorithm correctly, but then returns:\n\n```\nError in py_run_file_impl(file, local, convert) : ignoring SIGPIPE signal\n```\n\nThis happens when trying to return the `idata` object as far as I can tell.\n\nIf I run `reprex.py` in Python directly it runs fine, so I don't know whether this is a bug with `reticulate`, or whether I have implemented something incorrectly, but if anyone has any suggestions that would be super helpful.\n\nMany thanks.\n"
+  },
+  "patch": "diff --git a/NEWS.md b/NEWS.md\nindex 40a826173..8e2eec7fb 100644\n--- a/NEWS.md\n+++ b/NEWS.md\n@@ -1,5 +1,7 @@\n # reticulate (development version)\n \n+- Fix spurious `Error: ignoring SIGPIPE signal` on Unix when embedded Python writes to a closed pipe (#1868).\n+\n # reticulate 1.44.1\n \n - The default Python version in `install_python()` \ndiff --git a/src/python.cpp b/src/python.cpp\nindex c0b4fb53d..83abcf641 100644\n--- a/src/python.cpp\n+++ b/src/python.cpp\n@@ -2853,6 +2853,11 @@ static void interrupt_handler(int signum) {\n \n PyOS_sighandler_t orig_interrupt_handler = NULL;\n \n+#ifndef _WIN32\n+static bool s_restore_sigpipe_handler = false;\n+static PyOS_sighandler_t s_orig_sigpipe_handler = SIG_DFL;\n+#endif\n+\n PyOS_sighandler_t install_interrupt_handlers_() {\n   // Installs a C handler and a Python handler\n   // Exported as an R symbol in case the user did some action that cleared the\n@@ -3171,6 +3176,16 @@ void py_initialize(const std::string& python,\n       // initialize python\n       Py_InitializeEx(0); // 0 means \"do not install signal handlers\"\n       s_was_python_initialized_by_reticulate = true;\n+\n+#ifndef _WIN32\n+      // Python ignores SIGPIPE by default to avoid the process being\n+      // interrupted during normal pipe / IPC usage (EPIPE is handled as an\n+      // exception instead). Because reticulate uses Py_InitializeEx(0), we\n+      // must explicitly mirror that behavior.\n+      s_orig_sigpipe_handler = PyOS_setsig(SIGPIPE, SIG_IGN);\n+      s_restore_sigpipe_handler = true;\n+#endif\n+\n       const wchar_t *argv[1] = {s_python_v3.c_str()};\n       PySys_SetArgv_v3(1, const_cast<wchar_t**>(argv));\n \n@@ -3262,6 +3277,14 @@ void py_finalize() {\n     Py_MakePendingCalls();\n     if (orig_interrupt_handler)\n       reticulate_setsig(SIGINT, orig_interrupt_handler);\n+\n+#ifndef _WIN32\n+    if (s_restore_sigpipe_handler) {\n+      PyOS_setsig(SIGPIPE, s_orig_sigpipe_handler);\n+      s_restore_sigpipe_handler = false;\n+    }\n+#endif\n+\n     is_py_finalized = true;\n     Py_Finalize();\n   }",
+  "test_patch": "diff --git a/tests/testthat/test-sigpipe.R b/tests/testthat/test-sigpipe.R\nnew file mode 100644\nindex 000000000..895f336af\n--- /dev/null\n+++ b/tests/testthat/test-sigpipe.R\n@@ -0,0 +1,20 @@\n+test_that(\"SIGPIPE does not interrupt embedded Python\", {\n+  testthat::skip_on_os(\"windows\")\n+  skip_if_no_python()\n+\n+  err <- tryCatch(\n+    {\n+      py_run_string(\"import os; r,w=os.pipe(); os.close(r); os.write(w,b'x')\")\n+      NULL\n+    },\n+    error = function(e) e\n+  )\n+\n+  expect_true(inherits(err, \"error\"))\n+  expect_false(grepl(\n+    \"ignoring SIGPIPE signal\",\n+    conditionMessage(err),\n+    fixed = TRUE\n+  ))\n+  expect_true(grepl(\"BrokenPipeError|\\\\[Errno 32\\\\]\", conditionMessage(err)))\n+})\n",
+  "tests": {
+    "fail_to_pass": [
+      "test_that('SIGPIPE does not interrupt embedded Python', { ... }) - Test creates a pipe, closes the read end, and writes to the write end. Should raise BrokenPipeError, not 'ignoring SIGPIPE signal' error."
+    ],
+    "pass_to_pass": [
+      "Existing reticulate tests should continue to pass",
+      "Python initialization and finalization should work correctly",
+      "Signal handling for SIGINT should remain unaffected"
+    ]
+  },
+  "metadata": {
+    "task_type": "bug_fix",
+    "difficulty": "medium",
+    "quality_score": 8,
+    "mined_at": "2026-02-22T19:03:31.894610+00:00",
+    "key_changes": [
+      "Add static variables to track SIGPIPE handler state: `s_restore_sigpipe_handler` (bool) and `s_orig_sigpipe_handler` (PyOS_sighandler_t)",
+      "In py_initialize(), after Py_InitializeEx(0), call `PyOS_setsig(SIGPIPE, SIG_IGN)` and save the original handler",
+      "In py_finalize(), restore the original SIGPIPE handler using `PyOS_setsig(SIGPIPE, s_orig_sigpipe_handler)`",
+      "Wrap all SIGPIPE code in `#ifndef _WIN32` preprocessor guards"
+    ],
+    "potential_pitfalls": [
+      "Forgetting to wrap code in `#ifndef _WIN32` guards (SIGPIPE doesn't exist on Windows)",
+      "Not saving the original handler before setting SIG_IGN",
+      "Not restoring the handler on finalization (could affect R's signal handling after Python is shut down)",
+      "Setting the handler before Py_InitializeEx(0) instead of after"
+    ]
+  },
+  "instruction": "Fix the SIGPIPE signal handling issue in reticulate's Python initialization. When reticulate initializes Python with `Py_InitializeEx(0)`, CPython does not install its default signal dispositions (including ignoring SIGPIPE). This causes R's 'Error: ignoring SIGPIPE signal' when embedded Python code writes to a closed pipe. The fix should: (1) Ignore SIGPIPE on Unix immediately after Python initialization to mirror CPython's default behavior, and (2) Restore the previous SIGPIPE handler on `py_finalize()`.",
+  "context": "The relevant code is in src/python.cpp. Key functions are `py_initialize()` and `py_finalize()`. Python provides `PyOS_setsig()` for signal handling. The fix should use `#ifndef _WIN32` guards since SIGPIPE is Unix-specific. Pattern to follow: similar to how `orig_interrupt_handler` is saved and restored for SIGINT."
+}

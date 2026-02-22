@@ -1,0 +1,48 @@
+{
+  "task_id": "r-lib_httr2_822",
+  "source": {
+    "repo": "r-lib/httr2",
+    "pr_number": 822,
+    "base_commit": "43ca7827b295e4beee2459f637433675d5724f22",
+    "head_commit": "5952c6cd87c5c598ef3c755456bb17042ef6f5d1",
+    "merged_commit": "362d28a0676719cc054e2db032f5b8148a33c981",
+    "pr_url": "https://github.com/r-lib/httr2/pull/822",
+    "merged_at": "2025-12-05T16:49:28+00:00",
+    "issue_url": "https://github.com/r-lib/httr2/issues/820"
+  },
+  "problem_statement": {
+    "title": "Always refill the bucket when taking a token",
+    "body": "Fixes #820",
+    "issue_title": "req_throttle() error: take_token() sometimes returns negative values",
+    "issue_body": "### Reprex:\n\n``` r\nlibrary(httr2)\n# Setup the query\nurl <- \"https://whatever.com\"\nreq <- request(url) |>\n    req_throttle(capacity = 5, fill_time_s = 5)\n\nSys.sleep(2)\n\n# Simulate fast use of req_throttle tokens\nfor (n in 1:15) {\n    print(httr2:::the$throttle[[req$policies$throttle_realm]]$take_token())\n}\n#> [1] 0\n#> [1] 0\n#> [1] 0\n#> [1] 0\n#> [1] 0\n#> [1] -1\n#> [1] 0\n#> [1] 1\n#> [1] 2\n#> [1] 3\n#> [1] 4\n#> [1] 5\n#> [1] 6\n#> [1] 7\n#> [1] 8\n```\n\n<sup>Created on 2025-12-05 with [reprex v2.1.1](https://reprex.tidyverse.org)</sup>\n\n### Why this is an issue\nThis is an issue because the internal `httr2:::sys_sleep()` function used internally by `req_perform()` does not handle that edge case gracefully:\n\n```r\n...\nsys_sleep(throttle_delay(req), \"for throttling delay\")\n...\n```\n(see: [L104](https://github.com/r-lib/httr2/blob/0dcc9e05eb0744f371f4681f3181eaa75dd0a3b2/R/req-perform.R#L104))\n\n...as it only checks explicitly for time == 0 and therefore just goes ahead and feeds negative values into Sys.sleep() \u2013 as shown below:\n\n``` r\nhttr2:::sys_sleep\n#> function (seconds, task, fps = 10, progress = NULL) \n#> {\n#>     check_number_decimal(seconds)\n#>     check_string(task)\n#>     check_number_decimal(fps)\n#>     progress <- progress %||% getOption(\"httr2_progress\", !is_testing())\n#>     check_bool(progress, allow_null = TRUE)\n#>     if (seconds == 0) {\n#>         return(invisible())\n#>     }\n#>     if (!progress) {\n#>         cli::cli_alert(\"Waiting {round(seconds, 2)}s {task}\")\n#>         Sys.sleep(seconds)\n#>         return(invisible())\n#>     }\n#>     start <- cur_time()\n#>     signal(\"\", class = \"httr2_sleep\", seconds = seconds)\n#>     cli::cli_progress_bar(format = \"Waiting {ceiling(seconds)}s {task} {cli::pb_bar}\", \n#>         total = seconds * fps)\n#>     while ({\n#>         left <- start + seconds - cur_time()\n#>         left > 0\n#>     }) {\n#>         Sys.sleep(min(1/fps, left))\n#>         cli::cli_progress_update(set = (seconds - left) * fps)\n#>     }\n#>     cli::cli_progress_done()\n#>     invisible()\n#> }\n#> <bytecode: 0x110a958a0>\n#> <environment: namespace:httr2>\n```\n\n<sup>Created on 2025-12-05 with [reprex v2.1.1](https://reprex.tidyverse.org)</sup>\n\n### How I found the issue\n\nMy self-hosted github runner regularly throws this error:\n\n<img width=\"530\" height=\"444\" alt=\"Image\" src=\"https://github.com/user-attachments/assets/703cafb1-68b7-44f5-be40-32554b9a6e3c\" />\n\n### Workarounds\n\nI haven't found any yet.\n\n(Except to stop using req_throttle, of course.)\n"
+  },
+  "patch": "diff --git a/R/req-throttle.R b/R/req-throttle.R\nindex 78b178da..8d958a92 100644\n--- a/R/req-throttle.R\n+++ b/R/req-throttle.R\n@@ -152,7 +152,6 @@ TokenBucket <- R6::R6Class(\n       if (self$tokens >= 1) {\n         0\n       } else {\n-        self$refill()\n         (1 - self$tokens) / self$fill_rate\n       }\n     },\n@@ -161,6 +160,7 @@ TokenBucket <- R6::R6Class(\n     # Might cause tokens to drop below 0 temporarily so if you don't end up\n     # waiting this long, you need to return the token\n     take_token = function() {\n+      self$refill()\n       wait <- self$token_wait_time()\n       self$tokens <- self$tokens - 1\n       wait",
+  "test_patch": "diff --git a/tests/testthat/test-req-throttle.R b/tests/testthat/test-req-throttle.R\nindex ba8316f6..b0dbcb46 100644\n--- a/tests/testthat/test-req-throttle.R\n+++ b/tests/testthat/test-req-throttle.R\n@@ -102,3 +102,24 @@ test_that(\"token bucket handles fractions correctly\", {\n   mock_time <- mock_time + 0.1\n   expect_equal(bucket$refill(), 0)\n })\n+\n+test_that(\"never returns negative time\", {\n+  mock_time <- 0\n+  local_mocked_bindings(unix_time = function() mock_time)\n+\n+  bucket <- TokenBucket$new(capacity = 5, fill_rate = 1)\n+  mock_time <- 5\n+\n+  # first five are free\n+  replicate(5, expect_equal(bucket$take_token(), 0))\n+\n+  # we get another 5 after 5 seconds\n+  mock_time <- mock_time + 5\n+  replicate(5, expect_equal(bucket$take_token(), 0))\n+\n+  # if we only wait a second, we only get one\n+  mock_time <- mock_time + 1\n+  expect_equal(bucket$take_token(), 0)\n+  expect_equal(bucket$take_token(), 1)\n+  expect_equal(bucket$take_token(), 2)\n+})\n",
+  "tests": {
+    "fail_to_pass": [
+      "test_that('never returns negative time', { ... }) - Verifies take_token() always returns non-negative wait times even when tokens are depleted"
+    ],
+    "pass_to_pass": [
+      "test_that('token bucket basic works', { ... })",
+      "test_that('token bucket handles fractions correctly', { ... })"
+    ]
+  },
+  "metadata": {
+    "task_type": "bug_fix",
+    "difficulty": "easy",
+    "quality_score": 9,
+    "mined_at": "2026-02-22T19:04:41.880865+00:00",
+    "key_changes": [
+      "Move the self$refill() call from token_wait_time() to take_token()",
+      "Ensure refill happens before calculating wait time and decrementing tokens",
+      "Remove the refill() call from the else branch in token_wait_time()"
+    ],
+    "potential_pitfalls": [
+      "Refilling at the wrong time can cause token count to go negative",
+      "The order of operations matters: refill first, then calculate wait, then decrement",
+      "Need to understand that token_wait_time() is also called separately, so refill placement affects both paths"
+    ]
+  },
+  "instruction": "Fix the bug in the TokenBucket class where take_token() sometimes returns negative wait times. The issue occurs when the token bucket is depleted and subsequent calls to take_token() return negative values instead of the correct positive wait times. The fix involves ensuring the bucket is always refilled before calculating wait time and taking a token.",
+  "context": "The TokenBucket class implements a rate-limiting token bucket algorithm. Key methods:\n\n- `refill()`: Adds tokens based on elapsed time since last refill\n- `token_wait_time()`: Returns time to wait before a token is available (0 if tokens >= 1)\n- `take_token()`: Takes a token and returns wait time (can be 0 if token available)\n\nThe bug manifests when:\n1. Bucket has tokens depleted (tokens < 1)\n2. token_wait_time() is called, which refills and calculates wait\n3. take_token() subtracts 1 from tokens, potentially making it negative\n4. Next call sees negative tokens and returns negative wait time"
+}

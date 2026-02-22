@@ -1,0 +1,20 @@
+{
+  "task_id": "task-12c414bb",
+  "source_package": "forcats",
+  "source_file": "R/explicit_na.R",
+  "difficulty": "hard",
+  "instruction": "Add comprehensive edge case tests for `fct_explicit_na`.\n\n\nExisting tests for reference:\n```r\n\n```\n\n\nThe existing tests cover basic functionality. Add tests for:\n1. NULL inputs to each argument\n2. Empty vectors/strings: character(0), \"\", integer(0)\n3. Boundary values: 0, 1, -1, NA, NaN, Inf\n4. Invalid input types (passing numeric where character expected, etc.)\n5. Missing arguments (use expect_error with class matching)\n6. Very long inputs (strings > 1000 chars, vectors > 10000 elements)\n",
+  "context": "Package: forcats v1.0.1.9000\nDescription: Tools for Working with Categorical Variables (Factors)\nFunction: fct_explicit_na\nParameters: f, na_level\nTest patterns used: test_that\nExpectations used: expect_snapshot\n\nFunction Code:\n```r\nfct_explicit_na <- function(f, na_level = \"(Missing)\") {\n  lifecycle::deprecate_warn(\n    when = \"1.0.0\",\n    what = \"fct_explicit_na()\",\n    with = \"fct_na_value_to_level()\"\n  )\n\n  f <- check_factor(f)\n\n  is_missing <- is.na(f)\n  is_missing_level <- is.na(levels(f))\n\n  if (any(is_missing)) {\n    f <- fct_expand(f, na_level)\n    f[is_missing] <- na_level\n\n    f\n  } else if (any(is_missing_level)) {\n    levs <- levels(f)\n    levs[is.na(levs)] <- na_level\n\n    lvls_revalue(f, levs)\n  } else {\n    f\n  }\n}\n```",
+  "reference_test": "# No substantive reference patterns available",
+  "test_type": "unit",
+  "patterns": [
+    "test_that"
+  ],
+  "dependencies": [
+    "testthat"
+  ],
+  "split": "train",
+  "function_name": "fct_explicit_na",
+  "quality_score": 0.56,
+  "constraints": {}
+}

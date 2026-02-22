@@ -1,0 +1,20 @@
+{
+  "task_id": "task-565b7ced",
+  "source_package": "usethis",
+  "source_file": "R/addin.R",
+  "difficulty": "easy",
+  "instruction": "A test for `use_addin` is failing. Diagnose and fix the issue.\n\n\nFailing test:\n```r\n\n```\n\n\nSteps:\n1. Read the function source code to understand expected behavior\n2. Compare the test expectations with actual function behavior\n3. Fix the test if expectations are wrong, or fix the function if it has a bug\n4. Ensure the fix maintains backward compatibility\n5. Run the tests to verify the fix\n",
+  "context": "Package: usethis v3.2.1.9000\nDescription: Automate Package and Project Setup\nFunction: use_addin\nParameters: addin, open\nTest patterns used: test_that\nExpectations used: expect_equal\n\nFunction Code:\n```r\nuse_addin <- function(addin = \"new_addin\", open = rlang::is_interactive()) {\n  addin_dcf_path <- proj_path(\"inst\", \"rstudio\", \"addins.dcf\")\n\n  if (!file_exists(addin_dcf_path)) {\n    create_directory(proj_path(\"inst\", \"rstudio\"))\n    file_create(addin_dcf_path)\n    ui_bullets(c(\"v\" = \"Creating {.path {pth(addin_dcf_path)}}\"))\n  }\n\n  addin_info <- render_template(\"addins.dcf\", data = list(addin = addin))\n  addin_info[length(addin_info) + 1] <- \"\"\n  write_utf8(addin_dcf_path, addin_info, append = TRUE)\n  ui_bullets(c(\n    \"v\" = \"Adding binding to {.fun {addin}} to {.path addins.dcf}\"\n  ))\n\n  if (open) {\n    edit_file(addin_dcf_path)\n  }\n\n  invisible(TRUE)\n}\n```",
+  "reference_test": "# No substantive reference patterns available",
+  "test_type": "unit",
+  "patterns": [
+    "test_that"
+  ],
+  "dependencies": [
+    "testthat"
+  ],
+  "split": "held_out",
+  "function_name": "use_addin",
+  "quality_score": 0.51,
+  "constraints": {}
+}

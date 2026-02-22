@@ -1,0 +1,55 @@
+{
+  "task_id": "tidyverse_readr_1615",
+  "source": {
+    "repo": "tidyverse/readr",
+    "pr_number": 1615,
+    "base_commit": "c2a334f192ff0160a2e5e9afc0982ad1bcf543af",
+    "head_commit": "06c790fe99bb3e734d7a354589085b0d0b431c9a",
+    "merged_commit": "320d56e717e40045298cebc43880a9d44ccb78f2",
+    "pr_url": "https://github.com/tidyverse/readr/pull/1615",
+    "merged_at": "2026-02-18T20:58:03+00:00",
+    "issue_url": "https://github.com/tidyverse/readr/pull/1606"
+  },
+  "problem_statement": {
+    "title": "Handle empty raw input in `read_file()` and `read_file_raw()`",
+    "body": "Closes #1606, closes #1590",
+    "issue_title": "add vector length check for read_file_ functions.",
+    "issue_body": "Fixes #1590 \r\n\r\n@tinarozsos and I have worked on this. `read_file()` and `read_file_raw()` both cause a segmentation fault (crashing R) when reading an empty raw vector. This issue does not arise when using other types of empty vector because those are caught and errored by other aspects of the function before reaching the relevant code. Nor does the behaviour arise when using a non-empty raw vector (e.g. `raw(1)`). There are potentially two issues here: 1) the code reaches a point where it attempts to access unowned memory; 2) the C code doesn't catch that the memory is unowned and still tries to access it. We address the first issue.\r\n\r\nBecause all the affected functions use `datasource()` to dispatch to the relevant function, we add a simple check for a vector size greater than 0, also providing an informative error message. We also add a couple of tests for this behaviour.\r\n\r\nWe hope this is helpful :).\r\n"
+  },
+  "patch": "diff --git a/R/file.R b/R/file.R\nindex 66a97494..8b7e3bf0 100644\n--- a/R/file.R\n+++ b/R/file.R\n@@ -25,7 +25,7 @@\n #'\n #' read_lines(I(x))\n read_file <- function(file, locale = default_locale()) {\n-  if (empty_file(file)) {\n+  if (empty_file(file) || empty_raw(file)) {\n     return(\"\")\n   }\n \n@@ -36,7 +36,7 @@ read_file <- function(file, locale = default_locale()) {\n #' @export\n #' @rdname read_file\n read_file_raw <- function(file) {\n-  if (empty_file(file)) {\n+  if (empty_file(file) || empty_raw(file)) {\n     return(raw())\n   }\n \ndiff --git a/R/source.R b/R/source.R\nindex ed79ae37..73551309 100644\n--- a/R/source.R\n+++ b/R/source.R\n@@ -323,6 +323,10 @@ empty_file <- function(x) {\n     file.info(x, extra_cols = FALSE)$size == 0\n }\n \n+empty_raw <- function(x) {\n+  is.raw(x) && length(x) == 0\n+}\n+\n #' Returns values from the clipboard\n #'\n #' This is useful in the [read_delim()] functions to read from the clipboard.",
+  "test_patch": "diff --git a/tests/testthat/test-read-file.R b/tests/testthat/test-read-file.R\nindex bcec681a..e69ae6bb 100644\n--- a/tests/testthat/test-read-file.R\n+++ b/tests/testthat/test-read-file.R\n@@ -68,6 +68,10 @@ test_that(\"read_file returns \\\"\\\" on an empty file\", {\n   expect_equal(read_file(test_path(\"empty-file\")), \"\")\n })\n \n+test_that(\"read_file returns \\\"\\\" on an empty raw vector\", {\n+  expect_equal(read_file(raw()), \"\")\n+})\n+\n # read_file_raw ---------------------------------------------------------------\n \n test_that(\"read_file_raw works with a local text file\", {\n@@ -84,3 +88,7 @@ test_that(\"read_file_raw works with a character datasource\", {\n test_that(\"read_file_raw returns raw() on an empty file\", {\n   expect_equal(read_file_raw(test_path(\"empty-file\")), raw())\n })\n+\n+test_that(\"read_file_raw returns raw() on an empty raw vector\", {\n+  expect_equal(read_file_raw(raw()), raw())\n+})\n",
+  "tests": {
+    "fail_to_pass": [
+      "read_file(raw()) returns \"\" (empty string)",
+      "read_file_raw(raw()) returns raw() (empty raw vector)",
+      "read_file() does not crash with segmentation fault on empty raw vector",
+      "read_file_raw() does not crash with segmentation fault on empty raw vector"
+    ],
+    "pass_to_pass": [
+      "read_file returns \"\" on an empty file",
+      "read_file_raw returns raw() on an empty file",
+      "read_file works with normal file input",
+      "read_file_raw works with normal file input"
+    ]
+  },
+  "metadata": {
+    "task_type": "bug_fix",
+    "difficulty": "easy",
+    "quality_score": 8,
+    "mined_at": "2026-02-22T18:37:12.810350+00:00",
+    "key_changes": [
+      "Create new helper function `empty_raw()` that checks `is.raw(x) && length(x) == 0`",
+      "Add `|| empty_raw(file)` condition to the early return check in `read_file()`",
+      "Add `|| empty_raw(file)` condition to the early return check in `read_file_raw()`",
+      "Place `empty_raw()` function in R/source.R near `empty_file()`"
+    ],
+    "potential_pitfalls": [
+      "Must check both `is.raw(x)` AND `length(x) == 0` - checking only one condition is insufficient",
+      "Return appropriate empty values: `\"\"` for `read_file()`, `raw()` for `read_file_raw()`",
+      "Don't break existing `empty_file()` handling - use OR condition, not replacement",
+      "Non-empty raw vectors (e.g., `raw(1)`) should continue to work normally"
+    ]
+  },
+  "instruction": "Fix a segmentation fault bug in `read_file()` and `read_file_raw()` functions that occurs when passing an empty raw vector (e.g., `raw()`). The functions should handle this edge case gracefully instead of crashing R. For `read_file()`, return an empty string `\"\"` when given an empty raw vector. For `read_file_raw()`, return an empty raw vector `raw()` when given an empty raw vector. Create a helper function `empty_raw()` to check for this condition, similar to the existing `empty_file()` helper.",
+  "context": "The existing `empty_file()` function checks for empty file inputs:\n\nr\nempty_file <- function(x) {\n  is.character(x) && length(x) == 1 && file.exists(x) &&\n    file.info(x, extra_cols = FALSE)$size == 0\n}\n\n\nCurrent `read_file()` implementation:\nr\nread_file <- function(file, locale = default_locale()) {\n  if (empty_file(file)) {\n    return(\"\")\n  }\n  # ... rest of function\n}\n\n\nCurrent `read_file_raw()` implementation:\nr\nread_file_raw <- function(file) {\n  if (empty_file(file)) {\n    return(raw())\n  }\n  # ... rest of function\n}\n"
+}

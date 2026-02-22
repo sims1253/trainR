@@ -1,20 +1,357 @@
 # PR Mining Configuration
-# Used by: scripts/mine_prs.py
-
-# LLM settings come from llm.yaml
-# This file only has mining-specific settings
-
-quality:
-  min_score: 7
-  require_test_changes: true
-  require_linked_issue: true
-
-limits:
-  max_prs_per_repo: 50
-  since_days: 30
+# Single source of truth for all repositories
+#
+# Usage:
+#   uv run python scripts/mine_prs.py --repos-file configs/mining.yaml
 
 repos:
-  # Can also specify via --repo or --repos-file
-  - tidyverse/dplyr
-  - tidyverse/ggplot2
-  - r-lib/cli
+  # =============================================================================
+  # CORE DATA MANIPULATION
+  # =============================================================================
+  - owner: tidyverse
+    repo: dplyr
+    domain: core-data
+    stars: 4800
+    notes: "Core data manipulation, most widely used R package"
+
+  - owner: tidyverse
+    repo: tidyr
+    domain: core-data
+    stars: 1500
+    notes: "Data tidying, reshape operations"
+
+  - owner: tidyverse
+    repo: tibble
+    domain: core-data
+    stars: 1000
+    notes: "Modern data frames with better defaults"
+
+  - owner: tidyverse
+    repo: readr
+    domain: core-data
+    stars: 1000
+    notes: "Fast data import"
+
+  # =============================================================================
+  # VISUALIZATION
+  # =============================================================================
+  - owner: tidyverse
+    repo: ggplot2
+    domain: visualization
+    stars: 6000
+    notes: "Most starred R package, grammar of graphics"
+
+  - owner: plotly
+    repo: plotly.R
+    domain: visualization
+    stars: 2500
+    notes: "Interactive visualization"
+
+  - owner: thomasp85
+    repo: patchwork
+    domain: visualization
+    stars: 2000
+    notes: "Plot composition, combine ggplot objects"
+
+  - owner: thomasp85
+    repo: gganimate
+    domain: visualization
+    stars: 2000
+    notes: "Animation framework for ggplot2"
+
+  - owner: wilkelab
+    repo: cowplot
+    domain: visualization
+    stars: 800
+    notes: "Plot arrangement and annotation"
+
+  - owner: stan-dev
+    repo: bayesplot
+    domain: visualization
+    stars: 500
+    notes: "Bayesian visualization, MCMC diagnostics"
+
+  - owner: thomasp85
+    repo: farver
+    domain: visualization
+    stars: 200
+    notes: "Color space manipulation"
+
+  - owner: rstudio
+    repo: ggvis
+    domain: visualization
+    stars: 400
+    notes: "Interactive grammar of graphics"
+
+  # =============================================================================
+  # TESTING
+  # =============================================================================
+  - owner: r-lib
+    repo: testthat
+    domain: testing
+    stars: 900
+    notes: "Testing framework itself, unit testing for R"
+
+  # =============================================================================
+  # METAPROGRAMMING
+  # =============================================================================
+  - owner: tidyverse
+    repo: purrr
+    domain: metaprogramming
+    stars: 1200
+    notes: "Functional programming, map/apply patterns"
+
+  - owner: r-lib
+    repo: rlang
+    domain: metaprogramming
+    stars: 500
+    notes: "Metaprogramming, tidy evaluation"
+
+  # =============================================================================
+  # BAYESIAN / STAN
+  # =============================================================================
+  - owner: paul-buerkner
+    repo: brms
+    domain: bayesian
+    stars: 1200
+    notes: "Bayesian regression models with Stan backend"
+
+  - owner: stan-dev
+    repo: posterior
+    domain: bayesian
+    stars: 300
+    notes: "Posterior analysis, MCMC output handling"
+
+  - owner: stan-dev
+    repo: cmdstanr
+    domain: bayesian
+    stars: 200
+    notes: "CmdStan interface for R"
+
+  # =============================================================================
+  # SPATIAL
+  # =============================================================================
+  - owner: r-spatial
+    repo: sf
+    domain: spatial
+    stars: 1200
+    notes: "Simple features for spatial data"
+
+  - owner: r-spatial
+    repo: stars
+    domain: spatial
+    stars: 500
+    notes: "Spatiotemporal arrays, raster data"
+
+  # =============================================================================
+  # MACHINE LEARNING
+  # =============================================================================
+  - owner: mlr-org
+    repo: mlr3
+    domain: ml
+    stars: 800
+    notes: "Machine learning framework"
+
+  - owner: tidymodels
+    repo: parsnip
+    domain: ml
+    stars: 700
+    notes: "Unified model interface"
+
+  - owner: tidymodels
+    repo: recipes
+    domain: ml
+    stars: 600
+    notes: "Preprocessing pipelines"
+
+  - owner: tidymodels
+    repo: rsample
+    domain: ml
+    stars: 400
+    notes: "Resampling methods, cross-validation"
+
+  - owner: tidymodels
+    repo: yardstick
+    domain: ml
+    stars: 400
+    notes: "Model metrics and evaluation"
+
+  # =============================================================================
+  # I/O AND INTERFACES
+  # =============================================================================
+  - owner: rstudio
+    repo: reticulate
+    domain: io
+    stars: 1600
+    notes: "R-Python interface"
+
+  - owner: r-lib
+    repo: httr2
+    domain: io
+    stars: 300
+    notes: "HTTP requests, web API client"
+
+  # =============================================================================
+  # WEB APPLICATIONS
+  # =============================================================================
+  - owner: rstudio
+    repo: shiny
+    domain: web
+    stars: 5000
+    notes: "Web applications, complex reactive state"
+
+  - owner: rstudio
+    repo: plumber
+    domain: web
+    stars: 1000
+    notes: "REST API framework"
+
+  # =============================================================================
+  # DEVELOPMENT TOOLS
+  # =============================================================================
+  - owner: r-lib
+    repo: devtools
+    domain: devtools
+    stars: 1500
+    notes: "Package development workflow"
+
+  - owner: r-lib
+    repo: usethis
+    domain: devtools
+    stars: 1000
+    notes: "Package automation, project setup"
+
+  - owner: ropensci
+    repo: targets
+    domain: devtools
+    stars: 900
+    notes: "Pipeline orchestration"
+
+  - owner: rstudio
+    repo: renv
+    domain: devtools
+    stars: 800
+    notes: "Package management, reproducible environments"
+
+  - owner: r-lib
+    repo: cli
+    domain: devtools
+    stars: 400
+    notes: "CLI output formatting, semantic messages"
+
+  - owner: r-lib
+    repo: withr
+    domain: devtools
+    stars: 200
+    notes: "Context management, temporary side effects"
+
+  # =============================================================================
+  # REPORTING
+  # =============================================================================
+  - owner: rstudio
+    repo: knitr
+    domain: reporting
+    stars: 2300
+    notes: "Dynamic report generation"
+
+  - owner: davidgohel
+    repo: officer
+    domain: reporting
+    stars: 600
+    notes: "Microsoft Office document generation"
+
+  - owner: davidgohel
+    repo: flextable
+    domain: reporting
+    stars: 500
+    notes: "Flexible tables for reporting"
+
+  # =============================================================================
+  # STRINGS, DATES, AND FORMATTING
+  # =============================================================================
+  - owner: tidyverse
+    repo: stringr
+    domain: strings-dates
+    stars: 800
+    notes: "String manipulation"
+
+  - owner: tidyverse
+    repo: lubridate
+    domain: strings-dates
+    stars: 700
+    notes: "Date/time handling"
+
+  - owner: tidyverse
+    repo: glue
+    domain: strings-dates
+    stars: 600
+    notes: "String interpolation"
+
+  - owner: tidyverse
+    repo: forcats
+    domain: strings-dates
+    stars: 600
+    notes: "Factor handling and manipulation"
+
+  - owner: r-lib
+    repo: scales
+    domain: strings-dates
+    stars: 600
+    notes: "Scale transformations for visualization"
+
+# =============================================================================
+# MINING SETTINGS
+# =============================================================================
+settings:
+  # How many days back to look for merged PRs
+  since_days: 30
+
+  # Minimum quality score (1-10) required to include task
+  min_quality_score: 7
+
+  # Maximum PRs to process per repository
+  max_prs_per_repo: 50
+
+  # Only include PRs that modify test files
+  require_test_changes: true
+
+  # Only include PRs with linked issues
+  require_linked_issue: true
+
+  # LLM model to use for evaluation
+  llm_model: "opencode/glm-5-free"
+
+  # Rate limiting (requests per hour)
+  rate_limit: 100
+
+  # Output format
+  output_format: "json"
+
+  # Include full diff in output (can be large)
+  include_full_diff: false
+
+  # Retry settings for API failures
+  retry_attempts: 3
+  retry_delay_seconds: 5
+
+# =============================================================================
+# QUALITY CRITERIA
+# =============================================================================
+quality_criteria:
+  # Minimum number of test assertions for a good task
+  min_test_assertions: 2
+
+  # Maximum number of files changed (too many = unclear scope)
+  max_files_changed: 10
+
+  # Preferred task types (in order of priority)
+  preferred_types:
+    - bug_fix
+    - feature_impl
+    - test_writing
+
+  # Exclude PRs with these labels
+  exclude_labels:
+    - "documentation"
+    - "dependencies"
+    - "ci/cd"

@@ -1,0 +1,20 @@
+{
+  "task_id": "task-c7bb8f5d",
+  "source_package": "rlang",
+  "source_file": "R/arg.R",
+  "difficulty": "hard",
+  "instruction": "Add comprehensive edge case tests for `arg_match0`.\n\n\nExisting tests for reference:\n```r\n\n```\n\n\nThe existing tests cover basic functionality. Add tests for:\n1. NULL inputs to each argument\n2. Empty vectors/strings: character(0), \"\", integer(0)\n3. Boundary values: 0, 1, -1, NA, NaN, Inf\n4. Invalid input types (passing numeric where character expected, etc.)\n5. Missing arguments (use expect_error with class matching)\n6. Very long inputs (strings > 1000 chars, vectors > 10000 elements)\n",
+  "context": "Package: rlang v1.1.7.9000\nDescription: Functions for Base Types and Core R and 'Tidyverse' Features\nFunction: arg_match0\nParameters: arg, values, arg_nm, error_call\nTest patterns used: test_that\nExpectations used: expect_snapshot\n\nFunction Code:\n```r\narg_match0 <- function(\n  arg,\n  values,\n  arg_nm = caller_arg(arg),\n  error_call = caller_env()\n) {\n  .External(ffi_arg_match0, arg, values, environment())\n}\n```",
+  "reference_test": "# No substantive reference patterns available",
+  "test_type": "unit",
+  "patterns": [
+    "test_that"
+  ],
+  "dependencies": [
+    "testthat"
+  ],
+  "split": "train",
+  "function_name": "arg_match0",
+  "quality_score": 0.56,
+  "constraints": {}
+}

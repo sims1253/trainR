@@ -1,0 +1,22 @@
+{
+  "task_id": "task-3a1b0dc5",
+  "source_package": "httr2",
+  "source_file": "R/content-type.R",
+  "difficulty": "medium",
+  "instruction": "Write a complete testthat test file for `httr2::check_content_type`.\n\nPackage: httr2 v1.2.2.9000\nDescription: Perform HTTP Requests and Process the Responses\nFunction: check_content_type\nParameters: content_type, valid_types, valid_suffix, inform_check_type, call\nTest patterns used: expect_snapshot, test_that\nExpectations used: expect_no_error, expect_snapshot\n\nFunction Code:\n```r\ncheck_content_type <- function(\n  content_type,\n  valid_types = NULL,\n  valid_suffix = NULL,\n  inform_check_type = FALSE,\n  call = caller_env()\n) {\n  parsed <- parse_content_type(content_type)\n  base_type <- paste0(parsed$type, \"/\", parsed$subtype)\n\n  if (is.null(valid_types) || base_type %in% valid_types) {\n    return()\n  }\n  if (!is.null(valid_suffix) && parsed$suffix == valid_suffix) {\n    return()\n  }\n\n  msg <- \"Expecting type {.or {.str {valid_types}}}\"\n  if (!is.null(valid_suffix)) {\n    msg <- paste0(msg, \" or suffix {.str {valid_suffix}}.\")\n  }\n\n  cli::cli_abort(\n    c(\"Unexpected content type {.str {content_type}}.\", \"*\" = msg),\n    i = if (inform_check_type) \"Override check with `check_type = FALSE`.\",\n    call = call\n  )\n}\n```\n\nRequirements:\n1. Use test_that() blocks with descriptive names that reference `check_content_type`\n2. Test basic functionality using appropriate expectations (expect_no_error, expect_snapshot)\n3. Test edge cases: NULL input, empty strings, missing arguments\n4. Test error conditions with expect_error()\n5. Each test_that() block should test one logical behavior\n",
+  "context": "Package: httr2 v1.2.2.9000\nDescription: Perform HTTP Requests and Process the Responses\nFunction: check_content_type\nParameters: content_type, valid_types, valid_suffix, inform_check_type, call\nTest patterns used: expect_snapshot, test_that\nExpectations used: expect_no_error, expect_snapshot\n\nFunction Code:\n```r\ncheck_content_type <- function(\n  content_type,\n  valid_types = NULL,\n  valid_suffix = NULL,\n  inform_check_type = FALSE,\n  call = caller_env()\n) {\n  parsed <- parse_content_type(content_type)\n  base_type <- paste0(parsed$type, \"/\", parsed$subtype)\n\n  if (is.null(valid_types) || base_type %in% valid_types) {\n    return()\n  }\n  if (!is.null(valid_suffix) && parsed$suffix == valid_suffix) {\n    return()\n  }\n\n  msg <- \"Expecting type {.or {.str {valid_types}}}\"\n  if (!is.null(valid_suffix)) {\n    msg <- paste0(msg, \" or suffix {.str {valid_suffix}}.\")\n  }\n\n  cli::cli_abort(\n    c(\"Unexpected content type {.str {content_type}}.\", \"*\" = msg),\n    i = if (inform_check_type) \"Override check with `check_type = FALSE`.\",\n    call = call\n  )\n}\n```",
+  "reference_test": "expect_snapshot(error = TRUE, {\n    resp_check_content_type(resp1, \"application/xml\")\n    resp_check_content_type(resp2, \"application/xml\")\n  })\n\nexpect_snapshot(\n    resp_check_content_type(resp, \"application/xml\"),\n    error = TRUE\n  )",
+  "test_type": "snapshot",
+  "patterns": [
+    "test_that",
+    "expect_snapshot"
+  ],
+  "dependencies": [
+    "R",
+    "testthat"
+  ],
+  "split": "held_out",
+  "function_name": "check_content_type",
+  "quality_score": 0.681,
+  "constraints": {}
+}

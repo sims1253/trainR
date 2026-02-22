@@ -1,0 +1,20 @@
+{
+  "task_id": "task-5043bb9a",
+  "source_package": "bayesplot",
+  "source_file": "R/available-module-functions.R",
+  "difficulty": "medium",
+  "instruction": "Refactor the existing tests for `available_ppd` to follow better testing practices.\n\n\nCurrent test patterns to refactor:\n- test_that at tests/testthat/test-available_ppc.R:43\n\n\nGoals:\n1. Use describe()/it() blocks for better organization where appropriate\n2. Reduce code duplication with helper functions or local fixtures\n3. Improve test descriptions to be specific about what behavior is verified\n4. Extract common setup into withr::local_* fixtures\n5. Each test should have a single responsibility\n",
+  "context": "Package: bayesplot v1.15.0.9000\nDescription: Plotting for Bayesian Models\nFunction: available_ppd\nParameters: pattern, fixed, invert, plots_only\nTest patterns used: test_that\nExpectations used: expect_identical, expect_s3_class\n\nFunction Code:\n```r\navailable_ppd <-\n  function(pattern = NULL,\n           fixed = FALSE,\n           invert = FALSE,\n           plots_only = TRUE) {\n    .list_module_functions(\n      .module = \"ppd\",\n      .pattern = pattern,\n      fixed = fixed,\n      invert = invert,\n      plots_only = plots_only\n    )\n  }\n```",
+  "reference_test": "# No substantive reference patterns available",
+  "test_type": "unit",
+  "patterns": [
+    "test_that"
+  ],
+  "dependencies": [
+    "testthat"
+  ],
+  "split": "held_out",
+  "function_name": "available_ppd",
+  "quality_score": 0.51,
+  "constraints": {}
+}

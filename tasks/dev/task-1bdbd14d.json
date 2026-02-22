@@ -1,0 +1,20 @@
+{
+  "task_id": "task-1bdbd14d",
+  "source_package": "tibble",
+  "source_file": "R/add.R",
+  "difficulty": "easy",
+  "instruction": "A test for `add_row` is failing. Diagnose and fix the issue.\n\n\nFailing test:\n```r\n\n```\n\n\nSteps:\n1. Read the function source code to understand expected behavior\n2. Compare the test expectations with actual function behavior\n3. Fix the test if expectations are wrong, or fix the function if it has a bug\n4. Ensure the fix maintains backward compatibility\n5. Run the tests to verify the fix\n",
+  "context": "Package: tibble v3.3.1.9004\nDescription: Simple Data Frames\nFunction: add_row\nParameters: .data, .before, .after\nTest patterns used: test_that\nExpectations used: expect_equal, expect_identical, expect_tibble_abort\n\nFunction Code:\n```r\nadd_row <- function(.data, ..., .before = NULL, .after = NULL) {\n  if (inherits(.data, \"grouped_df\")) {\n    abort_add_rows_to_grouped_df()\n  }\n\n  if (!is.data.frame(.data)) {\n    deprecate_stop(\"2.1.1\", \"add_row(.data = 'must be a data frame')\")\n  }\n\n  if (dots_n(...) == 0L) {\n    # A single row of missing values is added if no input is supplied\n    df <- new_tibble(list(), nrow = 1L)\n  } else {\n    df <- tibble(...)\n  }\n\n  extra_vars <- setdiff(names(df), names(.data))\n  if (has_length(extra_vars)) {\n    abort_incompatible_new_rows(extra_vars)\n  }\n\n  pos <- pos_from_before_after(.before, .after, nrow(.data))\n  out <- rbind_at(.data, df, pos)\n\n  vectbl_restore(out, .data)\n}\n```",
+  "reference_test": "# No substantive reference patterns available",
+  "test_type": "unit",
+  "patterns": [
+    "test_that"
+  ],
+  "dependencies": [
+    "testthat"
+  ],
+  "split": "dev",
+  "function_name": "add_row",
+  "quality_score": 0.51,
+  "constraints": {}
+}

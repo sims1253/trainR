@@ -1,0 +1,20 @@
+{
+  "task_id": "task-5e56241f",
+  "source_package": "rlang",
+  "source_file": "R/arg.R",
+  "difficulty": "medium",
+  "instruction": "Write a complete testthat test file for `rlang::arg_match`.\n\nPackage: rlang v1.1.7.9000\nDescription: Functions for Base Types and Core R and 'Tidyverse' Features\nFunction: arg_match\nParameters: arg, values, multiple, error_arg, error_call\nTest patterns used: test_that\nExpectations used: expect_equal, expect_snapshot\n\nFunction Code:\n```r\narg_match <- function(\n  arg,\n  values = NULL,\n  ...,\n  multiple = FALSE,\n  error_arg = caller_arg(arg),\n  error_call = caller_env()\n) {\n  check_dots_empty0(...)\n\n  arg_expr <- enexpr(arg)\n  error_arg <- as_string(error_arg)\n\n  check_symbol(arg_expr, arg = \"arg\")\n  check_character(arg, arg = error_arg, call = error_call)\n\n  if (is_null(values)) {\n    fn <- caller_fn()\n    values <- formals(fn)[[error_arg]]\n    values <- eval_bare(values, get_env(fn))\n  }\n\n  if (multiple) {\n    return(arg_match_multi(arg, values, error_arg, error_call))\n  }\n\n  if (!length(arg)) {\n    msg <- sprintf(\n      \"%s must be length 1, not length 0\",\n      format_arg(error_arg)\n    )\n    abort(msg, call = error_call, arg = error_arg)\n  }\n  if (length(arg) > 1 && !setequal(arg, values)) {\n    msg <- arg_match_invalid_msg(arg, values, error_arg)\n    abort(msg, call = error_call, arg = error_arg)\n  }\n\n  arg <- arg[[1]]\n  arg_match0(\n    arg,\n    values,\n    error_arg,\n    error_call = error_call\n  )\n}\n```\n\nRequirements:\n1. Use test_that() blocks with descriptive names that reference `arg_match`\n2. Test basic functionality using appropriate expectations (expect_equal, expect_snapshot)\n3. Test edge cases: NULL input, empty strings, missing arguments\n4. Test error conditions with expect_error()\n5. Each test_that() block should test one logical behavior\n",
+  "context": "Package: rlang v1.1.7.9000\nDescription: Functions for Base Types and Core R and 'Tidyverse' Features\nFunction: arg_match\nParameters: arg, values, multiple, error_arg, error_call\nTest patterns used: test_that\nExpectations used: expect_equal, expect_snapshot\n\nFunction Code:\n```r\narg_match <- function(\n  arg,\n  values = NULL,\n  ...,\n  multiple = FALSE,\n  error_arg = caller_arg(arg),\n  error_call = caller_env()\n) {\n  check_dots_empty0(...)\n\n  arg_expr <- enexpr(arg)\n  error_arg <- as_string(error_arg)\n\n  check_symbol(arg_expr, arg = \"arg\")\n  check_character(arg, arg = error_arg, call = error_call)\n\n  if (is_null(values)) {\n    fn <- caller_fn()\n    values <- formals(fn)[[error_arg]]\n    values <- eval_bare(values, get_env(fn))\n  }\n\n  if (multiple) {\n    return(arg_match_multi(arg, values, error_arg, error_call))\n  }\n\n  if (!length(arg)) {\n    msg <- sprintf(\n      \"%s must be length 1, not length 0\",\n      format_arg(error_arg)\n    )\n    abort(msg, call = error_call, arg = error_arg)\n  }\n  if (length(arg) > 1 && !setequal(arg, values)) {\n    msg <- arg_match_invalid_msg(arg, values, error_arg)\n    abort(msg, call = error_call, arg = error_arg)\n  }\n\n  arg <- arg[[1]]\n  arg_match0(\n    arg,\n    values,\n    error_arg,\n    error_call = error_call\n  )\n}\n```",
+  "reference_test": "# No substantive reference patterns available",
+  "test_type": "unit",
+  "patterns": [
+    "test_that"
+  ],
+  "dependencies": [
+    "testthat"
+  ],
+  "split": "held_out",
+  "function_name": "arg_match",
+  "quality_score": 0.585,
+  "constraints": {}
+}

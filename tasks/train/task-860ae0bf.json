@@ -1,0 +1,21 @@
+{
+  "task_id": "task-860ae0bf",
+  "source_package": "parsnip",
+  "source_file": "R/aaa.R",
+  "difficulty": "hard",
+  "instruction": "Add comprehensive edge case tests for `combine_words`.\n\n\nExisting tests for reference:\n```r\n\n```\n```r\nexpect_snapshot(combine_words(1))\n```\n```r\nexpect_snapshot(combine_words(1:2))\n```\n\n\nThe existing tests cover basic functionality. Add tests for:\n1. NULL inputs to each argument\n2. Empty vectors/strings: character(0), \"\", integer(0)\n3. Boundary values: 0, 1, -1, NA, NaN, Inf\n4. Invalid input types (passing numeric where character expected, etc.)\n5. Missing arguments (use expect_error with class matching)\n6. Very long inputs (strings > 1000 chars, vectors > 10000 elements)\n",
+  "context": "Package: parsnip v1.4.1.9002\nDescription: A Common API to Modeling and Analysis Functions\nFunction: combine_words\nParameters: x\nTest patterns used: expect_snapshot, test_that\nExpectations used: expect_snapshot\n\nFunction Code:\n```r\ncombine_words <- function(x) {\n  if (isTRUE(length(x) > 2)) {\n    last <- \", and \"\n  } else {\n    last <- \" and \"\n  }\n\n  glue::glue_collapse(x, \", \", last = last)\n}\n```",
+  "reference_test": "expect_snapshot(combine_words(1))\n\nexpect_snapshot(combine_words(1:2))",
+  "test_type": "snapshot",
+  "patterns": [
+    "test_that",
+    "expect_snapshot"
+  ],
+  "dependencies": [
+    "testthat"
+  ],
+  "split": "train",
+  "function_name": "combine_words",
+  "quality_score": 0.596,
+  "constraints": {}
+}

@@ -1,0 +1,22 @@
+{
+  "task_id": "task-a612db05",
+  "source_package": "parsnip",
+  "source_file": "R/boost_tree.R",
+  "difficulty": "hard",
+  "instruction": "Add comprehensive edge case tests for `boost_tree`.\n\n\nExisting tests for reference:\n```r\n\n```\n```r\nexpect_snapshot(error = TRUE, boost_tree(mode = \"bogus\"))\n```\n```r\nexpect_snapshot(translate(boost_tree(mode = \"classification\"), engine = NULL))\n```\n\n\nThe existing tests cover basic functionality. Add tests for:\n1. NULL inputs to each argument\n2. Empty vectors/strings: character(0), \"\", integer(0)\n3. Boundary values: 0, 1, -1, NA, NaN, Inf\n4. Invalid input types (passing numeric where character expected, etc.)\n5. Missing arguments (use expect_error with class matching)\n6. Very long inputs (strings > 1000 chars, vectors > 10000 elements)\n",
+  "context": "Package: parsnip v1.4.1.9002\nDescription: A Common API to Modeling and Analysis Functions\nFunction: boost_tree\nParameters: mode, engine, mtry, trees, min_n, tree_depth, learn_rate, loss_reduction, sample_size, stop_iter\nTest patterns used: expect_snapshot, test_that\nExpectations used: expect_no_error, expect_snapshot\n\nFunction Code:\n```r\nboost_tree <-\n  function(\n    mode = \"unknown\",\n    engine = \"xgboost\",\n    mtry = NULL,\n    trees = NULL,\n    min_n = NULL,\n    tree_depth = NULL,\n    learn_rate = NULL,\n    loss_reduction = NULL,\n    sample_size = NULL,\n    stop_iter = NULL\n  ) {\n    args <- list(\n      mtry = enquo(mtry),\n      trees = enquo(trees),\n      min_n = enquo(min_n),\n      tree_depth = enquo(tree_depth),\n      learn_rate = enquo(learn_rate),\n      loss_reduction = enquo(loss_reduction),\n      sample_size = enquo(sample_size),\n      stop_iter = enquo(stop_iter)\n    )\n\n    new_model_spec(\n      \"boost_tree\",\n      args,\n      eng_args = NULL,\n      mode = mode,\n      user_specified_mode = !missing(mode),\n      method = NULL,\n      engine = engine,\n      user_specified_engine = !missing(engine)\n    )\n  }\n```",
+  "reference_test": "expect_snapshot(error = TRUE, boost_tree(mode = \"bogus\"))\n\nexpect_snapshot(translate(boost_tree(mode = \"classification\"), engine = NULL))",
+  "test_type": "snapshot",
+  "patterns": [
+    "test_that",
+    "expect_snapshot"
+  ],
+  "dependencies": [
+    "R",
+    "testthat"
+  ],
+  "split": "train",
+  "function_name": "boost_tree",
+  "quality_score": 0.596,
+  "constraints": {}
+}

@@ -1,0 +1,53 @@
+{
+  "task_id": "r-lib_testthat_2307",
+  "source": {
+    "repo": "r-lib/testthat",
+    "pr_number": 2307,
+    "base_commit": "ceeadda3fc12a77db43284cb0c71554a7560efa0",
+    "head_commit": "20a74c5445910a7f1b045a7824997128b4d288fd",
+    "merged_commit": "f920707ca83b4ab8fc48547ebb680b3590a67180",
+    "pr_url": "https://github.com/r-lib/testthat/pull/2307",
+    "merged_at": "2026-01-07T19:23:34+00:00",
+    "issue_url": "https://github.com/r-lib/testthat/issues/2286"
+  },
+  "problem_statement": {
+    "title": "Report base error class",
+    "body": "In #2283 we started entracing snapshots so that we get useful backtraces if snapshot code unexpectedly errors. This had the unfortunate side-effect of changing the reported class for expected errors. We now show the original message if it was an entraced error.\r\n\r\nFixes #2286.",
+    "issue_title": "Error condition provided by `expect_snapshot` seems buggy in 3.3.0",
+    "issue_body": "```r\ntestthat::expect_snapshot(stop(\"error\"), error = TRUE, cnd = TRUE)\n```\n\n```\n\u2500\u2500 Snapshot \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n\u2139 Can't save or compare to reference when testing interactively.\nCode\n  stop(\"error\")\nCondition <rlang_error>\n  Error:\n  ! error\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n```\n\nThe condition seems changed to `rlang_error` in 3.3.0.\n\nFound in pola-rs/r-polars#1642."
+  },
+  "patch": "diff --git a/NEWS.md b/NEWS.md\nindex fce396ec8..2901b040a 100644\n--- a/NEWS.md\n+++ b/NEWS.md\n@@ -1,5 +1,6 @@\n # testthat 3.3.1\n \n+* `expect_snapshot()` now reports the original error class for base errors, rather than `rlang_error` (#2286).\n * `expect_success()` and `expect_failure()` are more clear about what the expectation actually did (#2297).\n * The hint to use `snapshot_download_gh()` is now only emitted when running in a job named \"R-CMD-check\" (#2300).\n * `expect_snapshot_file()` correctly reports file name if duplicated (@MichaelChirico, #2296).\ndiff --git a/R/snapshot.R b/R/snapshot.R\nindex d95f4f2e8..971f895cf 100644\n--- a/R/snapshot.R\n+++ b/R/snapshot.R\n@@ -185,12 +185,22 @@ snapshot_replay.condition <- function(\n   }\n \n   if (cnd_class) {\n-    type <- paste0(type, \" <\", class(x)[[1]], \">\")\n+    type <- paste0(type, \" <\", error_class(x), \">\")\n   }\n \n   c(snap_header(state, type), snapshot_lines(msg, transform))\n }\n \n+error_class <- function(x) {\n+  # If error was entraced from base R error, use original error class\n+  # This is a little fragile because entrace() does not document this behaviour\n+  if (inherits(x, \"rlang_error\") && !is.null(x$error)) {\n+    x <- x$error\n+  }\n+  class(x)[[1]]\n+}\n+\n+\n snapshot_lines <- function(x, transform = NULL) {\n   x <- split_lines(x)\n   if (!is.null(transform)) {",
+  "test_patch": "diff --git a/tests/testthat/_snaps/snapshot.md b/tests/testthat/_snaps/snapshot.md\nindex 35379f3f5..65b77b73f 100644\n--- a/tests/testthat/_snaps/snapshot.md\n+++ b/tests/testthat/_snaps/snapshot.md\n@@ -243,7 +243,7 @@\n     Condition <simpleWarning>\n       Warning in `f()`:\n       bar\n-    Condition <rlang_error>\n+    Condition <simpleError>\n       Error in `f()`:\n       ! baz\n \ndiff --git a/tests/testthat/test-snapshot.R b/tests/testthat/test-snapshot.R\nindex 4655b61f6..d6beb1243 100644\n--- a/tests/testthat/test-snapshot.R\n+++ b/tests/testthat/test-snapshot.R\n@@ -169,6 +169,24 @@ test_that(\"errors and warnings are folded\", {\n #   expect_snapshot(1 + 1)\n # })\n \n+test_that(\"extracts original error class\", {\n+  catch_entraced <- function(code) {\n+    tryCatch(\n+      withCallingHandlers(code, error = function(cnd) rlang::entrace(cnd)),\n+      error = function(cnd) cnd\n+    )\n+  }\n+\n+  cnd <- catch_entraced(stop(\"!\", call. = FALSE))\n+  expect_equal(error_class(cnd), \"simpleError\")\n+\n+  cnd <- catch_entraced(stop(errorCondition(\"!\", class = \"badError\")))\n+  expect_equal(error_class(cnd), \"badError\")\n+\n+  cnd <- catch_entraced(abort(\"!\"))\n+  expect_equal(error_class(cnd), \"rlang_error\")\n+})\n+\n test_that(\"hint is informative\", {\n   local_mocked_bindings(in_check_reporter = function() FALSE)\n   withr::local_envvar(GITHUB_ACTIONS = \"false\", TESTTHAT_WD = NA)\n",
+  "tests": {
+    "fail_to_pass": [
+      "test_that('extracts original error class', { ... }) - verifies error_class() returns 'simpleError' for entraced base errors",
+      "test_that('extracts original error class', { ... }) - verifies error_class() returns custom class for entraced custom errors",
+      "test_that('extracts original error class', { ... }) - verifies error_class() returns 'rlang_error' for native rlang abort() errors",
+      "Snapshot test showing Condition <simpleError> instead of Condition <rlang_error>"
+    ],
+    "pass_to_pass": [
+      "Existing snapshot tests continue to work correctly",
+      "Warning conditions still display correctly with their original class"
+    ]
+  },
+  "metadata": {
+    "task_type": "bug_fix",
+    "difficulty": "easy",
+    "quality_score": 8,
+    "mined_at": "2026-02-22T18:51:09.750278+00:00",
+    "key_changes": [
+      "Add new helper function `error_class(x)` that checks if error was entraced from base R",
+      "If error inherits from 'rlang_error' AND has `$error` field, return class of `x$error`",
+      "Otherwise return `class(x)[[1]]`",
+      "Update `snapshot_replay.condition()` to use `error_class(x)` instead of `class(x)[[1]]`"
+    ],
+    "potential_pitfalls": [
+      "The `$error` field behavior is not officially documented by rlang, making this somewhat fragile",
+      "Need to handle both base R errors (simpleError) and custom error classes correctly",
+      "Native rlang errors (from `abort()`) should still show as 'rlang_error'",
+      "Must not break existing snapshot behavior for warnings and other conditions"
+    ]
+  },
+  "instruction": "Fix the bug in `expect_snapshot()` where base R errors are incorrectly reported as `rlang_error` instead of their original class (e.g., `simpleError`). When testthat started entracing snapshots for better backtraces, it had the side effect of changing the reported error class. Implement an `error_class()` helper function that extracts the original error class from entraced errors, and use it in `snapshot_replay.condition()` when reporting condition classes.",
+  "context": "The `snapshot_replay.condition()` function in R/snapshot.R handles how conditions are displayed in snapshots. When `cnd_class = TRUE`, it shows the condition class. The issue is that entraced base R errors now show `rlang_error` instead of `simpleError`. An entraced error from base R has an `$error` field containing the original error object. The fix requires checking for this field and extracting the original class.\n\nKey function context:\nr\nsnapshot_replay.condition <- function(x, ...) {\n  # ... existing code ...\n  if (cnd_class) {\n    type <- paste0(type, \" <\", class(x)[[1]], \">\")  # Currently uses wrong class\n  }\n}\n"
+}

@@ -1,0 +1,20 @@
+{
+  "task_id": "task-4b388190",
+  "source_package": "usethis",
+  "source_file": "R/badge.R",
+  "difficulty": "hard",
+  "instruction": "Add comprehensive edge case tests for `use_badge`.\n\n\nExisting tests for reference:\n```r\n\n```\n\n\nThe existing tests cover basic functionality. Add tests for:\n1. NULL inputs to each argument\n2. Empty vectors/strings: character(0), \"\", integer(0)\n3. Boundary values: 0, 1, -1, NA, NaN, Inf\n4. Invalid input types (passing numeric where character expected, etc.)\n5. Missing arguments (use expect_error with class matching)\n6. Very long inputs (strings > 1000 chars, vectors > 10000 elements)\n",
+  "context": "Package: usethis v3.2.1.9000\nDescription: Automate Package and Project Setup\nFunction: use_badge\nParameters: badge_name, href, src\nTest patterns used: test_that\nExpectations used: expect_false\n\nFunction Code:\n```r\nuse_badge <- function(badge_name, href, src) {\n  path <- find_readme()\n  if (is.null(path)) {\n    ui_bullets(c(\n      \"!\" = \"Can't find a README for the current project.\",\n      \"i\" = \"See {.fun usethis::use_readme_rmd} for help creating this file.\",\n      \"i\" = \"Badge link will only be printed to screen.\"\n    ))\n    path <- \"README\"\n  }\n  changed <- block_append(\n    glue(\"{badge_name} badge\"),\n    glue(\"[![{badge_name}]({src})]({href})\"),\n    path = path,\n    block_start = badge_start,\n    block_end = badge_end\n  )\n\n  if (changed && path_ext(path) == \"Rmd\") {\n    ui_bullets(c(\n      \"_\" = \"Re-knit {.path {pth(path)}} with {.run devtools::build_readme()}.\"\n    ))\n  }\n  invisible(changed)\n}\n```",
+  "reference_test": "# No substantive reference patterns available",
+  "test_type": "unit",
+  "patterns": [
+    "test_that"
+  ],
+  "dependencies": [
+    "testthat"
+  ],
+  "split": "dev",
+  "function_name": "use_badge",
+  "quality_score": 0.56,
+  "constraints": {}
+}

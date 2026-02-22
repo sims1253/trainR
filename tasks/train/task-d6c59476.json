@@ -4,18 +4,17 @@
   "source_file": "R/adverb-compose.R",
   "difficulty": "hard",
   "instruction": "Add comprehensive edge case tests for `compose`.\n\n\nExisting tests for reference:\n```r\n\n```\n```r\n\n```\n```r\n\n```\n\n\nThe existing tests cover basic functionality. Add tests for:\n1. NULL inputs to each argument\n2. Empty vectors/strings: character(0), \"\", integer(0)\n3. Boundary values: 0, 1, -1, NA, NaN, Inf\n4. Invalid input types (passing numeric where character expected, etc.)\n5. Missing arguments (use expect_error with class matching)\n6. Very long inputs (strings > 1000 chars, vectors > 10000 elements)\n",
-  "context": "Package: purrr v1.2.1.9000\nDescription: Functional Programming Tools\nFunction: compose\nParameters: .dir\nTest patterns used: expect_snapshot, test_that\nExpectations used: expect_false, expect_identical, expect_s3_class, expect_snapshot, expect_true\n\nFunction Code:\n```r\ncompose <- function(..., .dir = c(\"backward\", \"forward\")) {\n  .dir <- arg_match0(.dir, c(\"backward\", \"forward\"))\n\n  fns <- map(list2(...), rlang::as_closure, env = caller_env())\n  if (!length(fns)) {\n    # Return the identity function\n    return(compose(function(x, ...) x))\n  }\n\n  if (.dir == \"backward\") {\n    n <- length(fns)\n    first_fn <- fns[[n]]\n    fns <- rev(fns[-n])\n  } else {\n    first_fn <- fns[[1]]\n    fns <- fns[-1]\n  }\n\n  composed <- function() {\n    env <- env(caller_env(), `_fn` = first_fn)\n\n    first_call <- sys.call()\n    first_call[[1]] <- quote(`_fn`)\n    env$`_out` <- .Call(purrr_eval, first_call, env)\n\n    call <- quote(`_fn`(`_out`))\n\n    for (fn in fns) {\n      env$`_fn` <- fn\n      env$`_out` <- .Call(purrr_eval, call, env)\n    }\n\n    env$`_out`\n  }\n  formals(composed) <- formals(first_fn)\n\n  structure(\n    composed,\n    class = c(\"purrr_function_compose\", \"function\"),\n    first_fn = first_fn,\n    fns = fns\n  )\n}\n```",
+  "context": "Package: purrr v1.2.1.9000\nDescription: Functional Programming Tools\nFunction: compose\nParameters: .dir\nTest patterns used: test_that\nExpectations used: expect_false, expect_identical, expect_s3_class, expect_true\n\nFunction Code:\n```r\ncompose <- function(..., .dir = c(\"backward\", \"forward\")) {\n  .dir <- arg_match0(.dir, c(\"backward\", \"forward\"))\n\n  fns <- map(list2(...), rlang::as_closure, env = caller_env())\n  if (!length(fns)) {\n    # Return the identity function\n    return(compose(function(x, ...) x))\n  }\n\n  if (.dir == \"backward\") {\n    n <- length(fns)\n    first_fn <- fns[[n]]\n    fns <- rev(fns[-n])\n  } else {\n    first_fn <- fns[[1]]\n    fns <- fns[-1]\n  }\n\n  composed <- function() {\n    env <- env(caller_env(), `_fn` = first_fn)\n\n    first_call <- sys.call()\n    first_call[[1]] <- quote(`_fn`)\n    env$`_out` <- .Call(purrr_eval, first_call, env)\n\n    call <- quote(`_fn`(`_out`))\n\n    for (fn in fns) {\n      env$`_fn` <- fn\n      env$`_out` <- .Call(purrr_eval, call, env)\n    }\n\n    env$`_out`\n  }\n  formals(composed) <- formals(first_fn)\n\n  structure(\n    composed,\n    class = c(\"purrr_function_compose\", \"function\"),\n    first_fn = first_fn,\n    fns = fns\n  )\n}\n```",
   "reference_test": "# No substantive reference patterns available",
-  "test_type": "snapshot",
+  "test_type": "unit",
   "patterns": [
-    "test_that",
-    "expect_snapshot"
+    "test_that"
   ],
   "dependencies": [
     "testthat"
   ],
   "split": "train",
   "function_name": "compose",
-  "quality_score": 0.566,
+  "quality_score": 0.56,
   "constraints": {}
 }

@@ -1,0 +1,73 @@
+# Benchmark Configuration
+# Run evaluations across models on task sets
+
+# Models to benchmark
+# Each entry references a model defined in configs/llm.yaml
+# Comment out models you don't want to run
+models:
+  - glm-5-free
+  - kimi-k2.5-free
+  - minimax-m2.5-free
+  - gpt-5-nano
+  - gpt-oss-120b-free
+  - step-3.5-flash
+  - trinity-large-preview
+  - nemotron-3-nano
+  - trinity-mini
+
+# Task selection
+# - selection: How to choose tasks
+#   - "all": Load all tasks from all splits
+#   - "splits": Load tasks from specific splits (see splits field)
+#   - "categories": Filter by task metadata (task_type, difficulty)
+#   - "files": Load specific task files
+tasks:
+  selection: "all"
+  
+  # Splits to include (used when selection: "splits")
+  # Available splits: train, dev, held_out, mined
+  #splits:
+  #  - mined
+  
+  # Category filters (used when selection: "categories")
+  # categories:
+  #   task_types: [bug_fix, feature_impl, test_writing]
+  #   difficulties: [easy, medium]
+  
+  # Specific files (used when selection: "files")
+  # files:
+  #   - tasks/mined/example.json
+
+# Judge configuration
+# The judge evaluates model outputs and assigns scores
+judge:
+  # mode: "single" or "ensemble"
+  # - single: One judge model evaluates
+  # - ensemble: Multiple judges vote after sharing initial scores
+  mode: "ensemble"
+  
+  # Single judge model (references llm.yaml)
+  single: glm-5-free
+  
+  # Ensemble configuration (used when mode: "ensemble")
+  ensemble:
+    judges:
+      - glm-5-free
+      - kimi-k2.5-free
+      - minimax-m2.5-free
+    voting: "majority"  # "majority" | "average" | "weighted"
+
+# Skill configuration (optional)
+# Skills are prompts that guide agent behavior
+# Leave empty/null for pure benchmark without skills
+skill: null  # Path to skill file, e.g., "skills/testing-r-packages-orig.md"
+
+# Execution settings
+settings:
+  timeout: 12000                      # Seconds per task
+  docker_image: "posit-gskill-eval:latest"
+  repeats: 1                        # Run each task N times
+  save_trajectories: true           # Save agent code outputs
+  save_traces: true                # Save LLM request/response traces
+  results_dir: "results/benchmarks"
+  log_level: "INFO"                 # DEBUG | INFO | WARNING

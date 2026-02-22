@@ -1,0 +1,22 @@
+{
+  "task_id": "task-b7fd2d4e",
+  "source_package": "readr",
+  "source_file": "R/col_types.R",
+  "difficulty": "hard",
+  "instruction": "Add comprehensive edge case tests for `spec`.\n\n\nExisting tests for reference:\n```r\n\n```\n```r\nexpect_snapshot(\n    col_spec_standardise(\"a,b,c\\n\", guess_max = NA),\n    error = TRUE\n  )\n```\n```r\nexpect_snapshot(\n    col_spec_standardise(\"a,b,c\\n\", guess_max = -1),\n    error = TRUE\n  )\n```\n\n\nThe existing tests cover basic functionality. Add tests for:\n1. NULL inputs to each argument\n2. Empty vectors/strings: character(0), \"\", integer(0)\n3. Boundary values: 0, 1, -1, NA, NaN, Inf\n4. Invalid input types (passing numeric where character expected, etc.)\n5. Missing arguments (use expect_error with class matching)\n6. Very long inputs (strings > 1000 chars, vectors > 10000 elements)\n",
+  "context": "Package: readr v2.2.0.9000\nDescription: Read Rectangular Text Data\nFunction: spec\nParameters: x\nTest patterns used: expect_snapshot, test_that\nExpectations used: expect_equal, expect_false, expect_null, expect_snapshot\n\nFunction Code:\n```r\nspec <- function(x) {\n  stopifnot(inherits(x, \"tbl_df\"))\n  attr(x, \"spec\")\n}\n```",
+  "reference_test": "expect_snapshot(\n    col_spec_standardise(\"a,b,c\\n\", guess_max = NA),\n    error = TRUE\n  )\n\nexpect_snapshot(\n    col_spec_standardise(\"a,b,c\\n\", guess_max = -1),\n    error = TRUE\n  )",
+  "test_type": "snapshot",
+  "patterns": [
+    "test_that",
+    "expect_snapshot"
+  ],
+  "dependencies": [
+    "R",
+    "testthat"
+  ],
+  "split": "train",
+  "function_name": "spec",
+  "quality_score": 0.656,
+  "constraints": {}
+}

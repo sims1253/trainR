@@ -1,0 +1,20 @@
+{
+  "task_id": "task-7fdff634",
+  "source_package": "scales",
+  "source_file": "R/bounds.R",
+  "difficulty": "medium",
+  "instruction": "Write a complete testthat test file for `scales::rescale_mid`.\n\nPackage: scales v1.4.0.9000\nDescription: Scale Functions for Visualization\nFunction: rescale_mid\nParameters: x, to, from, mid\nTest patterns used: test_that\nExpectations used: expect_equal\n\nFunction Code:\n```r\nrescale_mid <- function(x, to, from, mid, ...) {\n  UseMethod(\"rescale_mid\")\n}\n```\n\nRequirements:\n1. Use test_that() blocks with descriptive names that reference `rescale_mid`\n2. Test basic functionality using appropriate expectations (expect_equal)\n3. Test edge cases: NULL input, empty strings, missing arguments\n4. Test error conditions with expect_error()\n5. Each test_that() block should test one logical behavior\n",
+  "context": "Package: scales v1.4.0.9000\nDescription: Scale Functions for Visualization\nFunction: rescale_mid\nParameters: x, to, from, mid\nTest patterns used: test_that\nExpectations used: expect_equal\n\nFunction Code:\n```r\nrescale_mid <- function(x, to, from, mid, ...) {\n  UseMethod(\"rescale_mid\")\n}\n```",
+  "reference_test": "# No substantive reference patterns available",
+  "test_type": "unit",
+  "patterns": [
+    "test_that"
+  ],
+  "dependencies": [
+    "testthat"
+  ],
+  "split": "held_out",
+  "function_name": "rescale_mid",
+  "quality_score": 0.585,
+  "constraints": {}
+}

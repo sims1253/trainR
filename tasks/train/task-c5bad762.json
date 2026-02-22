@@ -1,0 +1,20 @@
+{
+  "task_id": "task-c5bad762",
+  "source_package": "plotly",
+  "source_file": "R/add.R",
+  "difficulty": "medium",
+  "instruction": "Add proper test fixtures to the tests for `add_image` using the withr package.\n\n\n\nRequirements:\n1. Identify tests that modify global state (options, env vars, working directory)\n2. Wrap state modifications with withr::local_* for automatic cleanup:\n   - withr::local_options() for R options\n   - withr::local_envvar() for environment variables\n   - withr::local_tempdir() for temporary directories\n   - withr::local_file() for temporary files\n3. Ensure tests can run in any order without side effects\n4. Use local_* (not with_*) inside test_that() blocks\n",
+  "context": "Package: plotly v4.12.0.9000\nDescription: Create Interactive Web Graphics via 'plotly.js'\nFunction: add_image\nParameters: p, z, colormodel, data, inherit\nTest patterns used: test_that\nExpectations used: expect_doppelganger\n\nFunction Code:\n```r\nadd_image <- function(p, z = NULL, colormodel = NULL, ..., data = NULL, inherit = TRUE) {\n  \n  if (inherit) {\n    z <- z %||% p$x$attrs[[1]][[\"z\"]]\n    colormodel <- colormodel %||% p$x$attrs[[1]][[\"colormodel\"]]\n  }\n  \n  if (inherits(z, \"raster\")) {\n    cols <- col2rgb(z, alpha = TRUE)\n    dims <- c(dim(z), 4)\n    z <- array(numeric(prod(dims)), dims)\n    matrix_ <- function(x) {\n      matrix(x, byrow = TRUE, nrow = dims[1], ncol = dims[2])\n    }\n    z[,,1] <- matrix_(cols[\"red\",])\n    z[,,2] <- matrix_(cols[\"green\",])\n    z[,,3] <- matrix_(cols[\"blue\",])\n    z[,,4] <- matrix_(cols[\"alpha\",])\n    \n    # Throw if we detect another colormodel\n    if (!identical(colormodel %||% \"rgba\", \"rgba\")) {\n      warning(\"Passing a raster object to z requires rgba colormodel\")\n    }\n    colormodel <- \"rgba\"\n  }\n  \n  add_trace(\n    p, z = z, colormodel = colormodel, ..., \n    data = data, type = \"image\"\n  )\n}\n```",
+  "reference_test": "# No substantive reference patterns available",
+  "test_type": "unit",
+  "patterns": [
+    "test_that"
+  ],
+  "dependencies": [
+    "testthat"
+  ],
+  "split": "train",
+  "function_name": "add_image",
+  "quality_score": 0.51,
+  "constraints": {}
+}

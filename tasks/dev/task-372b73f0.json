@@ -1,0 +1,22 @@
+{
+  "task_id": "task-372b73f0",
+  "source_package": "dplyr",
+  "source_file": "R/across.R",
+  "difficulty": "medium",
+  "instruction": "Add proper test fixtures to the tests for `if_any` using the withr package.\n\n\n\nRequirements:\n1. Identify tests that modify global state (options, env vars, working directory)\n2. Wrap state modifications with withr::local_* for automatic cleanup:\n   - withr::local_options() for R options\n   - withr::local_envvar() for environment variables\n   - withr::local_tempdir() for temporary directories\n   - withr::local_file() for temporary files\n3. Ensure tests can run in any order without side effects\n4. Use local_* (not with_*) inside test_that() blocks\n",
+  "context": "Package: dplyr v1.2.0.9000\nDescription: A Grammar of Data Manipulation\nFunction: if_any\nParameters: .cols, .fns, .names\nTest patterns used: expect_snapshot, test_that\nExpectations used: expect_equal, expect_error, expect_identical, expect_snapshot\n\nFunction Code:\n```r\nif_any <- function(.cols, .fns, ..., .names = NULL) {\n  context_local(\"across_if_fn\", \"if_any\")\n  context_local(\"across_frame\", current_env())\n  df <- across({{ .cols }}, .fns, ..., .names = .names)\n  x <- dplyr_new_list(df)\n  size <- vec_size(df)\n  dplyr_list_pany(x, size = size)\n}\n```",
+  "reference_test": "# No substantive reference patterns available",
+  "test_type": "snapshot",
+  "patterns": [
+    "test_that",
+    "expect_snapshot"
+  ],
+  "dependencies": [
+    "R",
+    "testthat"
+  ],
+  "split": "dev",
+  "function_name": "if_any",
+  "quality_score": 0.516,
+  "constraints": {}
+}

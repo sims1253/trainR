@@ -1,0 +1,22 @@
+{
+  "task_id": "task-123daec6",
+  "source_package": "cli",
+  "source_file": "R/aaa-utils.R",
+  "difficulty": "hard",
+  "instruction": "Add mocking to isolate `is_latex_output` from its external dependencies.\n\n\nExisting mocking patterns in this package:\n```r\nlocal_mocked_bindings(\n    loadedNamespaces = function() \"knitr\",\n    get = function(x, ...) {\n      if (x == \"is_latex_output\") {\n        function() TRUE\n      } else {\n        base::get(x, ...)\n      }\n    }\n  )\n```\n\n\nRequirements:\n1. Identify external dependencies in the function (system calls, file I/O, other packages)\n2. Use testthat::local_mocked_bindings() to mock each dependency\n3. Test both success and failure scenarios via mock return values\n4. Verify the function handles mock errors gracefully\n5. Ensure tests are deterministic (no network calls, no file system side effects)\n",
+  "context": "Package: cli v3.6.5.9000\nDescription: Helpers for Developing Command Line Interfaces\nFunction: is_latex_output\nTest patterns used: local_mocked_bindings\n\nFunction Code:\n```r\nis_latex_output <- function() {\n  if (!(\"knitr\" %in% loadedNamespaces())) return(FALSE)\n  get(\"is_latex_output\", asNamespace(\"knitr\"))()\n}\n```",
+  "reference_test": "local_mocked_bindings(\n    loadedNamespaces = function() \"knitr\",\n    get = function(x, ...) {\n      if (x == \"is_latex_output\") {\n        function() TRUE\n      } else {\n        base::get(x, ...)\n      }\n    }\n  )",
+  "test_type": "integration",
+  "patterns": [
+    "local_mocked_bindings"
+  ],
+  "dependencies": [
+    "R",
+    "knitr",
+    "testthat"
+  ],
+  "split": "train",
+  "function_name": "is_latex_output",
+  "quality_score": 0.59,
+  "constraints": {}
+}

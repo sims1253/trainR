@@ -1,0 +1,22 @@
+{
+  "task_id": "task-336122f1",
+  "source_package": "purrr",
+  "source_file": "R/adverb-auto-browse.R",
+  "difficulty": "easy",
+  "instruction": "A test for `auto_browse` is failing. Diagnose and fix the issue.\n\n\nFailing test:\n```r\n\n```\n\n\nSteps:\n1. Read the function source code to understand expected behavior\n2. Compare the test expectations with actual function behavior\n3. Fix the test if expectations are wrong, or fix the function if it has a bug\n4. Ensure the fix maintains backward compatibility\n5. Run the tests to verify the fix\n",
+  "context": "Package: purrr v1.2.1.9000\nDescription: Functional Programming Tools\nFunction: auto_browse\nParameters: .f\nTest patterns used: expect_snapshot, test_that\nExpectations used: expect_no_error, expect_snapshot\n\nFunction Code:\n```r\nauto_browse <- function(.f) {\n  if (is_primitive(.f)) {\n    cli::cli_abort(\n      \"{.arg .f} must not be a primitive function.\",\n      arg = \".f\"\n    )\n  }\n\n  function(...) {\n    withCallingHandlers(\n      .f(...),\n      error = function(e) {\n        # 1: h(simpleError(msg, call))\n        # 2: .handleSimpleError(function (e)  <...>\n        # 3: stop(...)\n        frame <- sys.frame(4)\n        browse_in_frame(frame)\n      },\n      warning = function(e) {\n        if (getOption(\"warn\") >= 2) {\n          frame <- sys.frame(7)\n          browse_in_frame(frame)\n        }\n      }\n    )\n  }\n}\n```",
+  "reference_test": "expect_snapshot(auto_browse(log)(NULL), error = TRUE)",
+  "test_type": "snapshot",
+  "patterns": [
+    "test_that",
+    "expect_snapshot"
+  ],
+  "dependencies": [
+    "R",
+    "testthat"
+  ],
+  "split": "train",
+  "function_name": "auto_browse",
+  "quality_score": 0.546,
+  "constraints": {}
+}

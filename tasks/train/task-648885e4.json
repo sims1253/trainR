@@ -1,0 +1,20 @@
+{
+  "task_id": "task-648885e4",
+  "source_package": "devtools",
+  "source_file": "R/active.R",
+  "difficulty": "medium",
+  "instruction": "Refactor the existing tests for `find_test_file` to follow better testing practices.\n\n\nCurrent test patterns to refactor:\n- test_that at tests/testthat/test-active.R:15\n- test_that at tests/testthat/test-active.R:27\n\n\nGoals:\n1. Use describe()/it() blocks for better organization where appropriate\n2. Reduce code duplication with helper functions or local fixtures\n3. Improve test descriptions to be specific about what behavior is verified\n4. Extract common setup into withr::local_* fixtures\n5. Each test should have a single responsibility\n",
+  "context": "Package: devtools v2.4.6.9000\nDescription: Tools to Make Developing R Packages Easier\nFunction: find_test_file\nParameters: path, call\nTest patterns used: test_that\nExpectations used: expect_equal\n\nFunction Code:\n```r\nfind_test_file <- function(path, call = parent.frame()) {\n  type <- test_file_type(path)\n  if (anyNA(type)) {\n    file <- path_file(path[is.na(type)])\n    cli::cli_abort(\n      \"Don't know how to find tests associated with the active file {.file {file}}\",\n      call = call\n    )\n  }\n\n  pkg <- as.package(dirname(path))\n\n  is_test <- type == \"test\"\n  path[!is_test] <- paste0(\n    pkg$path,\n    \"/tests/testthat/test-\",\n    name_source(path[!is_test]),\n    \".R\"\n  )\n  path <- unique(path[file_exists(path)])\n\n  if (length(path) == 0) {\n    cli::cli_abort(\"No test files found\", call = call)\n  }\n  path\n}\n```",
+  "reference_test": "# No substantive reference patterns available",
+  "test_type": "unit",
+  "patterns": [
+    "test_that"
+  ],
+  "dependencies": [
+    "testthat"
+  ],
+  "split": "train",
+  "function_name": "find_test_file",
+  "quality_score": 0.51,
+  "constraints": {}
+}

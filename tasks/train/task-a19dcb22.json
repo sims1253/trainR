@@ -1,0 +1,20 @@
+{
+  "task_id": "task-a19dcb22",
+  "source_package": "reticulate",
+  "source_file": "R/RcppExports.R",
+  "difficulty": "hard",
+  "instruction": "Add comprehensive edge case tests for `py_finalize`.\n\n\nExisting tests for reference:\n```r\n\n```\n\n\nThe existing tests cover basic functionality. Add tests for:\n1. NULL inputs to each argument\n2. Empty vectors/strings: character(0), \"\", integer(0)\n3. Boundary values: 0, 1, -1, NA, NaN, Inf\n4. Invalid input types (passing numeric where character expected, etc.)\n5. Missing arguments (use expect_error with class matching)\n6. Very long inputs (strings > 1000 chars, vectors > 10000 elements)\n",
+  "context": "Package: reticulate v1.45.0.9000\nDescription: Interface to 'Python'\nFunction: py_finalize\nTest patterns used: test_that\nExpectations used: expect_contains\n\nFunction Code:\n```r\npy_finalize <- function() {\n    invisible(.Call(`_reticulate_py_finalize`))\n}\n```",
+  "reference_test": "# No substantive reference patterns available",
+  "test_type": "unit",
+  "patterns": [
+    "test_that"
+  ],
+  "dependencies": [
+    "testthat"
+  ],
+  "split": "train",
+  "function_name": "py_finalize",
+  "quality_score": 0.56,
+  "constraints": {}
+}

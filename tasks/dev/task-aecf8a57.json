@@ -1,0 +1,20 @@
+{
+  "task_id": "task-aecf8a57",
+  "source_package": "recipes",
+  "source_file": "R/case_weights.R",
+  "difficulty": "medium",
+  "instruction": "Refactor the existing tests for `get_case_weights` to follow better testing practices.\n\n\nCurrent test patterns to refactor:\n- test_that at tests/testthat/test-case-weight-functions.R:160\n\n\nGoals:\n1. Use describe()/it() blocks for better organization where appropriate\n2. Reduce code duplication with helper functions or local fixtures\n3. Improve test descriptions to be specific about what behavior is verified\n4. Extract common setup into withr::local_* fixtures\n5. Each test should have a single responsibility\n",
+  "context": "Package: recipes v1.3.1.9000\nDescription: Preprocessing and Feature Engineering Steps for Modeling\nFunction: get_case_weights\nParameters: info, .data, call\nTest patterns used: test_that\nExpectations used: expect_snapshot\n\nFunction Code:\n```r\nget_case_weights <- function(info, .data, call = rlang::caller_env()) {\n  wt_col <- info$variable[info$role == \"case_weights\" & !is.na(info$role)]\n\n  if (length(wt_col) == 1) {\n    res <- .data[[wt_col]]\n    if (!is.numeric(res)) {\n      cli::cli_abort(\n        c(\n          x = \"{.field {wt_col}} has a {.code case_weights} role and should be\n              numeric, but is {.obj_type_friendly {wt_col}}.\",\n          i = \"Only numeric case weights are supported in recipes.\"\n        ),\n        call = call\n      )\n    }\n  } else if (length(wt_col) == 0) {\n    res <- NULL\n  } else {\n    too_many_case_weights(wt_col, call = call)\n  }\n\n  res\n}\n```",
+  "reference_test": "# No substantive reference patterns available",
+  "test_type": "unit",
+  "patterns": [
+    "test_that"
+  ],
+  "dependencies": [
+    "testthat"
+  ],
+  "split": "dev",
+  "function_name": "get_case_weights",
+  "quality_score": 0.51,
+  "constraints": {}
+}

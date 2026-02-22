@@ -1,0 +1,52 @@
+{
+  "task_id": "r-lib_vctrs_2135",
+  "source": {
+    "repo": "r-lib/vctrs",
+    "pr_number": 2135,
+    "base_commit": "ca6c6c8a2ac5d2ace5c6fe00d42530e2de43e868",
+    "head_commit": "392672df2d74568415e097f3df64f706fdd55a88",
+    "merged_commit": "788f435796383833c4d54735948f3f13f9376751",
+    "pr_url": "https://github.com/r-lib/vctrs/pull/2135",
+    "merged_at": "2026-01-06T01:35:08+00:00",
+    "issue_url": "https://github.com/r-lib/vctrs/issues/1981"
+  },
+  "problem_statement": {
+    "title": "Remove common class fallback class before throwing error",
+    "body": "Closes #1981\r\nPlucked from https://github.com/r-lib/vctrs/pull/2128",
+    "issue_title": "`vec_c()` and `list_unchop()` report bad error message for incompatible fallback objects in the >=3rd position",
+    "issue_body": "``` r\nlibrary(vctrs)\n\nfoobar <- function(x) {\n  structure(x, class = \"vctrs_foobar\")\n}\n\n# Works\nvec_c(\n  foobar(1:2), foobar(5L)\n)\n#> [1] 1 2 5\n#> attr(,\"class\")\n#> [1] \"vctrs_foobar\"\n\n# Correctly fails, good error\n#\n# This is a failure because `typeof` isn't the same between\n# the two fallback objects\nvec_c(\n  foobar(1:2), foobar(0)\n)\n#> Error in `vec_c()`:\n#> ! Can't combine `..1` <vctrs_foobar> and `..2` <vctrs_foobar>.\n#> \u2716 Some attributes are incompatible.\n#> \u2139 The author of the class should implement vctrs methods.\n#> \u2139 See <https://vctrs.r-lib.org/reference/faq-error-incompatible-attributes.html>.\n\n# Correctly fails, bad error\n#\n# Common type of the first 2 is a `vctrs:::common_class_fallback`,\n# and the common type of that and `foobar(5)` results in a failure,\n# but the failure doesn't remove the `vctrs:::common_class_fallback`\n# class in the failure report\nvec_c(\n  foobar(1:2), foobar(5L), foobar(0)\n)\n#> Error in `vec_c()`:\n#> ! Can't combine `..1` <vctrs:::common_class_fallback> and `..3` <vctrs_foobar>.\n\n# This also affects `list_unchop()`'s `default` argument, so we should\n# add a test for that too\nlist_unchop(\n  x = list(foobar(1:2), foobar(5:6)),\n  indices = list(1:2, 5:6),\n  size = 7,\n  default = foobar(0)\n)\n#> Error in `list_unchop()`:\n#> ! Can't combine <vctrs:::common_class_fallback> and `default` <vctrs_foobar>.\n```\n\n<sup>Created on 2025-07-15 with [reprex v2.1.1](https://reprex.tidyverse.org)</sup>"
+  },
+  "patch": "diff --git a/R/type2.R b/R/type2.R\nindex 203e423d5..308d1a0eb 100644\n--- a/R/type2.R\n+++ b/R/type2.R\n@@ -161,6 +161,16 @@ vec_default_ptype2 <- function(\n     return(vec_ptype(x, x_arg = x_arg))\n   }\n \n+  if (opts$s3_fallback) {\n+    # Undo common class fallback class for error messages\n+    if (is_common_class_fallback(x)) {\n+      x <- fallback_class_remove(x)\n+    }\n+    if (is_common_class_fallback(y)) {\n+      y <- fallback_class_remove(y)\n+    }\n+  }\n+\n   # The from-dispatch parameter is set only when called from our S3\n   # dispatch mechanism, when no method is found to dispatch to. It\n   # indicates whether the error message should provide advice about\n@@ -277,6 +287,11 @@ fallback_class <- function(x) {\n     class(x)\n   }\n }\n+fallback_class_remove <- function(x) {\n+  class(x) <- attr(x, \"fallback_class\", exact = TRUE)\n+  attr(x, \"fallback_class\") <- NULL\n+  x\n+}\n \n check_ptype2_dots_empty <- function(\n   ...,",
+  "test_patch": "diff --git a/tests/testthat/_snaps/list-combine.md b/tests/testthat/_snaps/list-combine.md\nindex a8ac52ea7..b23b66937 100644\n--- a/tests/testthat/_snaps/list-combine.md\n+++ b/tests/testthat/_snaps/list-combine.md\n@@ -666,6 +666,39 @@\n       Error in `list_combine()`:\n       ! `indices` must have size 2, not size 1.\n \n+# common type failure after common class fallback reports the original class (#1981)\n+\n+    Code\n+      list_combine(list(int, dbl), indices = list(1, 2), size = 2)\n+    Condition\n+      Error in `list_combine()`:\n+      ! Can't combine `x[[1]]` <vctrs_foobar> and `x[[2]]` <vctrs_foobar>.\n+      x Some attributes are incompatible.\n+      i The author of the class should implement vctrs methods.\n+      i See <https://vctrs.r-lib.org/reference/faq-error-incompatible-attributes.html>.\n+\n+---\n+\n+    Code\n+      list_combine(list(int, int, dbl), indices = list(1, 2, 3), size = 3)\n+    Condition\n+      Error in `list_combine()`:\n+      ! Can't combine `x[[1]]` <vctrs_foobar> and `x[[3]]` <vctrs_foobar>.\n+      x Some attributes are incompatible.\n+      i The author of the class should implement vctrs methods.\n+      i See <https://vctrs.r-lib.org/reference/faq-error-incompatible-attributes.html>.\n+\n+---\n+\n+    Code\n+      list_combine(list(int, int), indices = list(1, 2), size = 2, default = dbl)\n+    Condition\n+      Error in `list_combine()`:\n+      ! Can't combine <vctrs_foobar> and `default` <vctrs_foobar>.\n+      x Some attributes are incompatible.\n+      i The author of the class should implement vctrs methods.\n+      i See <https://vctrs.r-lib.org/reference/faq-error-incompatible-attributes.html>.\n+\n # NULL is a valid index\n \n     Code\ndiff --git a/tests/testthat/test-list-combine.R b/tests/testthat/test-list-combine.R\nindex 9abf6a09d..4267827d5 100644\n--- a/tests/testthat/test-list-combine.R\n+++ b/tests/testthat/test-list-combine.R\n@@ -1695,6 +1695,49 @@ test_that(\"can fallback when combining arrays of >2D\", {\n   expect_identical(list_combine(x, indices = indices, size = 3), expect)\n })\n \n+test_that(\"common type failure after common class fallback reports the original class (#1981)\", {\n+  int <- foobar(int(1))\n+  dbl <- foobar(dbl(1))\n+\n+  # Works\n+  expect_identical(\n+    list_combine(\n+      list(int, int),\n+      indices = list(1, 2),\n+      size = 2\n+    ),\n+    foobar(int(1, 1))\n+  )\n+\n+  # Failure with 1 and 2\n+  expect_snapshot(error = TRUE, {\n+    list_combine(\n+      list(int, dbl),\n+      indices = list(1, 2),\n+      size = 2\n+    )\n+  })\n+\n+  # Failure with 1 and 3\n+  expect_snapshot(error = TRUE, {\n+    list_combine(\n+      list(int, int, dbl),\n+      indices = list(1, 2, 3),\n+      size = 3\n+    )\n+  })\n+\n+  # Failure with 1 and `default`\n+  expect_snapshot(error = TRUE, {\n+    list_combine(\n+      list(int, int),\n+      indices = list(1, 2),\n+      size = 2,\n+      default = dbl\n+    )\n+  })\n+})\n+\n test_that(\"can combine with all size 0 elements and get the right ptype\", {\n   x <- list(integer(), integer())\n   indices <- list(integer(), integer())\n",
+  "tests": {
+    "fail_to_pass": [
+      "Error message for `vec_c(foobar(1:2), foobar(5L), foobar(0))` should show `<vctrs_foobar>` not `<vctrs:::common_class_fallback>`",
+      "Error message for `list_unchop()` with incompatible default should show original class name",
+      "Error message for combining 2 incompatible fallback objects should show original class names"
+    ],
+    "pass_to_pass": [
+      "vec_c() with compatible fallback objects should still work correctly",
+      "list_combine() with compatible elements should still work correctly",
+      "Existing error messages for other incompatibility cases should remain unchanged"
+    ]
+  },
+  "metadata": {
+    "task_type": "bug_fix",
+    "difficulty": "medium",
+    "quality_score": 8,
+    "mined_at": "2026-02-22T18:54:22.398371+00:00",
+    "key_changes": [
+      "Add a check in `vec_default_ptype2()` before throwing error: if `opts$s3_fallback` is true, check if x or y is a common_class_fallback and restore original class",
+      "Create a `fallback_class_remove()` helper function that restores the original class from the `fallback_class` attribute",
+      "The fix should be placed after the early return for successful ptype2 and before the error is thrown"
+    ],
+    "potential_pitfalls": [
+      "Must only apply this transformation when `opts$s3_fallback` is TRUE",
+      "The `fallback_class` attribute stores the original class - need to restore it and remove the attribute",
+      "Both x and y might need to be transformed, not just one",
+      "Should not modify the objects if they are not common class fallback objects"
+    ]
+  },
+  "instruction": "Fix the error message in `vec_default_ptype2()` that incorrectly reports `vctrs:::common_class_fallback` instead of the original class name when combining incompatible fallback objects at positions >= 3. When `vec_c()` or `list_unchop()` combine objects with custom classes that don't have vctrs methods, and an incompatibility occurs after a common class fallback has been computed, the error message should show the original class name (e.g., `vctrs_foobar`) rather than the internal `vctrs:::common_class_fallback` class.",
+  "context": "The `vec_default_ptype2()` function in R/type2.R handles type coercion when no vctrs methods are defined for custom classes. When objects have a common class but incompatible attributes (like different typeof), a `common_class_fallback` object is created internally. Before throwing an error about incompatibility, the function should restore the original class for clearer error messages.\n\nRelated functions:\n- `is_common_class_fallback(x)` - checks if x is a common class fallback object\n- `fallback_class(x)` - gets the fallback class attribute\n- The fix should be added in `vec_default_ptype2()` before the error is thrown"
+}

@@ -1,0 +1,59 @@
+{
+  "task_id": "r-lib_testthat_2298",
+  "source": {
+    "repo": "r-lib/testthat",
+    "pr_number": 2298,
+    "base_commit": "75990dee7a6f120dc4c6127e6dc529ba28aabb3f",
+    "head_commit": "5ac636bcd6f0612f7e50a6545f0139bd2dff37fe",
+    "merged_commit": "ceeadda3fc12a77db43284cb0c71554a7560efa0",
+    "pr_url": "https://github.com/r-lib/testthat/pull/2298",
+    "merged_at": "2026-01-07T19:11:46+00:00",
+    "issue_url": "https://github.com/r-lib/testthat/issues/2297"
+  },
+  "problem_statement": {
+    "title": "Always report success/failure count",
+    "body": "Closes #2297 \r\n\r\nInitial proposal",
+    "issue_title": "expect_failure() should report that the correct number of failures was indeed observed",
+    "issue_body": "```r\nexpect_failure({\n  pass()\n  fail('x')\n})\n# Error: Expected exactly one failure and no successes.\n# Actually succeeded 1 times\n```\n\nIt's not clear from the message itself that the failure side of the equation is balanced -- I was reading through logs and puzzling over why the test didn't fail as I was finding it to do interactively."
+  },
+  "patch": "diff --git a/NEWS.md b/NEWS.md\nindex 510e4273b..fce396ec8 100644\n--- a/NEWS.md\n+++ b/NEWS.md\n@@ -1,5 +1,6 @@\n # testthat 3.3.1\n \n+* `expect_success()` and `expect_failure()` are more clear about what the expectation actually did (#2297).\n * The hint to use `snapshot_download_gh()` is now only emitted when running in a job named \"R-CMD-check\" (#2300).\n * `expect_snapshot_file()` correctly reports file name if duplicated (@MichaelChirico, #2296).\n * Fixed support for `shinytest2::AppDriver$expect_values()` screenshot snapshot failing on CI (#2293, #2288).",
+  "test_patch": "diff --git a/R/expect-self-test.R b/R/expect-self-test.R\nindex a4dd18601..a9c75bc92 100644\n--- a/R/expect-self-test.R\n+++ b/R/expect-self-test.R\n@@ -26,6 +26,36 @@ capture_success_failure <- function(expr) {\n   )\n }\n \n+format_success_failure <- function(status, exp_n_success, exp_n_failure) {\n+  pluralise <- function(n, singular, plural) {\n+    paste(n, ngettext(n, singular, plural))\n+  }\n+\n+  tick <- cli::col_green(cli::symbol$tick)\n+  cross <- cli::col_red(cli::symbol$cross)\n+\n+  success_ok <- status$n_success == exp_n_success\n+  failure_ok <- status$n_failure == exp_n_failure\n+\n+  c(\n+    sprintf(\n+      \"Expected %s and %s.\",\n+      pluralise(exp_n_success, \"success\", \"successes\"),\n+      pluralise(exp_n_failure, \"failure\", \"failures\")\n+    ),\n+    sprintf(\n+      \"%s Observed %s.\",\n+      if (success_ok) tick else cross,\n+      pluralise(status$n_success, \"success\", \"successes\")\n+    ),\n+    sprintf(\n+      \"%s Observed %s.\",\n+      if (failure_ok) tick else cross,\n+      pluralise(status$n_failure, \"failure\", \"failures\")\n+    )\n+  )\n+}\n+\n #' Test your custom expectations\n #'\n #' @description\n@@ -44,17 +74,11 @@ capture_success_failure <- function(expr) {\n expect_success <- function(expr) {\n   status <- capture_success_failure(expr)\n \n-  expected <- \"Expected exactly one success and no failures.\"\n-  if (status$n_success != 1) {\n-    actual <- sprintf(\"Actually succeeded %i times\", status$n_success)\n-    fail(c(expected, actual))\n-  } else if (status$n_failure > 0) {\n-    actual <- sprintf(\"Actually failed %i times\", status$n_failure)\n-    fail(c(expected, actual))\n-  } else {\n+  if (status$n_success == 1 && status$n_failure == 0) {\n     pass()\n+    return(invisible())\n   }\n-\n+  fail(format_success_failure(status, exp_n_success = 1, exp_n_failure = 0))\n   invisible()\n }\n \n@@ -63,21 +87,17 @@ expect_success <- function(expr) {\n expect_failure <- function(expr, message = NULL, ...) {\n   status <- capture_success_failure(expr)\n \n-  expected <- \"Expected exactly one failure and no successes.\"\n-  if (status$n_failure != 1) {\n-    actual <- sprintf(\"Actually failed %i times\", status$n_failure)\n-    fail(c(expected, actual))\n-  } else if (status$n_success != 0) {\n-    actual <- sprintf(\"Actually succeeded %i times\", status$n_success)\n-    fail(c(expected, actual))\n-  } else {\n+  if (status$n_failure == 1 && status$n_success == 0) {\n     if (is.null(message)) {\n       pass()\n     } else {\n       act <- labelled_value(status$last_failure$message, \"failure message\")\n       expect_match_(act, message, ..., title = \"message\")\n     }\n+    return(invisible())\n   }\n+\n+  fail(format_success_failure(status, exp_n_success = 0, exp_n_failure = 1))\n   invisible()\n }\n \ndiff --git a/tests/testthat/_snaps/expect-self-test.md b/tests/testthat/_snaps/expect-self-test.md\nindex ad7c1d82c..dead81396 100644\n--- a/tests/testthat/_snaps/expect-self-test.md\n+++ b/tests/testthat/_snaps/expect-self-test.md\n@@ -4,20 +4,30 @@\n       expect_failure(expect_no_failure())\n     Condition\n       Error:\n-      ! Expected exactly one failure and no successes.\n-      Actually failed 0 times\n+      ! Expected 0 successes and 1 failure.\n+      v Observed 0 successes.\n+      x Observed 0 failures.\n     Code\n       expect_failure(expect_many_failures())\n     Condition\n       Error:\n-      ! Expected exactly one failure and no successes.\n-      Actually failed 2 times\n+      ! Expected 0 successes and 1 failure.\n+      v Observed 0 successes.\n+      x Observed 2 failures.\n     Code\n       expect_failure(expect_has_success())\n     Condition\n       Error:\n-      ! Expected exactly one failure and no successes.\n-      Actually succeeded 1 times\n+      ! Expected 0 successes and 1 failure.\n+      x Observed 1 success.\n+      v Observed 1 failure.\n+    Code\n+      expect_failure(expect_both_wrong())\n+    Condition\n+      Error:\n+      ! Expected 0 successes and 1 failure.\n+      x Observed 1 success.\n+      x Observed 0 failures.\n     Code\n       expect_failure(expect_failure_foo(), \"bar\")\n     Condition\n@@ -52,20 +62,30 @@\n       expect_success(expect_no_success())\n     Condition\n       Error:\n-      ! Expected exactly one success and no failures.\n-      Actually succeeded 0 times\n+      ! Expected 1 success and 0 failures.\n+      x Observed 0 successes.\n+      v Observed 0 failures.\n     Code\n       expect_success(expect_many_successes())\n     Condition\n       Error:\n-      ! Expected exactly one success and no failures.\n-      Actually succeeded 2 times\n+      ! Expected 1 success and 0 failures.\n+      x Observed 2 successes.\n+      v Observed 0 failures.\n     Code\n       expect_success(expect_has_failure())\n     Condition\n       Error:\n-      ! Expected exactly one success and no failures.\n-      Actually failed 1 times\n+      ! Expected 1 success and 0 failures.\n+      v Observed 1 success.\n+      x Observed 1 failure.\n+    Code\n+      expect_success(expect_both_wrong())\n+    Condition\n+      Error:\n+      ! Expected 1 success and 0 failures.\n+      x Observed 0 successes.\n+      x Observed 1 failure.\n \n # expect_no are deprecated\n \ndiff --git a/tests/testthat/test-expect-self-test.R b/tests/testthat/test-expect-self-test.R\nindex 97ae8f849..b0258dafe 100644\n--- a/tests/testthat/test-expect-self-test.R\n+++ b/tests/testthat/test-expect-self-test.R\n@@ -31,12 +31,16 @@ test_that(\"expect_failure() generates a useful error messages\", {\n     fail()\n     pass()\n   }\n+  expect_both_wrong <- function() {\n+    pass()\n+  }\n   expect_failure_foo <- function() fail(\"foo\")\n \n   expect_snapshot_failure({\n     expect_failure(expect_no_failure())\n     expect_failure(expect_many_failures())\n     expect_failure(expect_has_success())\n+    expect_failure(expect_both_wrong())\n     expect_failure(expect_failure_foo(), \"bar\")\n   })\n })\n@@ -76,11 +80,15 @@ test_that(\"expect_success() generates a useful error messages\", {\n     fail()\n     pass()\n   }\n+  expect_both_wrong <- function() {\n+    fail()\n+  }\n \n   expect_snapshot_failure({\n     expect_success(expect_no_success())\n     expect_success(expect_many_successes())\n     expect_success(expect_has_failure())\n+    expect_success(expect_both_wrong())\n   })\n })\n \n",
+  "tests": {
+    "fail_to_pass": [
+      "expect_failure() error message shows both success and failure counts with visual indicators",
+      "expect_success() error message shows both success and failure counts with visual indicators",
+      "format_success_failure() correctly pluralizes 'success' and 'failure'",
+      "Visual indicators (tick/cross) correctly show which counts match expectations",
+      "Edge case where both success and failure counts are wrong is handled"
+    ],
+    "pass_to_pass": [
+      "expect_success() passes when exactly one success and zero failures occur",
+      "expect_failure() passes when exactly one failure and zero successes occur",
+      "expect_failure() with message argument still works correctly",
+      "Existing snapshot tests for other expect_self_test functions still pass"
+    ]
+  },
+  "metadata": {
+    "task_type": "bug_fix",
+    "difficulty": "medium",
+    "quality_score": 8,
+    "mined_at": "2026-02-22T18:53:03.162692+00:00",
+    "key_changes": [
+      "Create new helper function format_success_failure() that formats the error message",
+      "Use cli::col_green/cli::symbol$tick for correct counts and cli::col_red/cli::symbol$cross for incorrect counts",
+      "Use ngettext() for proper pluralization of 'success/successes' and 'failure/failures'",
+      "Refactor expect_success() to use the new format function with exp_n_success=1, exp_n_failure=0",
+      "Refactor expect_failure() to use the new format function with exp_n_success=0, exp_n_failure=1",
+      "Add early return after pass() in expect_success() to avoid fall-through"
+    ],
+    "potential_pitfalls": [
+      "Forgetting to return early after pass() in expect_success(), causing the fail() to also execute",
+      "Incorrect pluralization - using '1 successes' or '2 success'",
+      "Not handling the edge case where both counts are wrong (e.g., 1 success when expecting 0, and 0 failures when expecting 1)",
+      "Inconsistent formatting between expect_success() and expect_failure()",
+      "Missing the visual indicators or using wrong colors"
+    ]
+  },
+  "instruction": "Improve the error messages in `expect_success()` and `expect_failure()` functions to always report both success and failure counts. Currently, when these functions fail, they only report one side of the equation (e.g., 'Actually succeeded 1 times'), making it unclear whether the other count was correct. The new format should clearly show: (1) what was expected, (2) what was observed for successes with a visual indicator (tick if correct, cross if wrong), and (3) what was observed for failures with a visual indicator. For example, instead of 'Expected exactly one failure and no successes. Actually succeeded 1 times', the new message should be 'Expected 0 successes and 1 failure. x Observed 1 success. v Observed 1 failure.'",
+  "context": "The functions `expect_success()` and `expect_failure()` are in R/expect-self-test.R. They use `capture_success_failure()` which returns a list with `n_success` and `n_failure` fields. The existing code has separate error messages for different failure conditions. You need to create a helper function `format_success_failure(status, exp_n_success, exp_n_failure)` that formats a consistent message showing both counts with visual indicators (cli::col_green/cli::symbol$tick for correct, cli::col_red/cli::symbol$cross for incorrect). Handle pluralization properly (1 success vs 2 successes)."
+}

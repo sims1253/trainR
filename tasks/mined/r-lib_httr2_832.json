@@ -1,0 +1,50 @@
+{
+  "task_id": "r-lib_httr2_832",
+  "source": {
+    "repo": "r-lib/httr2",
+    "pr_number": 832,
+    "base_commit": "c7d4a865a6e94a9f482a11044dd066c7fd7ac14d",
+    "head_commit": "a7ab6dabda46056c4e9b5434bca9bc1041f305e9",
+    "merged_commit": "de347bdf84d291ef42f253d2ccb57c30f94d74a5",
+    "pr_url": "https://github.com/r-lib/httr2/pull/832",
+    "merged_at": "2026-01-14T19:10:15+00:00",
+    "issue_url": "https://github.com/r-lib/httr2/issues/782"
+  },
+  "problem_statement": {
+    "title": "Fix `last_response_json()` to work with 'application/problem+json' ",
+    "body": "closes #782\r\n\r\n\r\n```r\r\nlibrary(plumber2)\r\nlibrary(httr2)\r\n\r\napi <-  api() |>\r\n  api_get(\r\n    \"/health\",\r\n    function() {\r\n      plumber2::abort_bad_request(\"bad request\")\r\n    }\r\n  )\r\n\r\nmirai::daemons(1)\r\n\r\n# run api in a separate process & do not block the current process\r\nmi <- mirai::mirai({\r\n  api$ignite(block = TRUE, showcase = FALSE)\r\n}, api = api)\r\n\r\n\r\nrequest(\"http://127.0.0.1:8080/health\") |>  req_perform()\r\n\r\n# Error in `req_perform()`:\r\n# ! HTTP 400 Bad Request.\r\n```\r\n\r\n\r\n```r\r\n last_response_json()\r\n{\r\n  \"type\": \"https://datatracker.ietf.org/doc/html/rfc9110#section-15.5.1\",\r\n  \"title\": \"Bad Request\",\r\n  \"status\": 400,\r\n  \"detail\": \"bad request\"\r\n}\r\n\r\n```",
+    "issue_title": "Should `last_response_json()` work with 'application/problem+json' content type?",
+    "issue_body": "Currently  `last_response_json()`  errors with  `application/problem+json` response:\n\n```r\nlast_response_json()\n# Error in `last_response_json()`:\n# ! Last response doesn't have a JSON body.\n```\nBut this works:\n```r\nlast_response() |> resp_body_json()\n```\n\nA quick look at the source shows that:\n- `resp_body_json()` uses `resp_check_content_type` and \n-  `last_response_json()` checks `resp_content_type(resp)` if it is \"application/json\""
+  },
+  "patch": "diff --git a/NEWS.md b/NEWS.md\nindex e2e85e4c..db15ae62 100644\n--- a/NEWS.md\n+++ b/NEWS.md\n@@ -1,5 +1,8 @@\n # httr2 (development version)\n \n+* `last_response_json()` now works with content-types that end with `+json`, \n+e.g., `application/problem+json` (@cgiachalis, #782).\n+\n # httr2 1.2.2\n \n * httr2 will now emit OpenTelemetry traces for all requests when tracing is enabled. Requires the `otelsdk` package (@atheriel, #729).\ndiff --git a/R/last.R b/R/last.R\nindex 625d5d01..c57beb14 100644\n--- a/R/last.R\n+++ b/R/last.R\n@@ -61,9 +61,12 @@ last_response_json <- function(pretty = TRUE) {\n   if (is.null(resp)) {\n     cli::cli_abort(\"No request has been made successfully yet.\")\n   }\n-  if (!identical(resp_content_type(resp), \"application/json\")) {\n-    cli::cli_abort(\"Last response doesn't have a JSON body.\")\n-  }\n+  check_content_type(\n+    resp_content_type(resp),\n+    valid_types = \"application/json\",\n+    valid_suffix = \"json\",\n+    inform_check_type = TRUE\n+  )\n   httr2_json(resp_body_string(resp), pretty = pretty)\n }\n ",
+  "test_patch": "diff --git a/tests/testthat/_snaps/last.md b/tests/testthat/_snaps/last.md\nindex a8da3918..90957b31 100644\n--- a/tests/testthat/_snaps/last.md\n+++ b/tests/testthat/_snaps/last.md\n@@ -35,7 +35,8 @@\n       last_response_json()\n     Condition\n       Error in `last_response_json()`:\n-      ! Last response doesn't have a JSON body.\n+      ! Unexpected content type \"application/xml\".\n+      * Expecting type \"application/json\" or suffix \"json\".\n \n # useful errors if no last request/response\n \n",
+  "tests": {
+    "fail_to_pass": [
+      "last_response_() should successfully parse response body when content type is 'application/problem+'",
+      "Error message for non-JSON content types should indicate expected type or suffix"
+    ],
+    "pass_to_pass": [
+      "last_response_() should continue to work with 'application/' content type",
+      "last_response_() should still error appropriately for non-JSON content types like 'application/xml'"
+    ]
+  },
+  "metadata": {
+    "task_type": "bug_fix",
+    "difficulty": "easy",
+    "quality_score": 8,
+    "mined_at": "2026-02-22T19:04:13.066805+00:00",
+    "key_changes": [
+      "Replace the simple identical() check with check_content_type() function call",
+      "Use valid_types = \"application/\" for exact matching",
+      "Use valid_suffix = \"\" to allow + suffixes like application/problem+",
+      "Set inform_check_type = TRUE for better error messages"
+    ],
+    "potential_pitfalls": [
+      "Not discovering the existing check_content_type() function and reimplementing suffix matching logic",
+      "Breaking existing error messages for non-JSON content types",
+      "Forgetting to handle the case where content type is NULL or missing"
+    ]
+  },
+  "instruction": "Fix `last_response_()` to work with content types that end with `+`, such as `application/problem+`. Currently, the function errors with 'Last response doesn't have a JSON body' when the content type is `application/problem+`, but `resp_body_()` handles this correctly. The fix should allow any content type with a `+` suffix to be recognized as valid JSON.",
+  "context": "The `last_response_()` function in R/last.R currently checks content type with:\nr\nif (!identical(resp_content_type(resp), \"application/\")) {\n  cli::cli_abort(\"Last response doesn't have a JSON body.\")\n}\n\n\nThe package has a `check_content_type()` function that supports both exact type matching and suffix matching via `valid_types` and `valid_suffix` parameters. This function is used by `resp_body_()` which is why it works correctly."
+}

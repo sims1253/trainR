@@ -1,0 +1,20 @@
+{
+  "task_id": "task-7842d129",
+  "source_package": "testthat",
+  "source_file": "R/auto-test.R",
+  "difficulty": "hard",
+  "instruction": "Add comprehensive edge case tests for `watcher`.\n\n\nExisting tests for reference:\n```r\n\n```\n\n\nThe existing tests cover basic functionality. Add tests for:\n1. NULL inputs to each argument\n2. Empty vectors/strings: character(0), \"\", integer(0)\n3. Boundary values: 0, 1, -1, NA, NaN, Inf\n4. Invalid input types (passing numeric where character expected, etc.)\n5. Missing arguments (use expect_error with class matching)\n6. Very long inputs (strings > 1000 chars, vectors > 10000 elements)\n",
+  "context": "Package: testthat v3.3.2.9000\nDescription: Unit Testing for R\nFunction: watcher\nParameters: added, deleted, modified\nTest patterns used: test_that\nExpectations used: expect_equal\n\nFunction Code:\n```r\nwatcher <- function(added, deleted, modified) {\n    changed <- normalizePath(c(added, modified))\n\n    tests <- changed[starts_with(changed, test_path)]\n    code <- changed[starts_with(changed, code_path)]\n\n    # Remove helper from test and add it to code (if a helper changed,\n    # like for code, reload all and rerun all tests)\n    helper <- tests[starts_with(basename(tests), \"helper-\")]\n    tests <- setdiff(tests, helper)\n    code <- c(code, helper)\n\n    if (length(code) > 0) {\n      # Reload code and rerun all tests\n      cat(\"Changed code: \", paste0(basename(code), collapse = \", \"), \"\\n\")\n      cat(\"Rerunning all tests\\n\")\n      pkgload::load_all(path, quiet = TRUE)\n      test_dir(\n        test_path,\n        package = package,\n        reporter = reporter$clone(deep = TRUE)\n      )\n    } else if (length(tests) > 0) {\n      # If test changes, rerun just that test\n      cat(\"Rerunning tests: \", paste0(basename(tests), collapse = \", \"), \"\\n\")\n      env <- env_clone(asNamespace(package))\n      test_files(\n        test_dir = test_path,\n        test_package = package,\n        test_paths = tests,\n        env = env,\n        reporter = reporter$clone(deep = TRUE)\n      )\n    }\n\n    TRUE\n  }\n```",
+  "reference_test": "# No substantive reference patterns available",
+  "test_type": "unit",
+  "patterns": [
+    "test_that"
+  ],
+  "dependencies": [
+    "testthat"
+  ],
+  "split": "held_out",
+  "function_name": "watcher",
+  "quality_score": 0.56,
+  "constraints": {}
+}

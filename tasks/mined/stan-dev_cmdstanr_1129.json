@@ -1,0 +1,51 @@
+{
+  "task_id": "stan-dev_cmdstanr_1129",
+  "source": {
+    "repo": "stan-dev/cmdstanr",
+    "pr_number": 1129,
+    "base_commit": "6606bc278c9a4daf1a70b30ca488de84d802b0c6",
+    "head_commit": "c80d05ab7fabf65e7e79f897c2cedd8e20faac28",
+    "merged_commit": "862ada9fb3defea582d4b349b5fdd3f67550be0d",
+    "pr_url": "https://github.com/stan-dev/cmdstanr/pull/1129",
+    "merged_at": "2025-12-31T17:45:55+00:00",
+    "issue_url": "https://github.com/stan-dev/cmdstanr/issues/1126"
+  },
+  "problem_statement": {
+    "title": "Improve error message if any data is NULL",
+    "body": "fixes #1126\r\n\r\n#### Submission Checklist\r\n\r\n- [x] Run unit tests\r\n- [x] Declare copyright holder and agree to license (see below)\r\n\r\n#### Summary\r\n\r\nMore informative error message if any data is `NULL`\r\n\r\n#### Copyright and Licensing\r\n\r\nPlease list the copyright holder for the work you are submitting\r\n(this will be you or your assignee, such as a university or company):\r\n**Columbia University**\r\n\r\n\r\nBy submitting this pull request, the copyright holder is agreeing to\r\nlicense the submitted work under the following licenses:\r\n\r\n- Code: BSD 3-clause (https://opensource.org/licenses/BSD-3-Clause)\r\n- Documentation: CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)\r\n",
+    "issue_title": "Cryptic error in data.R if NULL passed as a variable",
+    "issue_body": "**Describe the bug**\nIf the data provided as a list includes a variable of type NULL, this won't be detected and the cryptic error as follows is generated:\n`Error in round(x) : non-numeric argument to mathematical function\n`\n(I had a bug in my own data prep code that meant NULL was being passed as a variable in the list without my awareness and because this error was so vague it took some time to track down the problem)\n\n**To Reproduce**\n```\nlibrary(cmdstanr)\n\nfile <- file.path(cmdstan_path(), \"examples/bernoulli/bernoulli.stan\")\nmod <- cmdstan_model(file)\n\n# data including a NULL variable\nstan_data <- list(N = NULL, y = c(0,1,0,0,0,0,0,0,0,1))\n\n# Run MCMC using the 'sample' method\nfit_mcmc <- mod$sample(data = stan_data)\n```\n\n**Expected behavior**\nIt would be preferable if an error reported \"Variable 'N' was found to be NULL - numeric value expected.' - or something along those lines.\n\n**Operating system**\nMac OsX 26.2\n\n**CmdStanR version number**\n\u20180.9.0.9000\u2019\nCmdStan version 2.37\n\n**Additional context**\nOn some occasions (though I could not make a reprex for this), the error also included the text: \n```\nError in round(x) : non-numeric argument to mathematical function\nCalled from: is_wholenumber(data[[var_name]])\n```\nI searched for `is_wholenumber` in CmdStanR source code and found it only once in the `process_data `function at line 190 in the data.R file - so I believe this line is throwing the error at least some of the time if not all.\n"
+  },
+  "patch": "diff --git a/R/data.R b/R/data.R\nindex f483ba4c2..31b647e2f 100644\n--- a/R/data.R\n+++ b/R/data.R\n@@ -77,6 +77,9 @@ write_stan_json <- function(data, file, always_decimal = FALSE) {\n \n   for (var_name in data_names) {\n     var <- data[[var_name]]\n+    if (is.null(var)) {\n+      stop(\"Variable '\", var_name, \"' is NULL.\", call. = FALSE)\n+    }\n     if (!(is.numeric(var) || is.factor(var) || is.logical(var) ||\n           is.data.frame(var) || is.list(var))) {\n       stop(\"Variable '\", var_name, \"' is of invalid type.\", call. = FALSE)\n@@ -176,7 +179,10 @@ process_data <- function(data, model_variables = NULL) {\n           call. = FALSE\n         )\n       }\n-      for(var_name in names(data_variables)) {\n+      for (var_name in names(data_variables)) {\n+        if (is.null(data[[var_name]])) {\n+          stop(\"Variable '\", var_name, \"' is NULL.\", call. = FALSE)\n+        }\n         # distinguish between scalars and arrays/vectors of length 1\n         if (length(data[[var_name]]) == 1\n             && data_variables[[var_name]]$dimensions == 1) {",
+  "test_patch": "diff --git a/tests/testthat/test-data.R b/tests/testthat/test-data.R\nindex c7283d9bd..b024f5e6d 100644\n--- a/tests/testthat/test-data.R\n+++ b/tests/testthat/test-data.R\n@@ -44,6 +44,19 @@ test_that(\"process_data works for inputs of length one\", {\n   expect_equal(jsonlite::read_json(process_data(data, model_variables = mod$variables())), list(val = list(5)))\n })\n \n+test_that(\"process_data errors on NULL data variables\", {\n+  stan_file <- write_stan_file(\"\n+  data {\n+    int N;\n+  }\n+  \")\n+  mod <- cmdstan_model(stan_file, compile = FALSE)\n+  expect_error(\n+    process_data(list(N = NULL), model_variables = mod$variables()),\n+    \"Variable 'N' is NULL\"\n+  )\n+})\n+\n test_that(\"process_fitted_params() works with basic input types\", {\n   temp_file <- tempfile()\n   temp_files <- c(tempfile(),\ndiff --git a/tests/testthat/test-json.R b/tests/testthat/test-json.R\nindex 1f7fb21b6..c2c2657cf 100644\n--- a/tests/testthat/test-json.R\n+++ b/tests/testthat/test-json.R\n@@ -116,6 +116,13 @@ test_that(\"write_stan_json errors if NAs\", {\n   )\n })\n \n+test_that(\"write_stan_json errors if NULL variables\", {\n+  expect_error(\n+    write_stan_json(list(N = NULL), tempfile()),\n+    \"Variable 'N' is NULL\"\n+  )\n+})\n+\n test_that(\"write_stan_json() errors if data is not a list\", {\n   expect_error(\n     write_stan_json(1:10),\n",
+  "tests": {
+    "fail_to_pass": [
+      "test_that('write_stan_ errors if NULL variables', { expect_error(write_stan_(list(N = NULL), tempfile()), \"Variable 'N' is NULL\") })",
+      "test_that('process_data errors on NULL data variables', { expect_error(process_data(list(N = NULL), model_variables = mod$variables()), \"Variable 'N' is NULL\") })"
+    ],
+    "pass_to_pass": [
+      "Existing tests for write_stan_ with valid numeric data",
+      "Existing tests for process_data with valid inputs",
+      "Tests for other error conditions (NA values, invalid types, non-list data)"
+    ]
+  },
+  "metadata": {
+    "task_type": "bug_fix",
+    "difficulty": "easy",
+    "quality_score": 9,
+    "mined_at": "2026-02-22T18:56:10.204718+00:00",
+    "key_changes": [
+      "Add `if (is.null(var)) { stop(\"Variable '\", var_name, \"' is NULL.\", call. = FALSE) }` check in write_stan_() after extracting the variable",
+      "Add similar NULL check in process_data() at the start of the loop over data_variables",
+      "Use `call. = FALSE` in the stop() call for cleaner error output"
+    ],
+    "potential_pitfalls": [
+      "The NULL check must be placed before other type checks that would fail on NULL",
+      "In process_data(), the check should use `data[[var_name]]` not `var` since the variable hasn't been extracted yet",
+      "The error message format should match the existing style in the codebase (single quotes around variable name)",
+      "Minor whitespace cleanup (space after 'for' in for loop) was included but is not essential"
+    ]
+  },
+  "instruction": "Fix the cryptic error message when NULL values are passed in the data list. Currently, passing NULL as a data variable causes an unhelpful error: 'Error in round(x) : non-numeric argument to mathematical function'. Add explicit NULL checks in the `write_stan_()` and `process_data()` functions in R/data.R to provide a clear error message like \"Variable 'N' is NULL.\" when a NULL value is encountered in the data.",
+  "context": "The `write_stan_()` function iterates over data variables and validates their types. The `process_data()` function also iterates over data variables for processing. Both functions should check for NULL values before attempting operations on them. The NULL check should be added early in the iteration loop, before any operations that would fail on NULL values (like `is.numeric()`, `is.factor()`, or `length()` checks)."
+}

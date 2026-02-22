@@ -1,0 +1,20 @@
+{
+  "task_id": "task-a191621e",
+  "source_package": "scales",
+  "source_file": "R/bounds.R",
+  "difficulty": "easy",
+  "instruction": "A test for `rescale` is failing. Diagnose and fix the issue.\n\n\nFailing test:\n```r\n\n```\n\n\nSteps:\n1. Read the function source code to understand expected behavior\n2. Compare the test expectations with actual function behavior\n3. Fix the test if expectations are wrong, or fix the function if it has a bug\n4. Ensure the fix maintains backward compatibility\n5. Run the tests to verify the fix\n",
+  "context": "Package: scales v1.4.0.9000\nDescription: Scale Functions for Visualization\nFunction: rescale\nParameters: x, to, from\nTest patterns used: test_that\nExpectations used: expect_equal\n\nFunction Code:\n```r\nrescale <- function(x, to, from, ...) {\n  UseMethod(\"rescale\")\n}\n```",
+  "reference_test": "# No substantive reference patterns available",
+  "test_type": "unit",
+  "patterns": [
+    "test_that"
+  ],
+  "dependencies": [
+    "testthat"
+  ],
+  "split": "train",
+  "function_name": "rescale",
+  "quality_score": 0.51,
+  "constraints": {}
+}

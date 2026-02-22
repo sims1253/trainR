@@ -1,0 +1,22 @@
+{
+  "task_id": "task-7070b661",
+  "source_package": "recipes",
+  "source_file": "R/case_weights.R",
+  "difficulty": "hard",
+  "instruction": "Add comprehensive edge case tests for `is_unsupervised_weights`.\n\n\nExisting tests for reference:\n```r\n\n```\n```r\n\n```\n```r\nexpect_snapshot(error = TRUE, is_unsupervised_weights(3))\n```\n\n\nThe existing tests cover basic functionality. Add tests for:\n1. NULL inputs to each argument\n2. Empty vectors/strings: character(0), \"\", integer(0)\n3. Boundary values: 0, 1, -1, NA, NaN, Inf\n4. Invalid input types (passing numeric where character expected, etc.)\n5. Missing arguments (use expect_error with class matching)\n6. Very long inputs (strings > 1000 chars, vectors > 10000 elements)\n",
+  "context": "Package: recipes v1.3.1.9000\nDescription: Preprocessing and Feature Engineering Steps for Modeling\nFunction: is_unsupervised_weights\nParameters: wts\nTest patterns used: expect_snapshot, test_that\nExpectations used: expect_false, expect_snapshot, expect_true\n\nFunction Code:\n```r\nis_unsupervised_weights <- function(wts) {\n  if (!hardhat::is_case_weights(wts)) {\n    cli::cli_abort(\"Must be be a {.code case_weights} variable.\")\n  }\n\n  hardhat::is_frequency_weights(wts)\n}\n```",
+  "reference_test": "expect_snapshot(error = TRUE, is_unsupervised_weights(3))",
+  "test_type": "snapshot",
+  "patterns": [
+    "test_that",
+    "expect_snapshot"
+  ],
+  "dependencies": [
+    "R",
+    "testthat"
+  ],
+  "split": "held_out",
+  "function_name": "is_unsupervised_weights",
+  "quality_score": 0.596,
+  "constraints": {}
+}

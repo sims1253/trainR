@@ -1,0 +1,21 @@
+{
+  "task_id": "task-41aa92b1",
+  "source_package": "gganimate",
+  "source_file": "R/anim_save.R",
+  "difficulty": "hard",
+  "instruction": "Add comprehensive edge case tests for `anim_save`.\n\n\nExisting tests for reference:\n```r\n\n```\n\n\nThe existing tests cover basic functionality. Add tests for:\n1. NULL inputs to each argument\n2. Empty vectors/strings: character(0), \"\", integer(0)\n3. Boundary values: 0, 1, -1, NA, NaN, Inf\n4. Invalid input types (passing numeric where character expected, etc.)\n5. Missing arguments (use expect_error with class matching)\n6. Very long inputs (strings > 1000 chars, vectors > 10000 elements)\n",
+  "context": "Package: gganimate v1.0.11.9000\nDescription: A Grammar of Animated Graphics\nFunction: anim_save\nParameters: filename, animation, path\nTest patterns used: test_that\nExpectations used: expect_equal\n\nFunction Code:\n```r\nanim_save <- function(filename, animation = last_animation(), path = NULL, ...) {\n  if (!is.null(path)) {\n    filename <- file.path(path, filename)\n  }\n  if (is.gganim(animation)) animation <- animate(animation, ...)\n  save_animation(animation, filename)\n}\n```",
+  "reference_test": "# No substantive reference patterns available",
+  "test_type": "unit",
+  "patterns": [
+    "test_that"
+  ],
+  "dependencies": [
+    "av",
+    "testthat"
+  ],
+  "split": "train",
+  "function_name": "anim_save",
+  "quality_score": 0.56,
+  "constraints": {}
+}

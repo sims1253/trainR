@@ -1,0 +1,22 @@
+{
+  "task_id": "task-e9f7d3b8",
+  "source_package": "readr",
+  "source_file": "R/col_types.R",
+  "difficulty": "medium",
+  "instruction": "Refactor the existing tests for `spec` to follow better testing practices.\n\n\nCurrent test patterns to refactor:\n- test_that at tests/testthat/test-col-spec.R:78\n- expect_snapshot at tests/testthat/test-col-spec.R:102\n  ```r\n  expect_snapshot(\n      col_spec_standardise(\"a,b,c\\n\", guess_max = NA),\n      error = TRUE\n  ```\n- expect_snapshot at tests/testthat/test-col-spec.R:106\n  ```r\n  expect_snapshot(\n      col_spec_standardise(\"a,b,c\\n\", guess_max = -1),\n      error = TRUE\n  ```\n- expect_snapshot at tests/testthat/test-col-spec.R:111\n  ```r\n  expect_snapshot(\n      col_spec_standardise(\"a,b,c\\n\", guess_max = Inf)\n    )\n  ```\n- expect_snapshot at tests/testthat/test-col-spec.R:155\n  ```r\n  expect_snapshot(col_spec_standardise(\"a,b,c\\n1,2,3\"))\n  ```\n\n\nGoals:\n1. Use describe()/it() blocks for better organization where appropriate\n2. Reduce code duplication with helper functions or local fixtures\n3. Improve test descriptions to be specific about what behavior is verified\n4. Extract common setup into withr::local_* fixtures\n5. Each test should have a single responsibility\n",
+  "context": "Package: readr v2.2.0.9000\nDescription: Read Rectangular Text Data\nFunction: spec\nParameters: x\nTest patterns used: expect_snapshot, test_that\nExpectations used: expect_equal, expect_false, expect_null, expect_snapshot\n\nFunction Code:\n```r\nspec <- function(x) {\n  stopifnot(inherits(x, \"tbl_df\"))\n  attr(x, \"spec\")\n}\n```",
+  "reference_test": "expect_snapshot(\n    col_spec_standardise(\"a,b,c\\n\", guess_max = NA),\n    error = TRUE\n  )\n\nexpect_snapshot(\n    col_spec_standardise(\"a,b,c\\n\", guess_max = -1),\n    error = TRUE\n  )",
+  "test_type": "snapshot",
+  "patterns": [
+    "test_that",
+    "expect_snapshot"
+  ],
+  "dependencies": [
+    "R",
+    "testthat"
+  ],
+  "split": "train",
+  "function_name": "spec",
+  "quality_score": 0.656,
+  "constraints": {}
+}

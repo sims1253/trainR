@@ -2,13 +2,23 @@
 """Generate testing tasks from R packages.
 
 This script generates testing tasks from R package source code using the
-task_generator module. It clones packages from r-lib, extracts test patterns,
-and generates tasks suitable for training/testing code generation models.
+task_generator module. It can process packages from:
+1. A single package with --package (and optional --owner)
+2. All repos from mining.yaml (default)
+3. Repos filtered by domain with --domain
 
 Usage:
-    uv run python scripts/generate_tasks.py --package cli --output ./tasks --num-tasks 15
-    uv run python scripts/generate_tasks.py --package cli --output ./tasks --dry-run
-    uv run python scripts/generate_tasks.py --package cli --output ./tasks --verbose
+    # Single package (defaults to r-lib org)
+    uv run python scripts/generate_tasks.py --package cli --num-tasks 15
+
+    # Single package from different org
+    uv run python scripts/generate_tasks.py --package dplyr --owner tidyverse --num-tasks 10
+
+    # All repos from mining.yaml
+    uv run python scripts/generate_tasks.py --num-tasks 5
+
+    # Only visualization packages
+    uv run python scripts/generate_tasks.py --domain visualization --num-tasks 5
 """
 
 import argparse
@@ -17,6 +27,8 @@ import subprocess
 import sys
 from pathlib import Path
 from typing import Any
+
+import yaml
 
 # Add parent to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -44,28 +56,16 @@ class PackageCloneError(Exception):
     pass
 
 
-def clone_package(package_name: str, packages_dir: Path) -> Path:
-    """Clone an R package from r-lib if not already present.
+def clone_package(owner: str, package_name: str, packages_dir: Path) -> Path:
+    """Clone an R package from GitHub if not already present."""
+    import os
 
-    Args:
-        package_name: Name of the R package to clone.
-        packages_dir: Directory to clone packages into.
-
-    Returns:
-        Path to the cloned package.
-
-    Raises:
-        PackageCloneError: If cloning fails.
-    """
     package_path = packages_dir / package_name
 
     if package_path.exists():
-        # Verify it's a valid git repo
         git_dir = package_path / ".git"
         if git_dir.exists():
-            console.print(
-                f"[green]✓[/green] Package {package_name} already exists at {package_path}"
-            )
+            console.print(f"[green]✓[/green] Package {package_name} already exists")
             return package_path
         else:
             console.print("[yellow]![/yellow] Directory exists but not a git repo, re-cloning...")
@@ -74,29 +74,49 @@ def clone_package(package_name: str, packages_dir: Path) -> Path:
             shutil.rmtree(package_path)
 
     packages_dir.mkdir(parents=True, exist_ok=True)
-    repo_url = f"https://github.com/r-lib/{package_name}.git"
 
-    console.print(f"[blue]Cloning {package_name} from {repo_url}...[/blue]")
+    # Use GitHub token if available for authentication
+    github_token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GITHUB_PAT")
+    if github_token:
+        repo_url = f"https://{github_token}@github.com/{owner}/{package_name}.git"
+    else:
+        repo_url = f"https://github.com/{owner}/{package_name}.git"
+
+    console.print(f"Cloning {package_name} from https://github.com/{owner}/{package_name}.git...")
 
     try:
-        result = subprocess.run(
+        subprocess.run(
             ["git", "clone", "--depth", "1", repo_url, str(package_path)],
+            check=True,
             capture_output=True,
             text=True,
-            timeout=120,  # 2 minute timeout
         )
-
-        if result.returncode != 0:
-            error_msg = result.stderr.strip() or result.stdout.strip()
-            raise PackageCloneError(f"Git clone failed: {error_msg}")
-
         console.print(f"[green]✓[/green] Successfully cloned {package_name}")
-        return package_path
+    except subprocess.CalledProcessError as e:
+        raise PackageCloneError(f"Failed to clone {owner}/{package_name}: {e.stderr}") from e
 
-    except subprocess.TimeoutExpired as e:
-        raise PackageCloneError("Git clone timed out after 120 seconds") from e
-    except FileNotFoundError as e:
-        raise PackageCloneError("Git not found. Please install git.") from e
+    return package_path
+
+
+def load_repos_from_config(config_path: str, domain_filter: str | None = None) -> list[dict]:
+    """Load repository list from mining.yaml config.
+
+    Args:
+        config_path: Path to mining.yaml
+        domain_filter: Optional domain to filter by (e.g., "core-data", "visualization")
+
+    Returns:
+        List of repo dicts with 'owner', 'repo', 'domain', 'stars', 'notes'
+    """
+    with open(config_path) as f:
+        config = yaml.safe_load(f)
+
+    repos = config.get("repos", [])
+
+    if domain_filter:
+        repos = [r for r in repos if r.get("domain") == domain_filter]
+
+    return repos
 
 
 def validate_package_structure(package_path: Path) -> bool:
@@ -271,6 +291,15 @@ Examples:
   Generate 15 tasks from cli package:
     uv run python scripts/generate_tasks.py --package cli --num-tasks 15
 
+  Generate tasks from a different org:
+    uv run python scripts/generate_tasks.py --package dplyr --owner tidyverse --num-tasks 10
+
+  Generate from all repos in mining.yaml:
+    uv run python scripts/generate_tasks.py --num-tasks 5
+
+  Generate from specific domain:
+    uv run python scripts/generate_tasks.py --domain visualization --num-tasks 5
+
   Dry run without saving:
     uv run python scripts/generate_tasks.py --package cli --dry-run
 
@@ -278,8 +307,29 @@ Examples:
     uv run python scripts/generate_tasks.py --package cli -v
 """,
     )
+
+    # Package selection - mutually exclusive
+    selection = parser.add_mutually_exclusive_group()
+    selection.add_argument(
+        "--package",
+        "-p",
+        help="Single package name to generate tasks from (uses --owner)",
+    )
+    selection.add_argument(
+        "--repos-file",
+        default="configs/mining.yaml",
+        help="YAML file with repos list (default: configs/mining.yaml)",
+    )
+    selection.add_argument(
+        "--domain",
+        help="Filter repos by domain (e.g., 'core-data', 'visualization')",
+    )
+
     parser.add_argument(
-        "--package", default="cli", help="Package name to generate tasks from (default: cli)"
+        "--owner",
+        "-o",
+        default="r-lib",
+        help="GitHub owner/org for single package (default: r-lib)",
     )
     parser.add_argument(
         "--output",
@@ -307,6 +357,11 @@ Examples:
     parser.add_argument(
         "--skip-clone", action="store_true", help="Skip cloning (use existing package)"
     )
+    parser.add_argument(
+        "--packages-dir",
+        default="packages",
+        help="Directory to clone packages into (default: packages)",
+    )
     args = parser.parse_args()
 
     # Setup logging
@@ -327,17 +382,30 @@ Examples:
 
     # Paths
     project_root = Path(__file__).parent.parent
-    packages_dir = project_root / "packages"
+    packages_dir = project_root / args.packages_dir
     output_dir = Path(args.output)
 
     # Make output_dir absolute if relative
     if not output_dir.is_absolute():
         output_dir = project_root / output_dir
 
+    # Determine which packages to process
+    if args.package:
+        # Single package mode
+        repos = [{"owner": args.owner, "repo": args.package}]
+    else:
+        # Load from config
+        repos = load_repos_from_config(args.repos_file, args.domain)
+        if not repos:
+            console.print(f"[red]No repos found in {args.repos_file}[/red]")
+            if args.domain:
+                console.print(f"  (filtered by domain: {args.domain})")
+            return 1
+
     console.print(
         Panel.fit(
             f"[bold]Task Generation Configuration[/bold]\n\n"
-            f"Package: {args.package}\n"
+            f"Packages: {len(repos)}\n"
             f"Output: {output_dir}\n"
             f"Num tasks: {args.num_tasks}\n"
             f"Split ratio: {args.split_ratio[0]:.0%} / {args.split_ratio[1]:.0%} / {args.split_ratio[2]:.0%}\n"
@@ -347,28 +415,10 @@ Examples:
         )
     )
 
+    console.print(f"\n[bold]Processing {len(repos)} packages...[/bold]")
+
     try:
-        # Clone or locate package
-        if args.skip_clone:
-            package_path = packages_dir / args.package
-            if not package_path.exists():
-                console.print(f"[red]Error: Package not found at {package_path}[/red]")
-                console.print("Run without --skip-clone to clone the package first.")
-                return 1
-        else:
-            try:
-                package_path = clone_package(args.package, packages_dir)
-            except PackageCloneError as e:
-                console.print(f"[red]Error cloning package: {e}[/red]")
-                return 1
-
-        # Validate package structure
-        if not validate_package_structure(package_path):
-            console.print(
-                "[yellow]Warning: Package may not have valid R package structure[/yellow]"
-            )
-
-        # Initialize generator
+        # Initialize generator (shared across all packages)
         console.print("\n[blue]Initializing task generator...[/blue]")
         quality_gate = TaskQualityGate(
             min_instruction_length=50,
@@ -381,32 +431,72 @@ Examples:
             quality_gate=quality_gate,
         )
 
-        # Generate tasks
-        console.print(f"[blue]Generating tasks from {package_path}...[/blue]")
+        all_valid_tasks: list[TestingTask] = []
+        all_rejected: list[dict[str, Any]] = []
 
-        # Note: TaskGenerator.generate_from_package already runs quality_gate.filter_valid
-        # But we want more detailed statistics, so we'll do it separately
-        all_tasks = generator.generate_from_package(
-            package_path=package_path,
-            num_tasks=args.num_tasks,
-            split_ratio=tuple(args.split_ratio),
-        )
+        for repo in repos:
+            owner = repo["owner"]
+            package_name = repo["repo"]
 
-        if not all_tasks:
-            console.print("[yellow]No tasks were generated. Check if package has tests.[/yellow]")
+            console.print(
+                f"\n[bold]{owner}/{package_name}[/bold] ({repo.get('domain', 'unknown')})"
+            )
+
+            # Clone or locate package
+            if args.skip_clone:
+                package_path = packages_dir / package_name
+                if not package_path.exists():
+                    console.print(f"[red]Error: Package not found at {package_path}[/red]")
+                    console.print("Run without --skip-clone to clone the package first.")
+                    continue
+            else:
+                try:
+                    package_path = clone_package(owner, package_name, packages_dir)
+                except PackageCloneError as e:
+                    console.print(f"[red]Error cloning package: {e}[/red]")
+                    continue
+
+            # Validate package structure
+            if not validate_package_structure(package_path):
+                console.print(
+                    "[yellow]Warning: Package may not have valid R package structure[/yellow]"
+                )
+
+            # Generate tasks
+            console.print(f"[blue]Generating tasks from {package_path}...[/blue]")
+
+            # Note: TaskGenerator.generate_from_package already runs quality_gate.filter_valid
+            # But we want more detailed statistics, so we'll do it separately
+            tasks = generator.generate_from_package(
+                package_path=package_path,
+                num_tasks=args.num_tasks,
+                split_ratio=tuple(args.split_ratio),
+            )
+
+            if not tasks:
+                console.print(
+                    "[yellow]No tasks were generated. Check if package has tests.[/yellow]"
+                )
+                continue
+
+            # Run quality gate again for detailed statistics (generator already filters)
+            # We do this to get rejection details
+            valid_tasks, rejected = run_quality_gate(tasks, quality_gate, args.verbose)
+            all_valid_tasks.extend(valid_tasks)
+            all_rejected.extend(rejected)
+
+        # Nothing processed
+        if not all_valid_tasks and not all_rejected:
+            console.print("[yellow]No tasks were generated from any package.[/yellow]")
             return 0
-
-        # Run quality gate again for detailed statistics (generator already filters)
-        # We do this to get rejection details
-        valid_tasks, rejected = run_quality_gate(all_tasks, quality_gate, args.verbose)
 
         # Save or dry run
         if args.dry_run:
-            console.print(f"\n[yellow]Dry run - not saving {len(valid_tasks)} tasks[/yellow]")
-            for task in valid_tasks[:10]:  # Show first 10
+            console.print(f"\n[yellow]Dry run - not saving {len(all_valid_tasks)} tasks[/yellow]")
+            for task in all_valid_tasks[:10]:  # Show first 10
                 console.print(f"  - {task.task_id} ({task.split}): {task.instruction[:60]}...")
-            if len(valid_tasks) > 10:
-                console.print(f"  ... and {len(valid_tasks) - 10} more")
+            if len(all_valid_tasks) > 10:
+                console.print(f"  ... and {len(all_valid_tasks) - 10} more")
         else:
             # Create output directories
             for split in ["train", "dev", "held_out"]:
@@ -415,7 +505,7 @@ Examples:
             # Save tasks
             console.print(f"\n[blue]Saving tasks to {output_dir}...[/blue]")
             saved_paths = []
-            for task in valid_tasks:
+            for task in all_valid_tasks:
                 path = generator.save_task(task)
                 saved_paths.append(path)
                 if args.verbose:
@@ -424,7 +514,7 @@ Examples:
             console.print(f"[green]✓[/green] Saved {len(saved_paths)} tasks")
 
         # Print statistics
-        print_statistics(valid_tasks, rejected, generator)
+        print_statistics(all_valid_tasks, all_rejected, generator)
 
         return 0
 

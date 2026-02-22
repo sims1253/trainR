@@ -1,0 +1,53 @@
+{
+  "task_id": "r-lib_httr2_821",
+  "source": {
+    "repo": "r-lib/httr2",
+    "pr_number": 821,
+    "base_commit": "0dcc9e05eb0744f371f4681f3181eaa75dd0a3b2",
+    "head_commit": "14fec0ad8abad5b9aabed02d2c834e36487fff98",
+    "merged_commit": "43ca7827b295e4beee2459f637433675d5724f22",
+    "pr_url": "https://github.com/r-lib/httr2/pull/821",
+    "merged_at": "2025-12-05T14:10:06+00:00",
+    "issue_url": "https://github.com/r-lib/httr2/issues/801"
+  },
+  "problem_statement": {
+    "title": "Only reset token bucket if needed",
+    "body": "Fixes #801",
+    "issue_title": "req_throttle does not throttle requests even when no tokens are available",
+    "issue_body": "Hi,\n\nI am not sure if I am doing something wrong or if I just don't understand how `req_throttle()` works. But my expectation was that there would only be 1 request per minute based on this configuration. But what happens is that requests are made as fast as possible until the rate limit is hit, even when no tokens are available via `throttle_status()`. Is this a bug or am I doing something wrong?\n\n``` r\nlibrary(httr2)\n\nfoo <- function() {\n  x <-\n    request(\"https://eutils.ncbi.nlm.nih.gov/entrez/eutils\") |>\n    req_url_path_append(\"esearch.fcgi\") |>\n    req_url_query(\n      db = 'pubmed',\n      term = 'Richard Feynman[au]',\n      retmode = 'json'\n    ) |>\n    req_throttle(capacity = 1, fill_time_s = 60) |>\n    req_perform() |>\n    resp_body_json()\n\n  print(throttle_status())\n\n  x\n}\n\nreplicate(100, foo())\n#>                     realm tokens to_wait\n#> 1 eutils.ncbi.nlm.nih.gov      0      60\n#>                     realm tokens to_wait\n#> 1 eutils.ncbi.nlm.nih.gov      0      59\n#>                     realm tokens to_wait\n#> 1 eutils.ncbi.nlm.nih.gov      0      60\n#> Error in `req_perform()`:\n#> ! HTTP 429 Too Many Requests.\n```"
+  },
+  "patch": "diff --git a/NEWS.md b/NEWS.md\nindex 3dc4da91..d9003019 100644\n--- a/NEWS.md\n+++ b/NEWS.md\n@@ -1,5 +1,6 @@\n # httr2 (development version)\n \n+* Multiple calls to `req_throttle()` no longer reset the token bucket (#801).\n * New `resps_ok()` returns a logical vector indicating which requests were successful (#807).\n * httr2 will now emit OpenTelemetry traces for all requests when tracing is  enabled. Requires the `otelsdk` package (@atheriel, #729).\n * `req_perform_connection()` no longer errors with `no applicable method for 'close' applied to an object of class \"c('httr2_failure', 'httr2_error', 'rlang_error', 'error', 'condition')` (#817).\ndiff --git a/R/req-throttle.R b/R/req-throttle.R\nindex b816c4de..78b178da 100644\n--- a/R/req-throttle.R\n+++ b/R/req-throttle.R\n@@ -48,13 +48,15 @@ req_throttle <- function(req, rate, capacity, fill_time_s = 60, realm = NULL) {\n     capacity <- rate * fill_time_s\n   } else {\n     check_number_whole(capacity, min = 0)\n+    rate <- capacity / fill_time_s\n   }\n   check_number_decimal(fill_time_s, min = 0)\n   check_string(realm, allow_null = TRUE)\n \n   realm <- realm %||% url_parse(req$url)$hostname\n-  the$throttle[[realm]] <- TokenBucket$new(capacity, fill_time_s)\n-\n+  if (!throttle_exists(realm, capacity, rate)) {\n+    the$throttle[[realm]] <- TokenBucket$new(capacity, rate)\n+  }\n   req_policies(req, throttle_realm = realm)\n }\n \n@@ -92,6 +94,15 @@ throttle_reset <- function(realm = NULL) {\n   invisible()\n }\n \n+throttle_exists <- function(realm, capacity, fill_rate) {\n+  if (!env_has(the$throttle, realm)) {\n+    return(FALSE)\n+  }\n+\n+  cur_throttle <- the$throttle[[realm]]\n+  cur_throttle$capacity == capacity && cur_throttle$fill_rate == fill_rate\n+}\n+\n throttle_delay <- function(req) {\n   if (!req_policy_exists(req, \"throttle_realm\")) {\n     0\n@@ -115,10 +126,11 @@ TokenBucket <- R6::R6Class(\n     last_fill = NULL,\n     tokens = NULL,\n \n-    initialize = function(capacity, fill_time_s) {\n+    initialize = function(capacity, fill_rate) {\n       self$capacity <- capacity\n       self$tokens <- capacity\n-      self$fill_rate <- capacity / fill_time_s\n+      self$fill_rate <- fill_rate\n+\n       self$last_fill <- unix_time()\n     },\n ",
+  "test_patch": "diff --git a/tests/testthat/test-req-throttle.R b/tests/testthat/test-req-throttle.R\nindex 3fe80753..ba8316f6 100644\n--- a/tests/testthat/test-req-throttle.R\n+++ b/tests/testthat/test-req-throttle.R\n@@ -27,6 +27,32 @@ test_that(\"first request isn't throttled\", {\n   expect_equal(throttle_delay(req), 0.5)\n })\n \n+test_that(\"throttle only reset if parameters change\", {\n+  on.exit(throttle_reset())\n+\n+  mock_time <- 0\n+  local_mocked_bindings(unix_time = function() mock_time)\n+\n+  req <- request_test() |> req_throttle(capacity = 1, fill_time_s = 1)\n+  expect_equal(throttle_delay(req), 0)\n+\n+  mock_time <- 0.5\n+  expect_equal(throttle_delay(req), 0.5)\n+  mock_time <- 1\n+\n+  req <- request_test() |> req_throttle(capacity = 1, fill_time_s = 1)\n+  expect_equal(throttle_delay(req), 1)\n+\n+  # reset: capacity changed\n+  req <- request_test() |> req_throttle(capacity = 2, fill_time_s = 1)\n+  expect_equal(throttle_delay(req), 0)\n+\n+  # reset: fill time changed\n+  req <- request_test() |> req_throttle(capacity = 2, fill_time_s = 2)\n+  expect_equal(throttle_delay(req), 0)\n+})\n+\n+\n test_that(\"realm defaults to hostname but can be overridden\", {\n   on.exit(throttle_reset())\n \n@@ -46,7 +72,7 @@ test_that(\"token bucket respects capacity limits\", {\n   mock_time <- 0\n   local_mocked_bindings(unix_time = function() mock_time)\n \n-  bucket <- TokenBucket$new(capacity = 2, fill_time_s = 1)\n+  bucket <- TokenBucket$new(capacity = 2, fill_rate = 2)\n   expect_equal(bucket$take_token(), 0)\n   expect_equal(bucket$tokens, 1)\n   expect_equal(bucket$take_token(), 0)\n@@ -61,7 +87,7 @@ test_that(\"token bucket handles fractions correctly\", {\n   mock_time <- 0\n   local_mocked_bindings(unix_time = function() mock_time)\n \n-  bucket <- TokenBucket$new(capacity = 2, fill_time_s = 1)\n+  bucket <- TokenBucket$new(capacity = 2, fill_rate = 2)\n   bucket$tokens <- 0\n   expect_equal(bucket$take_token(), 0.5)\n   expect_equal(bucket$tokens, -1)\n",
+  "tests": {
+    "fail_to_pass": [
+      "throttle only reset if parameters change - verifies that calling req_throttle() with same params preserves token state",
+      "throttle_delay returns correct value after multiple req_throttle calls with same params"
+    ],
+    "pass_to_pass": [
+      "first request isn't throttled",
+      "realm defaults to hostname but can be overridden",
+      "token bucket respects capacity limits",
+      "token bucket handles fractions correctly"
+    ]
+  },
+  "metadata": {
+    "task_type": "bug_fix",
+    "difficulty": "medium",
+    "quality_score": 8,
+    "mined_at": "2026-02-22T19:05:35.091182+00:00",
+    "key_changes": [
+      "Add a throttle_exists() helper function that checks if a throttle exists for a realm with matching capacity and fill_rate",
+      "Modify req_throttle() to only create a new TokenBucket if throttle_exists() returns FALSE",
+      "Change TokenBucket$initialize() to accept fill_rate directly instead of fill_time_s",
+      "Calculate rate from capacity/fill_time_s when capacity is explicitly provided"
+    ],
+    "potential_pitfalls": [
+      "Must check both capacity AND fill_rate when determining if throttle exists - checking only one is insufficient",
+      "When capacity is provided (not rate), need to calculate rate = capacity / fill_time_s before checking throttle_exists",
+      "The TokenBucket constructor signature change requires updating existing tests that instantiate TokenBucket directly",
+      "Must use env_has() to check if realm exists in the$throttle before accessing it"
+    ]
+  },
+  "instruction": "Fix the bug in req_throttle() where the token bucket is reset on every call, preventing proper request throttling. When req_throttle() is called multiple times with the same parameters (same realm, capacity, and fill rate), it should NOT reset the existing token bucket - it should reuse the existing one. The token bucket should only be reset when the throttle parameters (capacity or fill_rate) actually change.",
+  "context": "The req_throttle() function uses a TokenBucket R6 class stored in the$throttle environment keyed by realm. The TokenBucket class has fields: capacity, fill_rate, last_fill, and tokens. The bug is that every call to req_throttle() creates a new TokenBucket, resetting the token count and last_fill time, which defeats the purpose of throttling.\n\nKey function signature:\nreq_throttle <- function(req, rate, capacity, fill_time_s = 60, realm = NULL)\n\nTokenBucket is an R6 class with initialize(capacity, fill_rate), take_token(), and refill() methods."
+}

@@ -1,0 +1,21 @@
+{
+  "task_id": "task-be5c90a4",
+  "source_package": "rlang",
+  "source_file": "R/aaa-topics.R",
+  "difficulty": "easy",
+  "instruction": "Add snapshot tests for `rlang::text` to capture complex output.\n\n\nExisting snapshot tests in this package:\n```r\nexpect_snapshot({\n    err <- error_cnd(message = \"msg\", call = quote(foo(bar = TRUE)))\n    writeLines(cnd_message_format_prefixed(err))\n\n    # Inlined objects disable context deparsing\n    err1 <- error_cnd(message = \"msg\", call = expr(foo(bar = !!(1:3))))\n    err2 <- error_cnd(message = \"msg\", call = quote(foo$bar()))\n    err3 <- error_cnd(message = \"msg\", call = call2(identity))\n    writeLines(cnd_message_format_prefixed(err1))\n    writeLines(cnd_message_format_prefixed(err2))\n    writeLines(cnd_message_format_prefixed(err3))\n  })\n```\n```r\nexpect_snapshot({\n    (expect_error(with_context(base_problem(), \"step_dummy\")))\n    (expect_error(with_context(rlang_problem(), \"step_dummy\")))\n  })\n```\n\n\nSnapshot testing is appropriate when the function produces:\n- Formatted text output (messages, errors, warnings)\n- Complex data structures that are hard to test with expect_equal\n- Console output with ANSI formatting\n\nRequirements:\n1. Use expect_snapshot() for capturing printed output\n2. Use expect_snapshot(error = TRUE) for error message snapshots\n3. Use expect_snapshot(transform = ...) if output contains volatile data (timestamps, paths)\n4. Test with representative inputs that exercise different output formats\n",
+  "context": "Package: rlang v1.1.7.9000\nDescription: Functions for Base Types and Core R and 'Tidyverse' Features\nFunction: text\nParameters: id\nTest patterns used: expect_snapshot\nExpectations used: expect_snapshot\n\nFunction Code:\n```r\ntext <- function(id) {\n  switch(\n    id,\n    \"'{'\" = \"\\\\verb{\\\"\\\\{\\\"}\",\n    \"'{{'\" = \"\\\\verb{\\\"\\\\{\\\\{\\\"}\",\n    stop(sprintf(\"`id` '%s' doesn't exist.\", id))\n  )\n}\n```",
+  "reference_test": "expect_snapshot({\n    err <- error_cnd(message = \"msg\", call = quote(foo(bar = TRUE)))\n    writeLines(cnd_message_format_prefixed(err))\n\n    # Inlined objects disable context deparsing\n    err1 <- error_cnd(message = \"msg\", call = expr(foo(bar = !!(1:3))))\n    err2 <- error_cnd(message = \"msg\", call = quote(foo$bar()))\n    err3 <- error_cnd(message = \"msg\", call = call2(identity))\n    writeLines(cnd_message_format_prefixed(err1))\n    writeLines(cnd_message_format_prefixed(err2))\n    writeLines(cnd_message_format_prefixed(err3))\n  })\n\nexpect_snapshot({\n    (expect_error(with_context(base_problem(), \"step_dummy\")))\n    (expect_error(with_context(rlang_problem(), \"step_dummy\")))\n  })",
+  "test_type": "snapshot",
+  "patterns": [
+    "expect_snapshot"
+  ],
+  "dependencies": [
+    "R",
+    "testthat"
+  ],
+  "split": "dev",
+  "function_name": "text",
+  "quality_score": 0.705,
+  "constraints": {}
+}

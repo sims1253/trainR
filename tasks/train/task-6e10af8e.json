@@ -1,0 +1,20 @@
+{
+  "task_id": "task-6e10af8e",
+  "source_package": "scales",
+  "source_file": "R/bounds.R",
+  "difficulty": "hard",
+  "instruction": "Add comprehensive edge case tests for `rescale_mid`.\n\n\nExisting tests for reference:\n```r\n\n```\n\n\nThe existing tests cover basic functionality. Add tests for:\n1. NULL inputs to each argument\n2. Empty vectors/strings: character(0), \"\", integer(0)\n3. Boundary values: 0, 1, -1, NA, NaN, Inf\n4. Invalid input types (passing numeric where character expected, etc.)\n5. Missing arguments (use expect_error with class matching)\n6. Very long inputs (strings > 1000 chars, vectors > 10000 elements)\n",
+  "context": "Package: scales v1.4.0.9000\nDescription: Scale Functions for Visualization\nFunction: rescale_mid\nParameters: x, to, from, mid\nTest patterns used: test_that\nExpectations used: expect_equal\n\nFunction Code:\n```r\nrescale_mid <- function(x, to, from, mid, ...) {\n  UseMethod(\"rescale_mid\")\n}\n```",
+  "reference_test": "# No substantive reference patterns available",
+  "test_type": "unit",
+  "patterns": [
+    "test_that"
+  ],
+  "dependencies": [
+    "testthat"
+  ],
+  "split": "train",
+  "function_name": "rescale_mid",
+  "quality_score": 0.56,
+  "constraints": {}
+}

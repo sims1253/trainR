@@ -1,0 +1,20 @@
+{
+  "task_id": "task-0653a8f5",
+  "source_package": "sf",
+  "source_file": "R/cast_sfc.R",
+  "difficulty": "easy",
+  "instruction": "A test for `st_cast` is failing. Diagnose and fix the issue.\n\n\nFailing test:\n```r\n\n```\n\n\nSteps:\n1. Read the function source code to understand expected behavior\n2. Compare the test expectations with actual function behavior\n3. Fix the test if expectations are wrong, or fix the function if it has a bug\n4. Ensure the fix maintains backward compatibility\n5. Run the tests to verify the fix\n",
+  "context": "Package: sf v1.1-0\nDescription: Simple Features for R\nFunction: st_cast\nParameters: x, to\nTest patterns used: test_that\nExpectations used: expect_equal, expect_error, expect_identical, expect_s3_class, expect_silent\n\nFunction Code:\n```r\nst_cast <- function(x, to, ...) UseMethod(\"st_cast\")\n```",
+  "reference_test": "# No substantive reference patterns available",
+  "test_type": "unit",
+  "patterns": [
+    "test_that"
+  ],
+  "dependencies": [
+    "testthat"
+  ],
+  "split": "held_out",
+  "function_name": "st_cast",
+  "quality_score": 0.51,
+  "constraints": {}
+}

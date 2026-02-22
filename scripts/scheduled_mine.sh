@@ -30,7 +30,7 @@ TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 # Directories
 LOG_DIR="logs/mining"
 OUTPUT_DIR="tasks/mined/${DATE}"
-CONFIG_FILE="configs/repos_to_mine.yaml"
+CONFIG_FILE="configs/mining.yaml"
 
 # Create directories if they don't exist
 mkdir -p "$LOG_DIR"

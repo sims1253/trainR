@@ -1,0 +1,21 @@
+{
+  "task_id": "task-a6370776",
+  "source_package": "parsnip",
+  "source_file": "R/aaa.R",
+  "difficulty": "medium",
+  "instruction": "Refactor the existing tests for `combine_words` to follow better testing practices.\n\n\nCurrent test patterns to refactor:\n- test_that at tests/testthat/test-misc.R:60\n- expect_snapshot at tests/testthat/test-misc.R:61\n  ```r\n  expect_snapshot(combine_words(1))\n  ```\n- expect_snapshot at tests/testthat/test-misc.R:62\n  ```r\n  expect_snapshot(combine_words(1:2))\n  ```\n- expect_snapshot at tests/testthat/test-misc.R:63\n  ```r\n  expect_snapshot(combine_words(1:3))\n  ```\n- expect_snapshot at tests/testthat/test-misc.R:64\n  ```r\n  expect_snapshot(combine_words(1:4))\n  ```\n\n\nGoals:\n1. Use describe()/it() blocks for better organization where appropriate\n2. Reduce code duplication with helper functions or local fixtures\n3. Improve test descriptions to be specific about what behavior is verified\n4. Extract common setup into withr::local_* fixtures\n5. Each test should have a single responsibility\n",
+  "context": "Package: parsnip v1.4.1.9002\nDescription: A Common API to Modeling and Analysis Functions\nFunction: combine_words\nParameters: x\nTest patterns used: expect_snapshot, test_that\nExpectations used: expect_snapshot\n\nFunction Code:\n```r\ncombine_words <- function(x) {\n  if (isTRUE(length(x) > 2)) {\n    last <- \", and \"\n  } else {\n    last <- \" and \"\n  }\n\n  glue::glue_collapse(x, \", \", last = last)\n}\n```",
+  "reference_test": "expect_snapshot(combine_words(1))\n\nexpect_snapshot(combine_words(1:2))",
+  "test_type": "snapshot",
+  "patterns": [
+    "test_that",
+    "expect_snapshot"
+  ],
+  "dependencies": [
+    "testthat"
+  ],
+  "split": "train",
+  "function_name": "combine_words",
+  "quality_score": 0.596,
+  "constraints": {}
+}

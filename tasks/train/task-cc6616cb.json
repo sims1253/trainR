@@ -1,0 +1,24 @@
+{
+  "task_id": "task-cc6616cb",
+  "source_package": "yardstick",
+  "source_file": "R/aaa-metric_set.R",
+  "difficulty": "hard",
+  "instruction": "Add comprehensive edge case tests for `metric_set`.\n\n\nExisting tests for reference:\n```r\n\n```\n```r\n\n```\n```r\n\n```\n\n\nThe existing tests cover basic functionality. Add tests for:\n1. NULL inputs to each argument\n2. Empty vectors/strings: character(0), \"\", integer(0)\n3. Boundary values: 0, 1, -1, NA, NaN, Inf\n4. Invalid input types (passing numeric where character expected, etc.)\n5. Missing arguments (use expect_error with class matching)\n6. Very long inputs (strings > 1000 chars, vectors > 10000 elements)\n",
+  "context": "Package: yardstick v1.3.2.9000\nDescription: Tidy Characterizations of Model Performance\nFunction: metric_set\nTest patterns used: expect_snapshot, test_that\nExpectations used: expect_equal, expect_s3_class, expect_snapshot\n\nFunction Code:\n```r\nmetric_set <- function(...) {\n  quo_fns <- enquos(...)\n  validate_not_empty(quo_fns)\n\n  # Get values and check that they are fns\n  fns <- lapply(quo_fns, eval_tidy)\n  validate_inputs_are_functions(fns)\n\n  # Add on names, and then check that\n  # all fns are of the same function class\n  for (i in seq_along(fns)) {\n    fn_name <- names(fns[i])\n    if (fn_name == \"\") {\n      names(fns)[i] <- get_quo_label(quo_fns[[i]])\n    } else {\n      names(fns)[i] <- fn_name\n    }\n  }\n  validate_function_class(fns)\n\n  fn_cls <- class1(fns[[1]])\n\n  # signature of the function is different depending on input functions\n  if (fn_cls == \"numeric_metric\") {\n    make_numeric_metric_function(fns)\n  } else if (\n    fn_cls %in% c(\"prob_metric\", \"class_metric\", \"ordered_prob_metric\")\n  ) {\n    make_prob_class_metric_function(fns)\n  } else if (fn_cls == \"quantile_metric\") {\n    make_quantile_metric_function(fns)\n  } else if (\n    fn_cls %in%\n      c(\n        \"dynamic_survival_metric\",\n        \"static_survival_metric\",\n        \"integrated_survival_metric\",\n        \"linear_pred_survival_metric\"\n      )\n  ) {\n    make_survival_metric_function(fns)\n  } else {\n    # should not be reachable\n    # nocov start\n    cli::cli_abort(\n      \"{.fn validate_function_class} should have errored on unknown classes.\",\n      .internal = TRUE\n    )\n    # nocov end\n  }\n}\n```",
+  "reference_test": "# No substantive reference patterns available",
+  "test_type": "snapshot",
+  "patterns": [
+    "test_that",
+    "expect_snapshot"
+  ],
+  "dependencies": [
+    "R",
+    "rlang",
+    "survival",
+    "testthat"
+  ],
+  "split": "train",
+  "function_name": "metric_set",
+  "quality_score": 0.566,
+  "constraints": {}
+}

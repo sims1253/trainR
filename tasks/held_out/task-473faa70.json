@@ -1,0 +1,24 @@
+{
+  "task_id": "task-473faa70",
+  "source_package": "forcats",
+  "source_file": "R/compat-purrr.R",
+  "difficulty": "medium",
+  "instruction": "Add proper test fixtures to the tests for `f` using the withr package.\n\n\nExisting fixture usage in this package:\n```r\nwithr::local_options(lifecycle_verbosity = \"quiet\")\n```\n```r\nwithr::local_options(lifecycle_verbosity = \"quiet\")\n```\n\n\nRequirements:\n1. Identify tests that modify global state (options, env vars, working directory)\n2. Wrap state modifications with withr::local_* for automatic cleanup:\n   - withr::local_options() for R options\n   - withr::local_envvar() for environment variables\n   - withr::local_tempdir() for temporary directories\n   - withr::local_file() for temporary files\n3. Ensure tests can run in any order without side effects\n4. Use local_* (not with_*) inside test_that() blocks\n",
+  "context": "Package: forcats v1.0.1.9000\nDescription: Tools for Working with Categorical Variables (Factors)\nFunction: f\nParameters: x, y\nTest patterns used: expect_snapshot, with_fixture\nExpectations used: expect_snapshot\n\nFunction Code:\n```r\nf <- function(x, y) .f(y, x, ...)\n```",
+  "reference_test": "withr::local_options(lifecycle_verbosity = \"quiet\")\n\nwithr::local_options(lifecycle_verbosity = \"quiet\")\n\nwithr::local_options(lifecycle_verbosity = \"quiet\")",
+  "test_type": "snapshot",
+  "patterns": [
+    "with_fixture",
+    "expect_snapshot"
+  ],
+  "dependencies": [
+    "R",
+    "lifecycle",
+    "testthat",
+    "withr"
+  ],
+  "split": "held_out",
+  "function_name": "f",
+  "quality_score": 0.596,
+  "constraints": {}
+}

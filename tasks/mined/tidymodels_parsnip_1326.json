@@ -1,0 +1,53 @@
+{
+  "task_id": "tidymodels_parsnip_1326",
+  "source": {
+    "repo": "tidymodels/parsnip",
+    "pr_number": 1326,
+    "base_commit": "61db94ea7c8854ee119e02e291d4aa6f25086886",
+    "head_commit": "1fd01b64e64b5fdbe499c6ef04bc221a3638ce48",
+    "merged_commit": "78f5d50030159765f2adf92d9cb6bc3890952b07",
+    "pr_url": "https://github.com/tidymodels/parsnip/pull/1326",
+    "merged_at": "2026-01-30T13:43:51+00:00",
+    "issue_url": "https://github.com/tidymodels/parsnip/issues/1304"
+  },
+  "problem_statement": {
+    "title": "Keep quantile levels when modifying a model spec",
+    "body": "Closes #1304\r\n\r\nUpdated the model spec constructor to include the quantile levels (if any) when modifying the spec. ",
+    "issue_title": "set_engine() removes quantile levels",
+    "issue_body": "``` r\nlibrary(tidymodels)\n\nqnt_lvls <- (1:3) / 4\n\nlinear_reg() |> \n  set_engine(\"quantreg\") |> \n  set_mode(\"quantile regression\", quantile_levels = qnt_lvls)\n#> Linear Regression Model Specification (quantile regression)\n#> \n#> Computational engine: quantreg\n#> Quantile levels: 0.25, 0.5, and 0.75.\n\nlinear_reg() |> \n  set_mode(\"quantile regression\", quantile_levels = qnt_lvls) |> \n  set_engine(\"quantreg\")\n#> Linear Regression Model Specification (quantile regression)\n#> \n#> Computational engine: quantreg\n#> Quantile levels: .\n```\n\n<sup>Created on 2025-11-14 with [reprex v2.1.1](https://reprex.tidyverse.org)</sup>\n\nWe should create a constructor function for model specifications to avoid this issue in the future. "
+  },
+  "patch": "diff --git a/DESCRIPTION b/DESCRIPTION\nindex 286951677..2380f5f6b 100644\n--- a/DESCRIPTION\n+++ b/DESCRIPTION\n@@ -1,6 +1,6 @@\n Package: parsnip\n Title: A Common API to Modeling and Analysis Functions\n-Version: 1.4.1.9001\n+Version: 1.4.1.9002\n Authors@R: c(\n     person(\"Max\", \"Kuhn\", , \"max@posit.co\", role = c(\"cre\", \"aut\"),\n            comment = c(ORCID = \"0000-0003-2402-136X\")),\ndiff --git a/NEWS.md b/NEWS.md\nindex d383c2521..3def0085e 100644\n--- a/NEWS.md\n+++ b/NEWS.md\n@@ -1,5 +1,6 @@\n # parsnip (development version)\n \n+* Quantile levels are not dropped when a model specification is modified (#1304)\n \n * xgboost and qrnn engines were added for quantile regression to `boost_tree()` and `mlp()`, respectively. (#1321)\n \ndiff --git a/R/arguments.R b/R/arguments.R\nindex df67ac8dd..0518a0d18 100644\n--- a/R/arguments.R\n+++ b/R/arguments.R\n@@ -81,7 +81,8 @@ set_args.model_spec <- function(object, ...) {\n     user_specified_mode = object$user_specified_mode,\n     method = NULL,\n     engine = object$engine,\n-    user_specified_engine = object$user_specified_engine\n+    user_specified_engine = object$user_specified_engine,\n+    quantile_levels = object$quantile_levels\n   )\n }\n \ndiff --git a/R/engines.R b/R/engines.R\nindex 906a09ccc..ba9ade978 100644\n--- a/R/engines.R\n+++ b/R/engines.R\n@@ -145,7 +145,8 @@ set_engine.model_spec <- function(object, engine, ...) {\n     user_specified_mode = object$user_specified_mode,\n     method = NULL,\n     engine = object$engine,\n-    user_specified_engine = TRUE\n+    user_specified_engine = TRUE,\n+    quantile_levels = object$quantile_levels\n   )\n }\n \ndiff --git a/R/misc.R b/R/misc.R\nindex 1d79ec16e..40418ba40 100644\n--- a/R/misc.R\n+++ b/R/misc.R\n@@ -374,7 +374,8 @@ new_model_spec <- function(\n   user_specified_mode = TRUE,\n   method,\n   engine,\n-  user_specified_engine = TRUE\n+  user_specified_engine = TRUE,\n+  quantile_levels = NULL\n ) {\n   # determine if the model specification could feasibly match any entry\n   # in the union of the parsnip model environment and model_info_table.\n@@ -386,7 +387,8 @@ new_model_spec <- function(\n     user_specified_mode = user_specified_mode,\n     method = method,\n     engine = engine,\n-    user_specified_engine = user_specified_engine\n+    user_specified_engine = user_specified_engine,\n+    quantile_levels = quantile_levels\n   )\n   class(out) <- make_classes(cls)\n \ndiff --git a/R/update.R b/R/update.R\nindex 9760ded0e..fbdf6ea71 100644\n--- a/R/update.R\n+++ b/R/update.R\n@@ -100,6 +100,7 @@ update_spec <- function(\n     user_specified_mode = object$user_specified_mode,\n     method = NULL,\n     engine = object$engine,\n-    user_specified_engine = object$user_specified_engine\n+    user_specified_engine = object$user_specified_engine,\n+    quantile_levels = object$quantile_levels\n   )\n }\ndiff --git a/man/add_on_exports.Rd b/man/add_on_exports.Rd\nindex 09c3434fb..75a8eeddc 100644\n--- a/man/add_on_exports.Rd\n+++ b/man/add_on_exports.Rd\n@@ -31,7 +31,8 @@ new_model_spec(\n   user_specified_mode = TRUE,\n   method,\n   engine,\n-  user_specified_engine = TRUE\n+  user_specified_engine = TRUE,\n+  quantile_levels = NULL\n )\n \n check_final_param(x, call = rlang::caller_env())",
+  "test_patch": "diff --git a/tests/testthat/test-model_basics.R b/tests/testthat/test-model_basics.R\nindex 6138e8477..076c2663f 100644\n--- a/tests/testthat/test-model_basics.R\n+++ b/tests/testthat/test-model_basics.R\n@@ -98,3 +98,39 @@ test_that('basic object classes and print methods', {\n   expect_true(inherits(svm_rbf(engine = 'kernlab'), 'svm_rbf'))\n   expect_true(inherits(svm_rbf(engine = 'liquidSVM'), 'svm_rbf'))\n })\n+\n+\n+test_that('retaining quantile levels', {\n+  lvls <- (1:3) / 4\n+\n+  rf_spec_1 <- rand_forest()\n+  expect_null(rf_spec_1$quantile_levels)\n+\n+  rf_spec_2m <-\n+    rf_spec_1 |>\n+    set_mode(\"quantile regression\", quantile_levels = lvls)\n+\n+  expect_equal(rf_spec_2m$quantile_levels, lvls)\n+\n+  rf_spec_2e <-\n+    rf_spec_1 |>\n+    set_engine(\"grf\")\n+\n+  expect_null(rf_spec_2e$quantile_levels)\n+\n+  rf_spec_2me <-\n+    rf_spec_2m |>\n+    set_engine(\"grf\")\n+\n+  expect_equal(rf_spec_2me$quantile_levels, lvls)\n+\n+  rf_spec_2em <-\n+    rf_spec_2e |>\n+    set_mode(\"quantile regression\", quantile_levels = lvls)\n+\n+  expect_equal(rf_spec_2em$quantile_levels, lvls)\n+\n+  rf_spec_up <- update(rf_spec_2em, parameters = list(mtry = 10))\n+\n+  expect_equal(rf_spec_up$quantile_levels, lvls)\n+})\n",
+  "tests": {
+    "fail_to_pass": [
+      "quantile levels are retained when set_mode() is called before set_engine()",
+      "quantile levels are retained when set_engine() is called before set_mode()",
+      "quantile levels are retained when update() is called on a spec with quantile levels",
+      "quantile levels remain NULL when not set"
+    ],
+    "pass_to_pass": [
+      "basic model spec creation works correctly",
+      "set_engine() works correctly for models without quantile levels",
+      "set_mode() works correctly for modes other than quantile regression"
+    ]
+  },
+  "metadata": {
+    "task_type": "bug_fix",
+    "difficulty": "easy",
+    "quality_score": 8,
+    "mined_at": "2026-02-22T18:38:38.100201+00:00",
+    "key_changes": [
+      "Add `quantile_levels = object$quantile_levels` parameter to the new_model_spec() call in set_args.model_spec() (R/arguments.R)",
+      "Add `quantile_levels = object$quantile_levels` parameter to the new_model_spec() call in set_engine.model_spec() (R/engines.R)",
+      "Add `quantile_levels = object$quantile_levels` parameter to the new_model_spec() call in update_spec() (R/update.R)",
+      "Add `quantile_levels = NULL` as a default parameter to new_model_spec() function definition (R/misc.R)"
+    ],
+    "potential_pitfalls": [
+      "Forgetting to update all locations where new_model_spec() is called",
+      "Not handling the NULL case correctly (when quantile_levels haven't been set)",
+      "Missing the update_spec() function which also needs the fix"
+    ]
+  },
+  "instruction": "Fix the bug where quantile levels are dropped when modifying a model specification. When a user sets quantile levels via `set_mode('quantile regression', quantile_levels = ...)`, these levels should be retained when subsequently calling `set_engine()` or other model spec modification functions. Currently, the order of operations matters: `set_mode() |> set_engine()` loses quantile levels, while `set_engine() |> set_mode()` preserves them. The fix requires ensuring that `quantile_levels` is passed through when creating new model spec objects in the constructor functions.",
+  "context": "The parsnip package uses a model specification object that contains various fields including `quantile_levels`. When functions like `set_engine()`, `set_args()`, and `update()` modify a spec, they create a new spec object via `new_model_spec()`. The bug occurs because `quantile_levels` is not being passed from the original object to the new one.\n\nKey function signature from R/misc.R:\nr\nnew_model_spec <- function(\n  ...,\n  user_specified_mode = TRUE,\n  method,\n  engine,\n  user_specified_engine = TRUE,\n  quantile_levels = NULL\n)\n\n\nThe fix involves adding `quantile_levels = object$quantile_levels` to the constructor calls in `set_args.model_spec()`, `set_engine.model_spec()`, and `update_spec()`."
+}

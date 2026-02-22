@@ -1,30 +1,103 @@
-# LLM Configuration - Single Source of Truth
-# LiteLLM providers: https://docs.litellm.ai/docs/providers
+# LLM Configuration
+# Single source of truth for all model definitions
+# Reference models by name in other configs (benchmark.yaml, mining.yaml, CLI)
 
-provider: openrouter
-
-# API keys (environment variables):
-# - OPENROUTER_API_KEY → openrouter
-# - Z_AI_API_KEY → zai / zai_coding_plan
-# - GEMINI_API_KEY → gemini
-# - OPENCODE_API_KEY → opencode
-# - OPENAI_API_KEY → openai
-# - ANTHROPIC_API_KEY → anthropic
-
-# Default models
-models:
-  # Task agent: Runs in Docker, executes tasks
-  task_agent: openrouter/openai/gpt-oss-120b:free
-  
-  # Reflection: GEPA optimization judge
-  reflection: opencode/glm-5-free
-
-  # Mining: PR quality evaluation
-  mining: opencode/glm-5-free
-
-# Custom endpoints (for providers NOT natively supported by LiteLLM)
-custom_endpoints:
+# Provider configurations (shared across models using this provider)
+providers:
   opencode:
-    base_url: https://opencode.ai/zen/v1
-  zai_coding_plan:
-    base_url: https://api.z.ai/api/coding/paas/v4
+    base_url: "https://opencode.ai/zen/v1"
+    api_key_env: "OPENCODE_API_KEY"
+    litellm_prefix: "openai"  # Transform to openai/{model} for LiteLLM
+    supports_response_format: true
+    
+  openrouter:
+    base_url: null  # LiteLLM handles this natively
+    api_key_env: "OPENROUTER_API_KEY"
+    litellm_prefix: null  # Use as-is
+    supports_response_format: true
+    
+  zai:
+    base_url: "https://api.z.ai/v1"
+    api_key_env: "Z_AI_API_KEY"
+    litellm_prefix: "openai"
+
+# Model definitions
+# Each model has: id (full model path), provider, capabilities
+# Use the 'name' field to reference this model elsewhere
+models:
+  # OpenCode free models
+  glm-5-free:
+    id: "glm-5-free"
+    provider: opencode
+    capabilities:
+      reasoning: true        # Puts content in reasoning_content field
+      json_mode: prompt      # "native" | "prompt" | "none" - how to get JSON output
+      max_tokens_default: 2000
+      
+  kimi-k2.5-free:
+    id: "kimi-k2.5-free"
+    provider: opencode
+    capabilities:
+      reasoning: true
+      json_mode: prompt
+      max_tokens_default: 2000
+      
+  minimax-m2.5-free:
+    id: "minimax-m2.5-free"
+    provider: opencode
+    capabilities:
+      reasoning: false
+      json_mode: prompt
+      max_tokens_default: 2000
+      
+  gpt-5-nano:
+    id: "gpt-5-nano"
+    provider: opencode
+    capabilities:
+      reasoning: false
+      json_mode: native
+      max_tokens_default: 1000
+      drop_params: [temperature]  # These params are not supported
+      
+  # OpenRouter models
+  gpt-oss-120b-free:
+    id: "openrouter/openai/gpt-oss-120b:free"
+    provider: openrouter
+    capabilities:
+      reasoning: false
+      json_mode: native
+      
+  step-3.5-flash:
+    id: "openrouter/stepfun/step-3.5-flash"
+    provider: openrouter
+    capabilities:
+      reasoning: false
+      json_mode: native
+      
+  trinity-large-preview:
+    id: "openrouter/arcee-ai/trinity-large-preview:free"
+    provider: openrouter
+    capabilities:
+      reasoning: false
+      json_mode: native
+      
+  nemotron-3-nano:
+    id: "openrouter/nvidia/nemotron-3-nano-30b-a3b"
+    provider: openrouter
+    capabilities:
+      reasoning: false
+      json_mode: prompt
+      
+  trinity-mini:
+    id: "openrouter/arcee-ai/trinity-mini"
+    provider: openrouter
+    capabilities:
+      reasoning: false
+      json_mode: native
+
+# Default model assignments for different purposes
+defaults:
+  mining: glm-5-free
+  task_agent: gpt-oss-120b-free
+  reflection: glm-5-free
+  judge: glm-5-free

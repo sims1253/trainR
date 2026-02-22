@@ -4,19 +4,17 @@
   "source_file": "R/auto-test.R",
   "difficulty": "easy",
   "instruction": "A test for `watcher` is failing. Diagnose and fix the issue.\n\n\nFailing test:\n```r\n\n```\n\n\nSteps:\n1. Read the function source code to understand expected behavior\n2. Compare the test expectations with actual function behavior\n3. Fix the test if expectations are wrong, or fix the function if it has a bug\n4. Ensure the fix maintains backward compatibility\n5. Run the tests to verify the fix\n",
-  "context": "Package: testthat v3.3.2.9000\nDescription: Unit Testing for R\nFunction: watcher\nParameters: added, deleted, modified\nTest patterns used: test_that, with_fixture\nExpectations used: expect_equal\n\nFunction Code:\n```r\nwatcher <- function(added, deleted, modified) {\n    changed <- normalizePath(c(added, modified))\n\n    tests <- changed[starts_with(changed, test_path)]\n    code <- changed[starts_with(changed, code_path)]\n\n    # Remove helper from test and add it to code (if a helper changed,\n    # like for code, reload all and rerun all tests)\n    helper <- tests[starts_with(basename(tests), \"helper-\")]\n    tests <- setdiff(tests, helper)\n    code <- c(code, helper)\n\n    if (length(code) > 0) {\n      # Reload code and rerun all tests\n      cat(\"Changed code: \", paste0(basename(code), collapse = \", \"), \"\\n\")\n      cat(\"Rerunning all tests\\n\")\n      pkgload::load_all(path, quiet = TRUE)\n      test_dir(\n        test_path,\n        package = package,\n        reporter = reporter$clone(deep = TRUE)\n      )\n    } else if (length(tests) > 0) {\n      # If test changes, rerun just that test\n      cat(\"Rerunning tests: \", paste0(basename(tests), collapse = \", \"), \"\\n\")\n      env <- env_clone(asNamespace(package))\n      test_files(\n        test_dir = test_path,\n        test_package = package,\n        test_paths = tests,\n        env = env,\n        reporter = reporter$clone(deep = TRUE)\n      )\n    }\n\n    TRUE\n  }\n```",
-  "reference_test": "withr::local_tempfile(pattern = \"watcher\")\n\nwithr::local_tempfile(pattern = \"watcher\")",
+  "context": "Package: testthat v3.3.2.9000\nDescription: Unit Testing for R\nFunction: watcher\nParameters: added, deleted, modified\nTest patterns used: test_that\nExpectations used: expect_equal\n\nFunction Code:\n```r\nwatcher <- function(added, deleted, modified) {\n    changed <- normalizePath(c(added, modified))\n\n    tests <- changed[starts_with(changed, test_path)]\n    code <- changed[starts_with(changed, code_path)]\n\n    if (length(code) > 0) {\n      # Reload code and rerun all tests\n      cat(\"Changed code: \", paste0(basename(code), collapse = \", \"), \"\\n\")\n      cat(\"Rerunning all tests\\n\")\n      source_dir(code_path, env = env)\n      test_dir(test_path, env = env, reporter = reporter$clone(deep = TRUE))\n    } else if (length(tests) > 0) {\n      # If test changes, rerun just that test\n      cat(\"Rerunning tests: \", paste0(basename(tests), collapse = \", \"), \"\\n\")\n      test_files(tests, env = env, reporter = reporter$clone(deep = TRUE))\n    }\n\n    TRUE\n  }\n```",
+  "reference_test": "# No substantive reference patterns available",
   "test_type": "unit",
   "patterns": [
-    "test_that",
-    "with_fixture"
+    "test_that"
   ],
   "dependencies": [
-    "testthat",
-    "withr"
+    "testthat"
   ],
   "split": "train",
   "function_name": "watcher",
-  "quality_score": 0.516,
+  "quality_score": 0.51,
   "constraints": {}
 }

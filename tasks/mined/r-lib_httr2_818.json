@@ -1,0 +1,49 @@
+{
+  "task_id": "r-lib_httr2_818",
+  "source": {
+    "repo": "r-lib/httr2",
+    "pr_number": 818,
+    "base_commit": "fb371f4c15b3b70fe65eb18644efabd5fd18eeb1",
+    "head_commit": "3d6b27409316cfb9234fb4adce3bee24c024696a",
+    "merged_commit": "2134e18dae3f0fb39ae0ada8f9281b193d83e6f8",
+    "pr_url": "https://github.com/r-lib/httr2/pull/818",
+    "merged_at": "2025-12-04T22:03:15+00:00",
+    "issue_url": "https://github.com/r-lib/httr2/issues/817"
+  },
+  "problem_statement": {
+    "title": "Only attempt to close responses",
+    "body": "Fixes #817\r\n\r\nI can't see any easy way to reproduce this \u2014 it requires the connection to initially succeed and then only later fail with a curl error, not an HTTP error (this is why we see it only very occasionally).",
+    "issue_title": "`req_perform_connection()` fails poorly",
+    "issue_body": "```\n     \u2586\n  1. \u2514\u2500chat$chat(\"Summarise changes to sort\")\n  2.   \u2514\u2500coro::collect(...) at elmer/R/chat.R:203:7\n  3.     \u2514\u2500coro:::reduce_steps(x, steps, along_builder(list()))\n  4.       \u2514\u2500coro:::reduce(x, reducer, .init = identity)\n  5.         \u2514\u2500coro:::reduce_impl(.x, .f, ..., .init = .init)\n  6.           \u2514\u2500coro:::iter_reduce_impl(.x, .f, ..., .left = .left)\n  7.             \u251c\u2500coro::is_exhausted(new <- .x())\n  8.             \u2514\u2500coro (local) .x()\n  9.               \u2514\u2500base::evalq(...)\n 10.                 \u2514\u2500base::evalq(...)\n 11.                   \u2514\u2500base::evalq(...)\n 12.                     \u2514\u2500base::evalq(...)\n 13.                       \u251c\u2500coro::is_exhausted(elt <- iterator())\n 14.                       \u2514\u2500coro (local) iterator()\n 15.                         \u2514\u2500base::evalq(...)\n 16.                           \u2514\u2500base::evalq(...)\n 17.                             \u2514\u2500base::evalq(...)\n 18.                               \u2514\u2500base::evalq(...)\n 19.                                 \u251c\u2500coro::is_exhausted(elt <- iterator())\n 20.                                 \u2514\u2500coro (local) iterator()\n 21.                                   \u2514\u2500base::evalq(...)\n 22.                                     \u2514\u2500base::evalq(...)\n 23.                                       \u251c\u2500base::evalq(...)\n 24.                                       \u2502 \u2514\u2500base::evalq(...)\n 25.                                       \u2502   \u2514\u2500coro (local) user(...)\n 26.                                       \u2502     \u251c\u2500.last_value <<- eval_bare(substitute(expr), user_env)\n 27.                                       \u2502     \u2502 \u2514\u2500rlang::env_poke(env, lhs, value, inherit = TRUE, create = FALSE)\n 28.                                       \u2502     \u2514\u2500rlang::eval_bare(substitute(expr), user_env)\n 29.                                       \u2514\u2500httr2::req_perform_connection(req) at elmer/R/httr2.R:34:5\n 30.                                         \u2514\u2500base::close(resp)\n```\n\nSomething is going wrong in the failure calse"
+  },
+  "patch": "diff --git a/NEWS.md b/NEWS.md\nindex 9541d84b..3470d1d1 100644\n--- a/NEWS.md\n+++ b/NEWS.md\n@@ -1,5 +1,6 @@\n # httr2 (development version)\n \n+* `req_perform_connection()` no longer errors with `no applicable method for 'close' applied to an object of class \"c('httr2_failure', 'httr2_error', 'rlang_error', 'error', 'condition')` (#817).\n * Refactor `url_modify()` to better retain exact formatting of URL components \n   that are not modified. (#788, #794)\n \ndiff --git a/R/req-error.R b/R/req-error.R\nindex 9387fd96..9a8e4179 100644\n--- a/R/req-error.R\n+++ b/R/req-error.R\n@@ -112,8 +112,11 @@ error_body <- function(req, resp, call = caller_env()) {\n }\n \n capture_curl_error <- function(code, call = caller_env()) {\n-  resp <- tryCatch(\n-    code,\n+  tryCatch(\n+    {\n+      code\n+      NULL\n+    },\n     error = function(err) curl_cnd(err, call = call)\n   )\n }\ndiff --git a/R/req-perform-connection.R b/R/req-perform-connection.R\nindex 3dbfb664..7b0e3817 100644\n--- a/R/req-perform-connection.R\n+++ b/R/req-perform-connection.R\n@@ -81,7 +81,7 @@ req_perform_connection <- function(\n     retry_check_breaker(req, tries)\n     sys_sleep(delay, \"for retry backoff\")\n \n-    if (!is.null(resp)) {\n+    if (is_response(resp)) {\n       close(resp)\n     }\n     resp <- req_perform_connection1(req, handle, blocking = blocking)\n@@ -143,14 +143,11 @@ req_perform_connection1 <- function(req, handle, blocking = TRUE) {\n   err <- capture_curl_error({\n     conn <- curl::curl(req$url, handle = handle)\n     # Must open the stream in order to initiate the connection\n-    withCallingHandlers(\n-      open(conn, \"rbf\", blocking = blocking),\n-      warning = \\(cnd) tryInvokeRestart(\"muffleWarning\"),\n-      error = \\(cnd) close(conn)\n-    )\n+    suppressWarnings(open(conn, \"rbf\", blocking = blocking))\n     body <- StreamingBody$new(conn)\n   })\n   if (is_error(err)) {\n+    close(conn)\n     return(err)\n   }\n ",
+  "test_patch": "diff --git a/tests/testthat/_snaps/req-perform-connection.md b/tests/testthat/_snaps/req-perform-connection.md\nindex e9050317..79eca5cd 100644\n--- a/tests/testthat/_snaps/req-perform-connection.md\n+++ b/tests/testthat/_snaps/req-perform-connection.md\n@@ -21,6 +21,16 @@\n       Caused by error in `open()`:\n       ! Failed to connect\n \n+# correclty reports curl error with retries (#817)\n+\n+    Code\n+      req_perform_connection(req)\n+    Condition\n+      Error in `req_perform_connection()`:\n+      ! Failed to perform HTTP request.\n+      Caused by error in `open()`:\n+      ! Failed to connect\n+\n # validates its input\n \n     Code\ndiff --git a/tests/testthat/test-req-perform-connection.R b/tests/testthat/test-req-perform-connection.R\nindex 3f75ad73..0e9c45db 100644\n--- a/tests/testthat/test-req-perform-connection.R\n+++ b/tests/testthat/test-req-perform-connection.R\n@@ -70,6 +70,15 @@ test_that(\"curl errors become errors\", {\n   expect_null(last_response())\n })\n \n+test_that(\"correclty reports curl error with retries (#817)\", {\n+  local_mocked_bindings(open = function(...) abort(\"Failed to connect\"))\n+\n+  req <- request(\"http://127.0.0.1\") |>\n+    req_retry(max_tries = 2, retry_on_failure = TRUE, backoff = \\(i) 0)\n+\n+  expect_snapshot(req_perform_connection(req), error = TRUE)\n+})\n+\n test_that(\"mocking works\", {\n   req_200 <- request(\"https://ok\")\n   req_404 <- request(\"https://notok\")\n",
+  "tests": {
+    "fail_to_pass": [
+      "test_that(\"correctly reports curl error with retries (#817)\", { local_mocked_bindings(open = function(...) abort(\"Failed to connect\")); req <- request(\"http://127.0.0.1\") |> req_retry(max_tries = 2, retry_on_failure = TRUE, backoff = \\(i) 0); expect_snapshot(req_perform_connection(req), error = TRUE) })"
+    ],
+    "pass_to_pass": [
+      "test_that(\"curl errors become errors\", { ... }) - existing test for basic curl error handling",
+      "test_that(\"mocking works\", { ... }) - existing test for request mocking"
+    ]
+  },
+  "metadata": {
+    "task_type": "bug_fix",
+    "difficulty": "medium",
+    "quality_score": 8,
+    "mined_at": "2026-02-22T19:06:09.640582+00:00",
+    "key_changes": [
+      "Change the condition check from `if (!is.null(resp))` to `if (is_response(resp))` before calling `close(resp)`",
+      "Modify `capture_curl_error()` to return NULL on success instead of returning the result of evaluating `code`",
+      "Ensure the connection is properly closed when an error occurs in `req_perform_connection1()`"
+    ],
+    "potential_pitfalls": [
+      "Forgetting to close the connection when an error occurs in req_perform_connection1()",
+      "Not understanding that error conditions are objects that can be assigned to variables",
+      "Changing capture_curl_error() incorrectly could break other error handling",
+      "The fix requires changes in two files (req-error.R and req-perform-connection.R)"
+    ]
+  },
+  "instruction": "Fix a bug in `req_perform_connection()` where calling `close()` on an error condition object instead of a response object causes an error. When a curl error occurs during connection retries, the function attempts to close `resp` which is an error condition, not a response object. The fix should ensure `close()` is only called on actual response objects. The function should properly handle curl errors that occur after an initial successful connection but before the request completes.",
+  "context": "The `req_perform_connection()` function handles streaming HTTP connections with retry logic. In the retry loop, it checks if `resp` exists before calling `close(resp)`. However, when `capture_curl_error()` catches an error, it returns an error condition object (class 'httr2_failure', 'httr2_error', etc.) instead of NULL or a response. The `close()` generic has no method for error condition objects.\n\nKey function signatures:\n- `req_perform_connection(req, ...)` - main function with retry loop\n- `capture_curl_error(code, call)` - wraps code to catch curl errors\n- `is_response(resp)` - checks if object is a response (useful for the fix)"
+}

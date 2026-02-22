@@ -1,0 +1,20 @@
+{
+  "task_id": "task-955bcbe5",
+  "source_package": "officer",
+  "source_file": "R/dev-utils.R",
+  "difficulty": "hard",
+  "instruction": "Add comprehensive edge case tests for `as_base64`.\n\n\nExisting tests for reference:\n```r\n\n```\n```r\n\n```\n```r\n\n```\n\n\nThe existing tests cover basic functionality. Add tests for:\n1. NULL inputs to each argument\n2. Empty vectors/strings: character(0), \"\", integer(0)\n3. Boundary values: 0, 1, -1, NA, NaN, Inf\n4. Invalid input types (passing numeric where character expected, etc.)\n5. Missing arguments (use expect_error with class matching)\n6. Very long inputs (strings > 1000 chars, vectors > 10000 elements)\n",
+  "context": "Package: officer v0.7.3\nDescription: Manipulation of Microsoft Word and PowerPoint Documents\nFunction: as_base64\nParameters: x\nTest patterns used: test_that\nExpectations used: expect_equal, expect_error, expect_false, expect_length, expect_true\n\nFunction Code:\n```r\nas_base64 <- function(x) {\n  if (!is.character(x)) {\n    stop(\"'x' must be a character vector.\")\n  }\n  z <- vapply(\n    x,\n    function(elem) {\n      if (is.na(elem)) {\n        NA_character_\n      } else {\n        base64_encode(charToRaw(elem))\n      }\n    },\n    NA_character_\n  )\n  unname(z)\n}\n```",
+  "reference_test": "# No substantive reference patterns available",
+  "test_type": "unit",
+  "patterns": [
+    "test_that"
+  ],
+  "dependencies": [
+    "testthat"
+  ],
+  "split": "train",
+  "function_name": "as_base64",
+  "quality_score": 0.56,
+  "constraints": {}
+}

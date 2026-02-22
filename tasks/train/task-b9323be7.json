@@ -1,0 +1,20 @@
+{
+  "task_id": "task-b9323be7",
+  "source_package": "usethis",
+  "source_file": "R/addin.R",
+  "difficulty": "medium",
+  "instruction": "Write a complete testthat test file for `usethis::use_addin`.\n\nPackage: usethis v3.2.1.9000\nDescription: Automate Package and Project Setup\nFunction: use_addin\nParameters: addin, open\nTest patterns used: test_that\nExpectations used: expect_equal\n\nFunction Code:\n```r\nuse_addin <- function(addin = \"new_addin\", open = rlang::is_interactive()) {\n  addin_dcf_path <- proj_path(\"inst\", \"rstudio\", \"addins.dcf\")\n\n  if (!file_exists(addin_dcf_path)) {\n    create_directory(proj_path(\"inst\", \"rstudio\"))\n    file_create(addin_dcf_path)\n    ui_bullets(c(\"v\" = \"Creating {.path {pth(addin_dcf_path)}}\"))\n  }\n\n  addin_info <- render_template(\"addins.dcf\", data = list(addin = addin))\n  addin_info[length(addin_info) + 1] <- \"\"\n  write_utf8(addin_dcf_path, addin_info, append = TRUE)\n  ui_bullets(c(\n    \"v\" = \"Adding binding to {.fun {addin}} to {.path addins.dcf}\"\n  ))\n\n  if (open) {\n    edit_file(addin_dcf_path)\n  }\n\n  invisible(TRUE)\n}\n```\n\nRequirements:\n1. Use test_that() blocks with descriptive names that reference `use_addin`\n2. Test basic functionality using appropriate expectations (expect_equal)\n3. Test edge cases: NULL input, empty strings, missing arguments\n4. Test error conditions with expect_error()\n5. Each test_that() block should test one logical behavior\n",
+  "context": "Package: usethis v3.2.1.9000\nDescription: Automate Package and Project Setup\nFunction: use_addin\nParameters: addin, open\nTest patterns used: test_that\nExpectations used: expect_equal\n\nFunction Code:\n```r\nuse_addin <- function(addin = \"new_addin\", open = rlang::is_interactive()) {\n  addin_dcf_path <- proj_path(\"inst\", \"rstudio\", \"addins.dcf\")\n\n  if (!file_exists(addin_dcf_path)) {\n    create_directory(proj_path(\"inst\", \"rstudio\"))\n    file_create(addin_dcf_path)\n    ui_bullets(c(\"v\" = \"Creating {.path {pth(addin_dcf_path)}}\"))\n  }\n\n  addin_info <- render_template(\"addins.dcf\", data = list(addin = addin))\n  addin_info[length(addin_info) + 1] <- \"\"\n  write_utf8(addin_dcf_path, addin_info, append = TRUE)\n  ui_bullets(c(\n    \"v\" = \"Adding binding to {.fun {addin}} to {.path addins.dcf}\"\n  ))\n\n  if (open) {\n    edit_file(addin_dcf_path)\n  }\n\n  invisible(TRUE)\n}\n```",
+  "reference_test": "# No substantive reference patterns available",
+  "test_type": "unit",
+  "patterns": [
+    "test_that"
+  ],
+  "dependencies": [
+    "testthat"
+  ],
+  "split": "train",
+  "function_name": "use_addin",
+  "quality_score": 0.585,
+  "constraints": {}
+}

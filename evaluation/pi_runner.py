@@ -139,7 +139,7 @@ Write the tests now.
 
     def run_evaluation(
         self,
-        skill_content: str,
+        skill_content: str | None,
         task_instruction: str,
         task_context: str,
         package_dir: Path,
@@ -238,6 +238,9 @@ Write the tests now.
             success = test_result.get("passed", False)
             score = 1.0 if success else 0.0
 
+            # Parse token usage from Pi CLI JSON output
+            token_usage = self._parse_token_usage(output)
+
             return {
                 "success": success,
                 "score": score,
@@ -247,6 +250,7 @@ Write the tests now.
                 "execution_time": execution_time,
                 "model": model,
                 "turns_used": turns_used,
+                "token_usage": token_usage,
             }
 
         except subprocess.TimeoutExpired:
@@ -258,6 +262,7 @@ Write the tests now.
                 "execution_time": self.config.timeout,
                 "model": model,
                 "turns_used": 0,
+                "token_usage": {},
             }
         finally:
             # Cleanup temp files
@@ -309,6 +314,49 @@ Write the tests now.
                 "output": str(e),
             }
 
+    def _parse_token_usage(self, output: str) -> dict:
+        """Parse token usage from Pi CLI JSON output.
+
+        Pi CLI outputs JSON lines with 'turn_end' or 'message_end' events
+        containing usage stats. Aggregate all token counts.
+        """
+        total_input = 0
+        total_output = 0
+        total_cache_read = 0
+        total_cache_write = 0
+        turn_count = 0
+
+        for line in output.split("\n"):
+            line = line.strip()
+            if not line.startswith("{"):
+                continue
+
+            try:
+                event = json.loads(line)
+                event_type = event.get("type", "")
+
+                # Check for turn_end or message_end with usage at TOP LEVEL
+                if event_type in ("turn_end", "message_end"):
+                    usage = event.get("usage", {})  # TOP LEVEL, not nested
+
+                    if usage:
+                        total_input += usage.get("input", 0)
+                        total_output += usage.get("output", 0)
+                        total_cache_read += usage.get("cacheRead", 0)
+                        total_cache_write += usage.get("cacheWrite", 0)
+                        turn_count += 1
+            except json.JSONDecodeError:
+                continue
+
+        return {
+            "input_tokens": total_input,
+            "output_tokens": total_output,
+            "cache_read_tokens": total_cache_read,
+            "cache_write_tokens": total_cache_write,
+            "total_tokens": total_input + total_output,
+            "turn_count": turn_count,
+        }
+
 
 @dataclass
 class DockerPiRunnerConfig:
@@ -357,31 +405,59 @@ class DockerPiRunner:
                 f"Run 'make docker-build' first."
             )
 
+    @property
+    def workspace_dir(self) -> Path:
+        """Get the workspace directory for Docker mounts."""
+        return Path.cwd()
+
     def run_evaluation(
         self,
-        skill_content: str,
+        skill_content: str | None,
         task_instruction: str,
         task_context: str,
         package_dir: Path,
         model: str | None = None,
+        task: Any = None,
     ) -> dict[str, Any]:
-        """Run evaluation inside Docker container.
-
-        Args:
-            skill_content: Skill markdown (or empty for no-skill)
-            task_instruction: What the agent should do
-            task_context: Code/function context
-            package_dir: Path to R package
-            model: Model override
-
-        Returns:
-            Dict with success, score, output, error, etc.
-        """
+        """Run evaluation in Docker container using Pi CLI RPC mode."""
         import base64
+
+        from config import get_llm_config
 
         start_time = time.time()
         model = model or self.config.model
-        cwd = Path(package_dir).resolve()
+
+        # Resolve model from llm.yaml if needed
+        llm_config = get_llm_config()
+        try:
+            model_cfg = llm_config.get_model_config(model)
+            provider = model_cfg.get("provider", "")
+            if provider == "opencode":
+                pi_model = f"openrouter/{model_cfg.get('id', model)}"
+            elif provider == "openrouter":
+                pi_model = model_cfg.get("id", model)
+            else:
+                pi_model = model
+        except ValueError:
+            pi_model = model
+
+        # Extract repo info from task for cloning
+        source = getattr(task, "source", {}) or {}
+        if isinstance(source, dict):
+            repo = source.get("repo", "")
+            base_commit = source.get("base_commit", "")
+        else:
+            repo = getattr(source, "repo", "")
+            base_commit = getattr(source, "base_commit", "")
+
+        # Get patches and tests
+        test_patch = getattr(task, "test_patch", "") or ""
+        gold_patch = getattr(task, "patch", "") or ""
+        tests = getattr(task, "tests", {}) or {}
+        fail_to_pass = tests.get("fail_to_pass", []) if isinstance(tests, dict) else []
+        pass_to_pass = tests.get("pass_to_pass", []) if isinstance(tests, dict) else []
+
+        skill_b64 = base64.b64encode(skill_content.encode()).decode() if skill_content else ""
 
         # Build the prompt with explicit instructions
         prompt_parts = []
@@ -413,93 +489,129 @@ Write the tests now."""
         )
         prompt = "\n\n".join(prompt_parts)
 
-        # Encode skill for passing to container
-        skill_b64 = base64.b64encode(skill_content.encode()).decode()
-        prompt_b64 = base64.b64encode(prompt.encode()).decode()
+        # Build docker command with RPC mode
+        env_vars = {
+            "PI_MODEL": pi_model,
+            "SKILL_B64": skill_b64,
+            "PROMPT_B64": base64.b64encode(prompt.encode()).decode(),
+            "REPO": repo,
+            "BASE_COMMIT": base_commit,
+            "TEST_PATCH": base64.b64encode(test_patch.encode()).decode() if test_patch else "",
+            "GOLD_PATCH": base64.b64encode(gold_patch.encode()).decode() if gold_patch else "",
+            "FAIL_TO_PASS": json.dumps(fail_to_pass),
+            "PASS_TO_PASS": json.dumps(pass_to_pass),
+        }
 
-        # Build Docker command
-        # Use /bin/bash as entrypoint to bypass entrypoint.sh
-        cmd = [
-            "docker",
-            "run",
-            "--rm",
-            "--entrypoint",
-            "/bin/bash",
-            "-v",
-            f"{cwd}:/workspace",
-            "-e",
-            "NO_COLOR=1",
-            "-e",
-            f"SKILL_B64={skill_b64}",
-            "-e",
-            f"PROMPT_B64={prompt_b64}",
-            "-e",
-            f"PI_MODEL={model}",
-        ]
+        # Add API keys based on model prefix
+        if pi_model.startswith("openrouter/"):
+            api_key = os.environ.get("OPENROUTER_API_KEY")
+            if api_key:
+                env_vars["OPENROUTER_API_KEY"] = api_key
+        elif pi_model.startswith("openai/"):
+            api_key = os.environ.get("OPENAI_API_KEY")
+            if api_key:
+                env_vars["OPENAI_API_KEY"] = api_key
 
-        # Add API keys (explicitly pass values for reliability)
-        for key in self.config.api_keys or []:
-            value = os.environ.get(key)
-            if value:
-                cmd.extend(["-e", f"{key}={value}"])
+        github_token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GITHUB_PAT")
+        if github_token:
+            env_vars["GITHUB_TOKEN"] = github_token
 
-        cmd.append(self.config.docker_image)
-
-        # Pass -c and script as arguments to bash (which is the entrypoint)
-        cmd.extend(
+        # Build docker run command
+        docker_cmd = ["docker", "run", "--rm", "-i"]  # -i for stdin
+        for key, value in env_vars.items():
+            docker_cmd.extend(["-e", f"{key}={value}"])
+        docker_cmd.extend(
             [
-                "-c",
-                """
-            set -e
-            echo "[docker-pi] Starting evaluation with model: $PI_MODEL"
-            echo "[docker-pi] Cleaning up previous test files..."
-            rm -f tests/testthat/test-generated.R tests/testthat/_snaps/generated.md 2>/dev/null || true
-            echo "[docker-pi] OPENROUTER_API_KEY set: $(if [ -n "$OPENROUTER_API_KEY" ]; then echo 'YES'; else echo 'NO'; fi)"
-            echo "[docker-pi] ZAI_API_KEY set: $(if [ -n \"$ZAI_API_KEY\" ]; then echo 'YES'; else echo 'NO'; fi)"
-
-            # Decode prompt
-            PROMPT=$(echo "$PROMPT_B64" | base64 -d)
-
-            # Write skill to temp file if provided
-            if [ -n "$SKILL_B64" ]; then
-                SKILL_FILE=/tmp/skill.md
-                echo "$SKILL_B64" | base64 -d > "$SKILL_FILE"
-                SKILL_FLAG="--skill $SKILL_FILE"
-            else
-                SKILL_FLAG=""
-            fi
-
-            # Run Pi
-            cd /workspace
-            pi --print --mode json --no-session --model "$PI_MODEL" $SKILL_FLAG "$PROMPT" 2>&1 || true
-
-            echo ""
-            echo "[docker-pi] Running testthat..."
-            # Run only the generated test file if it exists, otherwise run all tests
-            if [ -f tests/testthat/test-generated.R ]; then
-                Rscript -e "testthat::test_file('tests/testthat/test-generated.R', reporter = 'summary')" 2>&1 || true
-            else
-                Rscript -e "testthat::test_dir('tests/testthat', reporter = 'summary')" 2>&1 || true
-            fi
-
-            echo "[docker-pi] Done"
-            """,
+                "-v",
+                f"{self.workspace_dir}:/workspace",
+                self.config.docker_image,
             ]
         )
 
-        console.print(f"[dim]Running Docker+Pi with model: {model}[/dim]")
+        console.print(f"[dim]Running Docker+Pi RPC with model: {model}[/dim]")
 
+        proc = None
         try:
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
+            # Start container with RPC mode
+            proc = subprocess.Popen(
+                docker_cmd,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 text=True,
-                timeout=self.config.timeout,
             )
+            stdin = proc.stdin
+            stdout = proc.stdout
+            assert stdin is not None
+            assert stdout is not None
 
+            output_lines = []
+            token_usage = {
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "cache_read_tokens": 0,
+                "cache_write_tokens": 0,
+            }
+
+            def send_command(cmd: dict):
+                stdin.write(json.dumps(cmd) + "\n")
+                stdin.flush()
+
+            def read_response():
+                for line in stdout:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        event = json.loads(line)
+                        output_lines.append(line)
+                        yield event
+                    except json.JSONDecodeError:
+                        continue
+
+            # Wait for container to be ready, then send prompt via RPC
+            prompt_sent = False
+            for event in read_response():
+                event_type = event.get("type", "")
+
+                # Track token usage from turn_end and message_end events
+                if event_type in ("turn_end", "message_end"):
+                    usage = event.get("usage", {})
+                    if usage:
+                        token_usage["input_tokens"] += usage.get("input", 0)
+                        token_usage["output_tokens"] += usage.get("output", 0)
+                        token_usage["cache_read_tokens"] += usage.get("cacheRead", 0)
+                        token_usage["cache_write_tokens"] += usage.get("cacheWrite", 0)
+
+                # Send prompt when ready
+                if not prompt_sent and event_type == "agent_start":
+                    send_command({"type": "prompt", "message": prompt})
+                    prompt_sent = True
+
+                # Check for completion
+                if event_type == "agent_end":
+                    # Get session stats for final token counts
+                    send_command({"type": "get_session_stats"})
+                    break
+
+            # Get final stats and abort
+            for event in read_response():
+                if event.get("type") == "response" and event.get("command") == "get_session_stats":
+                    stats = event.get("data", {}).get("tokens", {})
+                    if stats:
+                        token_usage["input_tokens"] = stats.get("input", 0)
+                        token_usage["output_tokens"] = stats.get("output", 0)
+                        token_usage["cache_read_tokens"] = stats.get("cacheRead", 0)
+                        token_usage["cache_write_tokens"] = stats.get("cacheWrite", 0)
+                    break
+
+            # Send abort to stop the agent
+            send_command({"type": "abort"})
+
+            proc.wait(timeout=10)
+
+            output = "\n".join(output_lines)
             execution_time = time.time() - start_time
-            output = result.stdout
-            error_output = result.stderr if result.returncode != 0 else None
 
             # Parse testthat results from output
             test_result = self._parse_testthat_output(output)
@@ -508,20 +620,36 @@ Write the tests now."""
                 "success": test_result.get("passed", False),
                 "score": 1.0 if test_result.get("passed", False) else 0.0,
                 "output": output,
-                "error": error_output,
+                "error": "",
                 "test_results": test_result,
                 "execution_time": execution_time,
                 "model": model,
+                "token_usage": token_usage,
             }
 
         except subprocess.TimeoutExpired:
+            if proc is not None:
+                proc.kill()
             return {
                 "success": False,
                 "score": 0.0,
                 "output": "",
-                "error": f"Evaluation timed out after {self.config.timeout}s",
+                "error": "Timeout",
+                "test_results": {},
                 "execution_time": self.config.timeout,
                 "model": model,
+                "token_usage": {},
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "score": 0.0,
+                "output": "",
+                "error": str(e),
+                "test_results": {},
+                "execution_time": time.time() - start_time,
+                "model": model,
+                "token_usage": {},
             }
 
     def _parse_testthat_output(self, output: str) -> dict[str, Any]:
@@ -560,4 +688,47 @@ Write the tests now."""
             "num_failed": num_failed,
             "num_skipped": num_skipped,
             "num_warnings": num_warnings,
+        }
+
+    def _parse_token_usage(self, output: str) -> dict:
+        """Parse token usage from Pi CLI JSON output.
+
+        Pi CLI outputs JSON lines with 'turn_end' or 'message_end' events
+        containing usage stats. Aggregate all token counts.
+        """
+        total_input = 0
+        total_output = 0
+        total_cache_read = 0
+        total_cache_write = 0
+        turn_count = 0
+
+        for line in output.split("\n"):
+            line = line.strip()
+            if not line.startswith("{"):
+                continue
+
+            try:
+                event = json.loads(line)
+                event_type = event.get("type", "")
+
+                # Check for turn_end or message_end with usage at TOP LEVEL
+                if event_type in ("turn_end", "message_end"):
+                    usage = event.get("usage", {})  # TOP LEVEL, not nested
+
+                    if usage:
+                        total_input += usage.get("input", 0)
+                        total_output += usage.get("output", 0)
+                        total_cache_read += usage.get("cacheRead", 0)
+                        total_cache_write += usage.get("cacheWrite", 0)
+                        turn_count += 1
+            except json.JSONDecodeError:
+                continue
+
+        return {
+            "input_tokens": total_input,
+            "output_tokens": total_output,
+            "cache_read_tokens": total_cache_read,
+            "cache_write_tokens": total_cache_write,
+            "total_tokens": total_input + total_output,
+            "turn_count": turn_count,
         }

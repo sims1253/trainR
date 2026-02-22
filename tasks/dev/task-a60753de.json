@@ -1,0 +1,22 @@
+{
+  "task_id": "task-a60753de",
+  "source_package": "rsample",
+  "source_file": "R/initial_split.R",
+  "difficulty": "hard",
+  "instruction": "Add comprehensive edge case tests for `initial_time_split`.\n\n\nExisting tests for reference:\n```r\nexpect_snapshot({\n    initial_time_split(mtcars, lag = 2)\n  })\n```\n```r\nexpect_snapshot(error = TRUE, {\n    initial_time_split(drinks, prop = 2)\n  })\n```\n```r\nexpect_snapshot(error = TRUE, {\n    initial_time_split(drinks, lag = 12.5)\n  })\n```\n\n\nThe existing tests cover basic functionality. Add tests for:\n1. NULL inputs to each argument\n2. Empty vectors/strings: character(0), \"\", integer(0)\n3. Boundary values: 0, 1, -1, NA, NaN, Inf\n4. Invalid input types (passing numeric where character expected, etc.)\n5. Missing arguments (use expect_error with class matching)\n6. Very long inputs (strings > 1000 chars, vectors > 10000 elements)\n",
+  "context": "Package: rsample v1.3.2.9000\nDescription: General Resampling Infrastructure\nFunction: initial_time_split\nParameters: data, prop, lag\nTest patterns used: expect_snapshot, test_that\nExpectations used: expect_identical, expect_s3_class, expect_snapshot\n\nFunction Code:\n```r\ninitial_time_split <- function(\n  data,\n  prop = 3 / 4,\n  lag = lifecycle::deprecated(),\n  ...\n) {\n  check_dots_empty()\n  check_prop(prop)\n\n  if (lifecycle::is_present(lag)) {\n    lifecycle::deprecate_soft(\n      when = \"1.3.1.9000\",\n      what = \"initial_time_split(lag)\",\n      details = \"Please lag your predictors prior to splitting the dataset.\"\n    )\n  } else {\n    lag <- 0\n  }\n\n  if (!is.numeric(lag) | !(lag %% 1 == 0)) {\n    cli_abort(\"{.arg lag} must be a whole number.\")\n  }\n\n  n_train <- floor(nrow(data) * prop)\n\n  if (lag > n_train) {\n    cli_abort(\n      \"{.arg lag} must be less than or equal to the number of training observations.\"\n    )\n  }\n\n  split <- rsplit(data, 1:n_train, (n_train + 1 - lag):nrow(data))\n  splits <- list(split)\n  ids <- \"Resample1\"\n  rset <- new_rset(splits, ids)\n\n  res <- rset$splits[[1]]\n\n  attrib <- list(\n    prop = prop,\n    lag = lag\n  )\n  for (i in names(attrib)) {\n    attr(res, i) <- attrib[[i]]\n  }\n\n  class(res) <- c(\"initial_time_split\", \"initial_split\", class(res))\n  res\n}\n```",
+  "reference_test": "expect_snapshot({\n    initial_time_split(mtcars, lag = 2)\n  })\n\nexpect_snapshot(error = TRUE, {\n    initial_time_split(drinks, prop = 2)\n  })\n\nexpect_snapshot(error = TRUE, {\n    initial_time_split(drinks, lag = 12.5)\n  })",
+  "test_type": "snapshot",
+  "patterns": [
+    "test_that",
+    "expect_snapshot"
+  ],
+  "dependencies": [
+    "R",
+    "testthat"
+  ],
+  "split": "dev",
+  "function_name": "initial_time_split",
+  "quality_score": 0.656,
+  "constraints": {}
+}

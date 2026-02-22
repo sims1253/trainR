@@ -1,0 +1,20 @@
+{
+  "task_id": "task-aee621f8",
+  "source_package": "readr",
+  "source_file": "R/col_types.R",
+  "difficulty": "easy",
+  "instruction": "Add snapshot tests for `readr::cols` to capture complex output.\n\n\nExisting snapshot tests in this package:\n```r\nexpect_snapshot(cols())\n```\n\n\nSnapshot testing is appropriate when the function produces:\n- Formatted text output (messages, errors, warnings)\n- Complex data structures that are hard to test with expect_equal\n- Console output with ANSI formatting\n\nRequirements:\n1. Use expect_snapshot() for capturing printed output\n2. Use expect_snapshot(error = TRUE) for error message snapshots\n3. Use expect_snapshot(transform = ...) if output contains volatile data (timestamps, paths)\n4. Test with representative inputs that exercise different output formats\n",
+  "context": "Package: readr v2.2.0.9000\nDescription: Read Rectangular Text Data\nFunction: cols\nParameters: .default\nTest patterns used: expect_snapshot\nExpectations used: expect_snapshot\n\nFunction Code:\n```r\ncols <- function(..., .default = col_guess()) {\n  if (edition_first()) {\n    col_types <- list(...)\n    is_character <- vapply(col_types, is.character, logical(1))\n    col_types[is_character] <- lapply(col_types[is_character], col_concise)\n\n    if (is.character(.default)) {\n      .default <- col_concise(.default)\n    }\n\n    return(col_spec(col_types, .default))\n  }\n  vroom::cols(..., .default = .default)\n}\n```",
+  "reference_test": "expect_snapshot(cols())",
+  "test_type": "snapshot",
+  "patterns": [
+    "expect_snapshot"
+  ],
+  "dependencies": [
+    "testthat"
+  ],
+  "split": "train",
+  "function_name": "cols",
+  "quality_score": 0.615,
+  "constraints": {}
+}

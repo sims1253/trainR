@@ -1,0 +1,20 @@
+{
+  "task_id": "task-dbcde743",
+  "source_package": "sf",
+  "source_file": "R/cast_sfc.R",
+  "difficulty": "medium",
+  "instruction": "Add proper test fixtures to the tests for `st_cast` using the withr package.\n\n\n\nRequirements:\n1. Identify tests that modify global state (options, env vars, working directory)\n2. Wrap state modifications with withr::local_* for automatic cleanup:\n   - withr::local_options() for R options\n   - withr::local_envvar() for environment variables\n   - withr::local_tempdir() for temporary directories\n   - withr::local_file() for temporary files\n3. Ensure tests can run in any order without side effects\n4. Use local_* (not with_*) inside test_that() blocks\n",
+  "context": "Package: sf v1.1-0\nDescription: Simple Features for R\nFunction: st_cast\nParameters: x, to\nTest patterns used: test_that\nExpectations used: expect_equal, expect_error, expect_identical, expect_s3_class, expect_silent\n\nFunction Code:\n```r\nst_cast <- function(x, to, ...) UseMethod(\"st_cast\")\n```",
+  "reference_test": "# No substantive reference patterns available",
+  "test_type": "unit",
+  "patterns": [
+    "test_that"
+  ],
+  "dependencies": [
+    "testthat"
+  ],
+  "split": "dev",
+  "function_name": "st_cast",
+  "quality_score": 0.51,
+  "constraints": {}
+}

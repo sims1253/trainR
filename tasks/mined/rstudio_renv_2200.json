@@ -1,0 +1,56 @@
+{
+  "task_id": "rstudio_renv_2200",
+  "source": {
+    "repo": "rstudio/renv",
+    "pr_number": 2200,
+    "base_commit": "527d0c1f8b5966515ad5ab4fe919513ca64989bc",
+    "head_commit": "782caca712d9b239dfc9c04069b2385b4cd4cd91",
+    "merged_commit": "e8599b99c505e44eaae0a623ad846a660a9219a1",
+    "pr_url": "https://github.com/rstudio/renv/pull/2200",
+    "merged_at": "2026-01-06T17:01:25+00:00",
+    "issue_url": "https://github.com/rstudio/renv/issues/716"
+  },
+  "problem_statement": {
+    "title": "feat: support multiple repo overrides",
+    "body": "This PR closes https://github.com/rstudio/renv/issues/716 to support setting named repos overrides via `RENV_CONFIG_REPOS_OVERRIDE` in addition to the current single unnamed repo. \r\n\r\nMultiple repos can be specified via `RENV_CONFIG_REPOS_OVERRIDE=NAME1=URL1;NAME2=URL2` where urls are semi-colon delimited.\r\n\r\nPlease let me know if I missed anything or if I can make any changes here! ",
+    "issue_title": "Feature request: multiple repos via renv.config.repos.override",
+    "issue_body": "Setting multiple repos in the `renv.config.repos.override` option would be a great helper in case of managing multiple repositories"
+  },
+  "patch": "diff --git a/NEWS.md b/NEWS.md\nindex a3f071eea..e25c50d5e 100644\n--- a/NEWS.md\n+++ b/NEWS.md\n@@ -1,6 +1,10 @@\n \n # renv (development version)\n \n+* `RENV_CONFIG_REPOS_OVERRIDE` now supports multiple named repositories using\n+  the syntax `NAME1=URL1;NAME2=URL2`. Single repository URLs continue to be\n+  supported.\n+\n * Fixed an issue where `renv::sysreqs()` could fail on operating systems\n   which don't declare a VERSION_ID in `/etc/os-release`. (#2197)\n \ndiff --git a/R/bootstrap.R b/R/bootstrap.R\nindex b3aaaca97..f602514e4 100644\n--- a/R/bootstrap.R\n+++ b/R/bootstrap.R\n@@ -107,12 +107,20 @@ renv_bootstrap_repos <- function() {\n   repos <- Sys.getenv(\"RENV_CONFIG_REPOS_OVERRIDE\", unset = NA)\n   if (!is.na(repos)) {\n \n-    # check for RSPM; if set, use a fallback repository for renv\n-    rspm <- Sys.getenv(\"RSPM\", unset = NA)\n-    if (identical(rspm, repos))\n-      repos <- c(RSPM = rspm, CRAN = cran)\n+    # split on ';' if present\n+    parts <- strsplit(repos, \";\", fixed = TRUE)[[1L]]\n \n-    return(repos)\n+    # split into named repositories if present\n+    idx <- regexpr(\"=\", parts, fixed = TRUE)\n+    keys <- substring(parts, 1L, idx - 1L)\n+    vals <- substring(parts, idx + 1L)\n+    names(vals) <- keys\n+\n+    # if we have a single unnamed repository, call it CRAN\n+    if (length(vals) == 1L && identical(keys, \"\"))\n+      names(vals) <- \"CRAN\"\n+\n+    return(vals)\n \n   }\n \ndiff --git a/inst/config.yml b/inst/config.yml\nindex fcf459c80..af863fd15 100644\n--- a/inst/config.yml\n+++ b/inst/config.yml\n@@ -268,6 +268,10 @@\n     the usage of some set of repositories over what is defined in `renv.lock` or otherwise\n     set by the R session.\n \n+    This can be specified as a single repository URL (e.g., \"https://cloud.r-project.org\"),\n+    or as multiple named repositories separated by semicolons using the format\n+    NAME=URL (e.g., \"CRAN=https://p3m.dev/cran/latest;R_UNIV=https://posit-dev.r-universe.dev\").\n+\n - name: \"rspm.enabled\"\n   type: \"logical[1]\"\n   default: true\ndiff --git a/inst/resources/activate.R b/inst/resources/activate.R\nindex 8b13aae8a..18d73e189 100644\n--- a/inst/resources/activate.R\n+++ b/inst/resources/activate.R\n@@ -266,14 +266,22 @@ local({\n     # check for repos override\n     repos <- Sys.getenv(\"RENV_CONFIG_REPOS_OVERRIDE\", unset = NA)\n     if (!is.na(repos)) {\n-  \n-      # check for RSPM; if set, use a fallback repository for renv\n-      rspm <- Sys.getenv(\"RSPM\", unset = NA)\n-      if (identical(rspm, repos))\n-        repos <- c(RSPM = rspm, CRAN = cran)\n-  \n-      return(repos)\n-  \n+\n+      # split on ';' if present\n+      parts <- strsplit(repos, \";\", fixed = TRUE)[[1L]]\n+\n+      # split into named repositories if present\n+      idx <- regexpr(\"=\", parts, fixed = TRUE)\n+      keys <- substring(parts, 1L, idx - 1L)\n+      vals <- substring(parts, idx + 1L)\n+      names(vals) <- keys\n+\n+      # if we have a single unnamed repository, call it CRAN\n+      if (length(vals) == 1L && identical(keys, \"\"))\n+        names(vals) <- \"CRAN\"\n+\n+      return(vals)\n+\n     }\n   \n     # check for lockfile repositories",
+  "test_patch": "diff --git a/tests/testthat/test-bootstrap.R b/tests/testthat/test-bootstrap.R\nindex 7b805208b..2842d876d 100644\n--- a/tests/testthat/test-bootstrap.R\n+++ b/tests/testthat/test-bootstrap.R\n@@ -284,3 +284,47 @@ test_that(\"bootstrap version validation handles 'standard' remote types\", {\n   )\n \n })\n+\n+# repos override tests ----------------------------------------------------\n+\n+test_that(\"repos override supports unnamed repo\", {\n+  renv_tests_scope()\n+  url <- \"https://p3m.dev/cran/latest\"\n+  renv_scope_envvars(RENV_CONFIG_REPOS_OVERRIDE = url)\n+  repos <- renv_bootstrap_repos()\n+  expect_true(url %in% repos)\n+})\n+\n+test_that(\"repos override can use 1 named repository\", {\n+  renv_tests_scope()\n+  override <- \"CRAN=https://p3m.dev/cran/latest\"\n+  renv_scope_envvars(RENV_CONFIG_REPOS_OVERRIDE = override)\n+  repos <- renv_bootstrap_repos()\n+  expect_equal(repos[\"CRAN\"], c(CRAN = \"https://p3m.dev/cran/latest\"))\n+})\n+\n+test_that(\"repos override can use 2+ named repositories\", {\n+  renv_tests_scope()\n+  override <- \"CRAN=https://p3m.dev/cran/latest;R_UNIV=https://posit-dev.r-universe.dev\"\n+  renv_scope_envvars(RENV_CONFIG_REPOS_OVERRIDE = override)\n+  repos <- renv_bootstrap_repos()\n+  expect_equal(repos[\"CRAN\"], c(CRAN = \"https://p3m.dev/cran/latest\"))\n+  expect_equal(repos[\"R_UNIV\"], c(R_UNIV = \"https://posit-dev.r-universe.dev\"))\n+  expect_equal(length(repos), 2L)\n+})\n+\n+test_that(\"repos override can handle `=` in repo urls\", {\n+  renv_tests_scope()\n+  override <- \"R_UNIV=https://posit-dev.r-universe.dev/?example=query\"\n+  renv_scope_envvars(RENV_CONFIG_REPOS_OVERRIDE = override)\n+  repos <- renv_bootstrap_repos()\n+  expect_equal(repos[\"R_UNIV\"], c(R_UNIV = \"https://posit-dev.r-universe.dev/?example=query\"))\n+})\n+\n+test_that(\"repos override handle paths\", {\n+  renv_tests_scope()\n+  override <- \"CRAN=https://p3m.dev/cran/__linux__/noble/latest\"\n+  renv_scope_envvars(RENV_CONFIG_REPOS_OVERRIDE = override)\n+  repos <- renv_bootstrap_repos()\n+  expect_equal(repos[\"CRAN\"], c(CRAN = \"https://p3m.dev/cran/__linux__/noble/latest\"))\n+})\n",
+  "tests": {
+    "fail_to_pass": [
+      "repos override supports unnamed repo - single URL should be named CRAN",
+      "repos override can use 1 named repository - NAME=URL format works",
+      "repos override can use 2+ named repositories - semicolon-delimited NAME=URL pairs work",
+      "repos override can handle `=` in repo urls - URLs with query parameters containing = are parsed correctly",
+      "repos override handle paths - URLs with path separators work correctly"
+    ],
+    "pass_to_pass": [
+      "Existing bootstrap version validation tests continue to pass",
+      "Other bootstrap repository resolution logic remains unchanged when RENV_CONFIG_REPOS_OVERRIDE is not set"
+    ]
+  },
+  "metadata": {
+    "task_type": "feature_impl",
+    "difficulty": "medium",
+    "quality_score": 8,
+    "mined_at": "2026-02-22T19:11:52.231834+00:00",
+    "key_changes": [
+      "Split RENV_CONFIG_REPOS_OVERRIDE value on ';' using strsplit()",
+      "Use regexpr() with fixed=TRUE to find first '=' in each part",
+      "Use substring() to extract name (before '=') and URL (after '=')",
+      "Assign names to the values vector using names(vals) <- keys",
+      "Handle edge case: single unnamed URL should be named 'CRAN'",
+      "Apply same changes to both R/bootstrap.R and inst/resources/activate.R"
+    ],
+    "potential_pitfalls": [
+      "Using strsplit() on '=' would fail for URLs containing '=' in query parameters - must use regexpr() to find only the first '='",
+      "Forgetting to handle the single unnamed URL case (should default to 'CRAN')",
+      "Not updating both R/bootstrap.R and inst/resources/activate.R (they contain parallel implementations)",
+      "Empty keys when no '=' is present - need to check with identical(keys, \"\")"
+    ]
+  },
+  "instruction": "Implement support for multiple named repositories in the `RENV_CONFIG_REPOS_OVERRIDE` environment variable. The function `renv_bootstrap_repos()` in R/bootstrap.R should parse the environment variable to support: (1) a single unnamed URL which gets named 'CRAN', and (2) multiple named repositories in the format `NAME1=URL1;NAME2=URL2` where repositories are semicolon-delimited. The same logic must also be implemented in inst/resources/activate.R which contains a parallel implementation for the activation script.",
+  "context": "The renv_bootstrap_repos() function currently reads RENV_CONFIG_REPOS_OVERRIDE and returns it as-is. The new implementation should:\n\n1. Split the value on ';' to get individual repo specifications\n2. For each part, split on the first '=' to get NAME=URL\n3. If a single unnamed URL is provided (no '='), name it 'CRAN'\n4. Return a named character vector of repositories\n\nKey function signature:\nr\nrenv_bootstrap_repos <- function() {\n  repos <- Sys.getenv(\"RENV_CONFIG_REPOS_OVERRIDE\", unset = NA)\n  # ... parsing logic ...\n  return(vals)  # named character vector\n}\n"
+}

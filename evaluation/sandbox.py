@@ -26,21 +26,26 @@ class EvaluationSandbox:
     def evaluate_task(
         self,
         task: Any,  # TestingTask from task_generator
-        skill_prompt: str,
+        skill_prompt: str | None,
         package_dir: Path | None = None,
-        model: str = "glm-4.5",
+        model: str | None = None,
     ) -> EvaluationResult:
         """Evaluate a single task with the given skill.
 
         Args:
             task: The testing task to evaluate.
-            skill_prompt: The skill prompt to use.
+            skill_prompt: The skill prompt to use (None for no skill, raw task instruction).
             package_dir: Path to the R package (defaults to packages/{source_package}).
-            model: Model to use for task execution (default: glm-4.5).
+            model: Model to use for task execution (default: from llm.yaml task_agent).
 
         Returns:
             EvaluationResult with score and details.
         """
+        # Resolve model from llm.yaml config
+        if model is None:
+            from config import get_llm_config
+
+            model = get_llm_config().task_agent
         start_time = time.time()
 
         if not os.environ.get("OPENROUTER_API_KEY"):
@@ -55,7 +60,18 @@ class EvaluationSandbox:
 
         # Determine package path
         if package_dir is None:
-            package_dir = Path(f"packages/{task.source_package}")
+            # Try source_package first, then derive from source.repo
+            source_package = getattr(task, "source_package", None)
+            if source_package is None:
+                # Try to get from source.repo (format: "owner/repo")
+                source = getattr(task, "source", {})
+                if isinstance(source, dict):
+                    repo = source.get("repo", "")
+                else:
+                    repo = getattr(source, "repo", "")
+                source_package = repo.split("/")[-1] if "/" in str(repo) else str(repo)
+
+            package_dir = Path(f"packages/{source_package}")
 
         if not package_dir.exists():
             return EvaluationResult(
@@ -74,6 +90,7 @@ class EvaluationSandbox:
             task_context=task.context,
             package_dir=package_dir,
             model=model,
+            task=task,  # Pass task for repo/commit info
         )
 
         # Parse results

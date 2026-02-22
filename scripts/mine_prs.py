@@ -52,6 +52,12 @@ class PRDetails:
     test_diff: str | None
     linked_issue: dict[str, Any] | None
     repo_name: str
+    # Commit SHIs for SWE-bench format
+    base_commit: str | None = None
+    head_commit: str | None = None
+    merged_commit: str | None = None
+    # Files with diffs for patch separation
+    files_with_diffs: list[dict[str, Any]] | None = None
 
     def to_analysis_input(self) -> PRAnalysisInput:
         """Convert to LLM input format"""
@@ -65,6 +71,44 @@ class PRDetails:
             code_diff=self.code_diff[:50000],  # Truncate to avoid token limits
             test_diff=self.test_diff[:20000] if self.test_diff else None,
         )
+
+
+def separate_patches(files: list[dict]) -> tuple[str, str]:
+    """
+    Separate file changes into patch (code) and test_patch (tests).
+    Follows SWE-bench convention: files with 'test' in path are test files.
+
+    Args:
+        files: List of file dicts with 'path' and 'diff' keys
+
+    Returns:
+        Tuple of (patch, test_patch) as unified diff strings
+    """
+    test_path_patterns = ["test", "tests", "testing", "spec", "e2e"]
+
+    code_changes = []
+    test_changes = []
+
+    for file in files:
+        path = file.get("path", "")
+        diff = file.get("diff", "")
+
+        if not diff:
+            continue
+
+        # Check if this is a test file
+        path_lower = path.lower()
+        is_test = any(pattern in path_lower for pattern in test_path_patterns)
+
+        if is_test:
+            test_changes.append(diff)
+        else:
+            code_changes.append(diff)
+
+    patch = "\n".join(code_changes) if code_changes else ""
+    test_patch = "\n".join(test_changes) if test_changes else ""
+
+    return patch, test_patch
 
 
 class GitHubPRMiner:
@@ -214,7 +258,7 @@ class GitHubPRMiner:
         """
         pr_number = pr_data["number"]
 
-        # Get full PR info
+        # Get full PR info including commit SHAs
         cmd = [
             "gh",
             "pr",
@@ -223,7 +267,8 @@ class GitHubPRMiner:
             "--repo",
             repo,
             "--json",
-            "number,title,body,baseRefName,headRefName,files,url,mergedAt",
+            "number,title,body,baseRefName,headRefName,files,url,mergedAt,"
+            "baseRefOid,headRefOid,mergeCommit",
         ]
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
@@ -231,13 +276,22 @@ class GitHubPRMiner:
 
         full_pr_data = json.loads(result.stdout)
 
+        # Get commit SHAs for SWE-bench format
+        base_commit = full_pr_data.get("baseRefOid")
+        head_commit = full_pr_data.get("headRefOid")
+        merged_commit = full_pr_data.get("mergeCommit", {}).get("oid")
+
         # Get diff
         cmd = ["gh", "pr", "diff", str(pr_number), "--repo", repo]
         diff_result = subprocess.run(cmd, capture_output=True, text=True)
         diff_text = diff_result.stdout if diff_result.returncode == 0 else "Unable to fetch diff"
 
-        # Get files changed
-        files_changed = [f.get("path", "") for f in full_pr_data.get("files", [])]
+        # Get files changed and build files_with_diffs list
+        files_data = full_pr_data.get("files", [])
+        files_changed = [f.get("path", "") for f in files_data]
+
+        # Parse individual file diffs from unified diff
+        files_with_diffs = self._parse_file_diffs(diff_text, files_data)
 
         # Extract test changes
         test_diff = self.extract_test_changes(diff_text)
@@ -274,7 +328,57 @@ class GitHubPRMiner:
             test_diff=test_diff,
             linked_issue=linked_issue,
             repo_name=repo,
+            base_commit=base_commit,
+            head_commit=head_commit,
+            merged_commit=merged_commit,
+            files_with_diffs=files_with_diffs,
         )
+
+    def _parse_file_diffs(self, diff_text: str, files_data: list[dict]) -> list[dict]:
+        """
+        Parse unified diff into individual file diffs.
+
+        Args:
+            diff_text: Full unified diff string
+            files_data: List of file metadata from GitHub API
+
+        Returns:
+            List of dicts with 'path' and 'diff' keys
+        """
+        files_with_diffs = []
+        current_file = None
+        current_diff = []
+
+        for line in diff_text.split("\n"):
+            if line.startswith("diff --git"):
+                # Save previous file if exists
+                if current_file and current_diff:
+                    files_with_diffs.append(
+                        {
+                            "path": current_file,
+                            "diff": "\n".join(current_diff),
+                        }
+                    )
+                # Start new file - extract path from "diff --git a/path b/path"
+                parts = line.split(" ")
+                if len(parts) >= 4:
+                    # Get path from b/path (the new file version)
+                    current_file = parts[3][2:] if parts[3].startswith("b/") else parts[3]
+                current_diff = [line]
+            else:
+                if current_file:
+                    current_diff.append(line)
+
+        # Don't forget the last file
+        if current_file and current_diff:
+            files_with_diffs.append(
+                {
+                    "path": current_file,
+                    "diff": "\n".join(current_diff),
+                }
+            )
+
+        return files_with_diffs
 
 
 class LLMTaskJudge:
@@ -291,13 +395,27 @@ Evaluate each PR on:
 4. **Difficulty appropriateness**: Is it neither trivial nor impossibly complex?
 5. **Realism**: Does it represent a realistic real-world coding task?
 
-Reject PRs that:
-- Are primarily documentation changes
-- Involve massive refactoring without clear test boundaries
-- Require extensive domain-specific knowledge
-- Have ambiguous or unclear requirements
-- Don't modify any source code
-- Are primarily configuration/deployment changes"""
+## Response Format (JSON Schema)
+
+You MUST include these required fields in your JSON response:
+
+**task_type** (required): One of "bug_fix", "feature_impl", "test_writing", "refactor", "documentation", "performance", "security", "dependency"
+
+**difficulty** (required): One of "easy" (single file, <20 lines), "medium" (multiple files, 20-100 lines), "hard" (complex, >100 lines)
+
+**quality_score** (required): Integer 1-10. 7+ is good. Consider: clarity, testability, self-contained, realistic.
+
+**instruction** (required): Clear task description. Example: "Fix the bug in test_discovery() where nested directories are not being scanned. The function should recursively find all test files."
+
+**is_good_task** (required): Boolean. True if this PR would make a good evaluation task, False if too ambiguous/large/unsuitable.
+
+Optional fields:
+- **context**: Relevant code snippets, function signatures
+- **fail_to_pass**: Array of test descriptions that verify the fix
+- **pass_to_pass**: Array of tests for regression checking
+- **key_changes**: Array of hints about what changes are needed
+- **potential_pitfalls**: Array of common mistakes to avoid
+- **rejection_reason**: If is_good_task is false, explain why"""
 
     EVALUATION_PROMPT = """Analyze this GitHub PR and evaluate its quality as a testing task.
 
@@ -325,33 +443,64 @@ Reject PRs that:
 Provide a structured evaluation of this PR as a potential testing task.
 """
 
-    def __init__(self, model: str | None = None, api_key: str | None = None):
+    def __init__(self, model: str | None = None, api_key: str | None = None, verbose: bool = False):
         """
         Initialize LLM judge.
-
         Uses unified config from configs/llm.yaml by default.
         """
+        self.verbose = verbose
         config = get_llm_config()
 
-        self.model = model or config.get_mining_model()
-        self.api_key = api_key or config.get_api_key()
+        # Get model name (just the name, e.g., "glm-5-free")
+        model_name = model or config.get_mining_model()
+        self.model = model_name
 
-        # Determine provider based on model name
-        if self.model.startswith("openrouter/"):
-            self.provider = "litellm"
-        elif "gpt" in self.model.lower() or "o1" in self.model.lower():
-            self.provider = "openai"
-            if not self.api_key:
-                self.api_key = os.environ.get("OPENAI_API_KEY")
-        elif "claude" in self.model.lower():
-            self.provider = "anthropic"
-            if not self.api_key:
-                self.api_key = os.environ.get("ANTHROPIC_API_KEY")
-        else:
-            self.provider = "litellm"
+        # Get full model config from llm.yaml
+        try:
+            model_cfg = config.get_model_config(model_name)
+            provider = model_cfg.get("provider", "")
+            self.provider = provider
+
+            # Get LiteLLM-compatible model string
+            self._litellm_model = config.get_litellm_model(model_name)
+
+            # Get base_url if needed
+            base_url = config.get_model_base_url(model_name)
+            self._litellm_kwargs = {"base_url": base_url} if base_url else {}
+
+            # Get API key from config
+            self.api_key = api_key or config.get_model_api_key(model_name)
+
+        except ValueError:
+            # Model not in llm.yaml - treat as raw model ID with provider prefix
+            # Fallback for models like "opencode/glm-5-free" passed directly
+            self._litellm_model = model_name
+            if model_name.startswith("opencode/") or model_name.startswith("zai/"):
+                self._litellm_model = "openai/" + model_name.split("/", 1)[1]
+                self.provider = model_name.split("/", 1)[0]
+            elif model_name.startswith("openrouter/"):
+                self.provider = "openrouter"
+            else:
+                self.provider = "litellm"
+
+            # Try to get base_url from legacy method
+            base_url = config.get_base_url(model_name)
+            self._litellm_kwargs = {"base_url": base_url} if base_url else {}
+
+            # Fallback API key detection for provider prefix format
+            if api_key:
+                self.api_key = api_key
+            elif model_name.startswith("opencode/"):
+                self.api_key = os.environ.get("OPENCODE_API_KEY")
+            elif model_name.startswith("zai/"):
+                self.api_key = os.environ.get("Z_AI_API_KEY")
+            elif model_name.startswith("openrouter/"):
+                self.api_key = os.environ.get("OPENROUTER_API_KEY")
+            else:
+                self.api_key = config.get_api_key()
 
         if not self.api_key:
-            print("Warning: No API key found for provider. Set appropriate env var.")
+            print(f"Warning: No API key found for model '{model_name}'. Check llm.yaml config.")
 
     def _call_openai(
         self, messages: list[dict[str, Any]], response_format: type[BaseModel]
@@ -375,19 +524,88 @@ Provide a structured evaluation of this PR as a potential testing task.
         self, messages: list[dict[str, Any]], response_format: type[BaseModel]
     ) -> BaseModel:
         """Call LiteLLM for model-agnostic access"""
+        import json
+
         import litellm
 
+        # Build schema instruction to include in prompt (some models ignore response_format.schema)
+        schema_json = response_format.model_json_schema()
+        schema_instruction = f"""
+You MUST respond with valid JSON matching this schema:
+{json.dumps(schema_json, indent=2)}
+
+Required fields:
+- task_type: one of "bug_fix", "feature_impl", "test_writing", "refactor", "documentation", "performance", "security", "dependency"
+- difficulty: one of "easy", "medium", "hard"
+- quality_score: integer 1-10 (7+ is good)
+- instruction: string describing the task
+- is_good_task: boolean"""
+
+        # Append schema instruction to last user message
+        enhanced_messages = []
+        for i, msg in enumerate(messages):
+            if msg.get("role") == "user" and i == len(messages) - 1:
+                # Last user message - append schema instruction
+                enhanced_messages.append(
+                    {"role": "user", "content": msg["content"] + schema_instruction}
+                )
+            else:
+                enhanced_messages.append(msg)
+
+        if self.verbose:
+            print("\n" + "=" * 60)
+            print("LLM INPUT:")
+            print(f"Model: {self._litellm_model}")
+            print(f"Base URL: {self._litellm_kwargs.get('base_url', 'default')}")
+            print(f"API Key: {self.api_key[:15]}..." if self.api_key else "No API key")
+            print("Messages:")
+            for msg in enhanced_messages:
+                role = msg.get("role", "unknown")
+                content = msg.get("content", "")
+                # Truncate long content
+                if len(content) > 500:
+                    content = content[:500] + "... (truncated)"
+                print(f"  [{role}]: {content}")
+
+        # Drop unsupported params for compatibility (e.g., gpt-5 doesn't support temperature!=1)
+        litellm.drop_params = True
+
         response = litellm.completion(
-            model=self.model,
-            messages=messages,
-            response_format={
-                "type": "json_object",
-                "schema": response_format.model_json_schema(),
-            },
-            temperature=0.3,
+            model=self._litellm_model,  # Use transformed model name for LiteLLM
+            messages=enhanced_messages,  # Use enhanced messages with schema in prompt
+            response_format={"type": "json_object"},  # Just JSON mode, no schema
+            temperature=0.3,  # Will be dropped automatically for models that don't support it
             api_key=self.api_key,
+            max_tokens=2000,  # Increased for reasoning models
+            **self._litellm_kwargs,  # Passes api_base for custom endpoints
         )
-        return response_format.model_validate_json(response.choices[0].message.content)
+
+        raw_content = response.choices[0].message.content
+
+        # Handle reasoning models (e.g., glm-5-free) that put content in reasoning_content
+        if not raw_content:
+            # Try reasoning_content field (used by some reasoning models)
+            raw_content = getattr(response.choices[0].message, "reasoning_content", None)
+            # Also check provider_specific_fields
+            if not raw_content:
+                provider_fields = getattr(
+                    response.choices[0].message, "provider_specific_fields", None
+                )
+                if provider_fields:
+                    raw_content = provider_fields.get("reasoning_content")
+
+        if not raw_content:
+            raise ValueError("LLM returned empty content")
+
+        if self.verbose:
+            content_source = (
+                "reasoning_content" if not response.choices[0].message.content else "content"
+            )
+            print(f"\nLLM OUTPUT (from {content_source}):")
+            print(raw_content[:1000] if len(raw_content) > 1000 else raw_content)
+            print("=" * 60 + "\n")
+
+        return response_format.model_validate_json(raw_content)
 
     def evaluate_task_quality(self, pr_details: PRDetails) -> MinedTaskSchema:
         """
@@ -422,11 +640,13 @@ Provide a structured evaluation of this PR as a potential testing task.
             else:
                 return cast("MinedTaskSchema", self._call_litellm(messages, MinedTaskSchema))
         except Exception as e:
+            if self.verbose:
+                print(f"\n[LLM ERROR] {type(e).__name__}: {e}")
             # Return a failed evaluation
             return MinedTaskSchema(
                 task_type=TaskType.BUG_FIX,
                 difficulty=Difficulty.MEDIUM,
-                quality_score=0,
+                quality_score=1,
                 instruction=f"Error evaluating PR: {e!s}",
                 context="",
                 fail_to_pass=[],
@@ -441,51 +661,58 @@ Provide a structured evaluation of this PR as a potential testing task.
 def create_task_from_pr(pr_details: PRDetails, llm_schema: MinedTaskSchema) -> dict:
     """
     Create final task JSON from PR details and LLM evaluation.
+    Uses SWE-bench format with separated patch and test_patch.
 
     Args:
         pr_details: PRDetails object
         llm_schema: MinedTaskSchema from LLM evaluation
 
     Returns:
-        Dict in standard task format
+        Dict in SWE-bench compatible task format
     """
     task_id = f"{pr_details.repo_name.replace('/', '_')}_{pr_details.number}"
+    _owner, _repo = pr_details.repo_name.split("/", 1)
+
+    # Separate patches into code and test changes
+    files_with_diffs = pr_details.files_with_diffs or []
+    patch, test_patch = separate_patches(files_with_diffs)
 
     task = {
         "task_id": task_id,
         "source": {
-            "type": "github_pr",
             "repo": pr_details.repo_name,
             "pr_number": pr_details.number,
+            "base_commit": pr_details.base_commit,
+            "head_commit": pr_details.head_commit,
+            "merged_commit": pr_details.merged_commit,
             "pr_url": pr_details.url,
             "merged_at": pr_details.merged_at.isoformat() if pr_details.merged_at else None,
-            "issue_number": pr_details.linked_issue.get("number")
+            "issue_url": pr_details.linked_issue.get("url") if pr_details.linked_issue else None,
+        },
+        "problem_statement": {
+            "title": pr_details.title,
+            "body": pr_details.body,
+            "issue_title": pr_details.linked_issue.get("title")
             if pr_details.linked_issue
             else None,
+            "issue_body": pr_details.linked_issue.get("body") if pr_details.linked_issue else None,
+        },
+        "patch": patch,
+        "test_patch": test_patch,
+        "tests": {
+            "fail_to_pass": llm_schema.fail_to_pass or [],
+            "pass_to_pass": llm_schema.pass_to_pass or [],
         },
         "metadata": {
             "task_type": llm_schema.task_type.value,
             "difficulty": llm_schema.difficulty.value,
             "quality_score": llm_schema.quality_score,
             "mined_at": datetime.now(timezone.utc).isoformat(),
-        },
-        "task": {
-            "instruction": llm_schema.instruction,
-            "context": llm_schema.context,
-        },
-        "tests": {
-            "fail_to_pass": llm_schema.fail_to_pass,
-            "pass_to_pass": llm_schema.pass_to_pass,
-        },
-        "solution_hints": {
             "key_changes": llm_schema.key_changes,
             "potential_pitfalls": llm_schema.potential_pitfalls,
-            "original_diff": pr_details.code_diff[:10000],  # Truncated
         },
-        "files": {
-            "changed": pr_details.files_changed,
-            "test_changes": pr_details.test_diff[:5000] if pr_details.test_diff else None,
-        },
+        "instruction": llm_schema.instruction,
+        "context": llm_schema.context,
     }
 
     return task
@@ -496,17 +723,42 @@ def load_repos_from_yaml(yaml_path: str) -> list[dict]:
     with open(yaml_path) as f:
         config = yaml.safe_load(f)
 
-    repos = []
+    # New flat format: repos is a single list
+    if "repos" in config:
+        repos = []
+        for repo_entry in config["repos"]:
+            repos.append(
+                {
+                    "owner": repo_entry["owner"],
+                    "repo": repo_entry["repo"],
+                    "name": f"{repo_entry['owner']}/{repo_entry['repo']}",
+                    "domain": repo_entry.get("domain"),
+                    "stars": repo_entry.get("stars"),
+                    "notes": repo_entry.get("notes"),
+                }
+            )
+        return repos
 
-    # Flatten all priority categories
-    for category in ["high_priority", "medium_priority", "bayesian_stan", "specialized"]:
-        if category in config:
-            for repo_config in config[category]:
+    # Fallback to old nested format for backwards compatibility
+    repos = []
+    repo_config = config.get("repositories", config)
+
+    for category in [
+        "task_generation",
+        "high_priority",
+        "medium_priority",
+        "bayesian_stan",
+        "specialized",
+        "data_table",
+        "visualization",
+    ]:
+        if category in repo_config:
+            for repo_entry in repo_config[category]:
                 repos.append(
                     {
-                        "owner": repo_config["owner"],
-                        "repo": repo_config["repo"],
-                        "name": f"{repo_config['owner']}/{repo_config['repo']}",
+                        "owner": repo_entry["owner"],
+                        "repo": repo_entry["repo"],
+                        "name": f"{repo_entry['owner']}/{repo_entry['repo']}",
                     }
                 )
 
@@ -523,6 +775,55 @@ def load_repos_from_file(file_path: str) -> list[dict]:
                 owner, repo = line.split("/", 1)
                 repos.append({"owner": owner, "repo": repo, "name": line})
     return repos
+
+
+def get_mined_task_ids(output_dir: Path) -> tuple[set[str], dict[str, dict]]:
+    """Get set of task IDs that have already been mined and rejected PRs.
+
+    Returns:
+        Tuple of (mined_task_ids, rejected_prs_info)
+        - mined_task_ids: Set of successfully mined task IDs
+        - rejected_prs_info: Dict mapping task_id to rejection details
+    """
+    task_ids = set()
+    rejected_prs = {}
+
+    if output_dir.exists():
+        # Load successful tasks
+        for task_file in output_dir.glob("*.json"):
+            task_id = task_file.stem
+            task_ids.add(task_id)
+
+    # Load rejected PRs cache
+    rejected_file = output_dir / "rejected_prs.json"
+    if rejected_file.exists():
+        rejected_prs = json.loads(rejected_file.read_text())
+
+    return task_ids, rejected_prs
+
+
+def save_rejected_pr(output_dir: Path, task_id: str, details: dict) -> None:
+    """Save rejected PR details to cache.
+
+    Args:
+        output_dir: Output directory for tasks
+        task_id: Task identifier (owner_repo_pr_number)
+        details: Rejection details including quality_score, reason, etc.
+    """
+    rejected_file = output_dir / "rejected_prs.json"
+
+    # Load existing rejections
+    rejected_prs = json.loads(rejected_file.read_text()) if rejected_file.exists() else {}
+
+    # Add/update this rejection
+    rejected_prs[task_id] = {
+        **details,
+        "rejected_at": datetime.now().isoformat(),
+    }
+
+    # Save
+    output_dir.mkdir(parents=True, exist_ok=True)
+    rejected_file.write_text(json.dumps(rejected_prs, indent=2))
 
 
 def main():
@@ -580,6 +881,22 @@ def main():
         default=True,
         help="Only process PRs with linked issues",
     )
+    parser.add_argument(
+        "--no-require-tests",
+        action="store_true",
+        help="Don't require test file changes",
+    )
+    parser.add_argument(
+        "--no-require-issue",
+        action="store_true",
+        help="Don't require linked issue",
+    )
+    parser.add_argument(
+        "--verbose",
+        "-v",
+        action="store_true",
+        help="Print detailed debug info including LLM inputs/outputs",
+    )
 
     args = parser.parse_args()
 
@@ -608,10 +925,7 @@ def main():
 
     print(f"Mining {len(repos)} repositories...")
     if args.dry_run:
-        for r in repos:
-            print(f"  - {r['name']}")
-        print("\nDry run complete. No tasks collected.")
-        return
+        print("DRY RUN MODE - No LLM calls, no files written\n")
 
     # Initialize components
     try:
@@ -620,18 +934,29 @@ def main():
         print(f"Error: {e}")
         sys.exit(1)
 
-    judge = LLMTaskJudge(model=args.model)
+    judge = LLMTaskJudge(model=args.model, verbose=args.verbose)
 
     # Create output directory
     output_dir = Path(args.output)
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    # Get already-mined task IDs AND rejected PRs
+    mined_task_ids, rejected_prs = get_mined_task_ids(output_dir)
+
+    if mined_task_ids and not args.dry_run:
+        print(f"Found {len(mined_task_ids)} previously mined tasks (will skip)")
+    if rejected_prs and not args.dry_run:
+        print(f"Found {len(rejected_prs)} previously rejected PRs (will skip)")
+
     # Statistics
     stats = {
         "repos_processed": 0,
         "prs_found": 0,
-        "prs_with_tests": 0,
-        "prs_with_issues": 0,
+        "already_mined": 0,
+        "previously_rejected": 0,
+        "prs_filtered_no_tests": 0,
+        "prs_filtered_no_issue": 0,
+        "would_evaluate": 0,  # for dry run
         "tasks_created": 0,
         "tasks_rejected": 0,
     }
@@ -653,12 +978,34 @@ def main():
         for pr in prs:
             print(f"\n  PR #{pr['number']}: {pr['title'][:60]}...")
 
+            # Generate task ID for this PR
+            owner, repo = repo_name.split("/", 1)
+            task_id = f"{owner}_{repo}_{pr['number']}"
+
+            # Skip if already mined
+            if task_id in mined_task_ids:
+                print(f"    → Skipping PR #{pr['number']} (already mined)")
+                stats["already_mined"] += 1
+                continue
+
+            # Skip if previously rejected
+            if task_id in rejected_prs:
+                prev_rejection = rejected_prs[task_id]
+                print(
+                    f"    → Skipping PR #{pr['number']} (previously rejected: {prev_rejection.get('rejection_reason', 'unknown')})"
+                )
+                stats["previously_rejected"] += 1
+                continue
+
             # Check for test changes
             has_tests = miner.has_test_changes(pr)
-            if args.require_tests and not has_tests:
-                print("    → Skipping: No test file changes")
+            if not args.no_require_tests and args.require_tests and not has_tests:
+                if args.dry_run:
+                    print("    → Would skip: No test file changes")
+                else:
+                    print("    → Skipping: No test file changes")
+                stats["prs_filtered_no_tests"] += 1
                 continue
-            stats["prs_with_tests"] += 1
 
             # Get PR details
             try:
@@ -668,26 +1015,49 @@ def main():
                 continue
 
             # Check for linked issue
-            if args.require_issue and not pr_details.linked_issue:
-                print("    → Skipping: No linked issue")
+            if not args.no_require_issue and args.require_issue and not pr_details.linked_issue:
+                if args.dry_run:
+                    print("    → Would skip: No linked issue")
+                else:
+                    print("    → Skipping: No linked issue")
+                stats["prs_filtered_no_issue"] += 1
                 continue
-            stats["prs_with_issues"] += 1
 
-            # Evaluate with LLM
+            # Evaluate with LLM (skip in dry-run)
+            if args.dry_run:
+                print("    → Would evaluate with LLM")
+                stats["would_evaluate"] += 1
+                continue
+
             print("    → Evaluating with LLM...")
             llm_schema = judge.evaluate_task_quality(pr_details)
 
-            # Check quality threshold
-            if llm_schema.quality_score < args.min_quality:
-                print(
-                    f"    → Rejected: Quality score {llm_schema.quality_score} < {args.min_quality}"
+            # Check quality threshold and task suitability
+            if not llm_schema.is_good_task or llm_schema.quality_score < args.min_quality:
+                rejection_reason = (
+                    llm_schema.rejection_reason
+                    or f"Quality score {llm_schema.quality_score} < {args.min_quality}"
                 )
+                print(f"    → Rejected: {rejection_reason}")
                 stats["tasks_rejected"] += 1
-                continue
 
-            if not llm_schema.is_good_task:
-                print(f"    → Rejected: {llm_schema.rejection_reason}")
-                stats["tasks_rejected"] += 1
+                # Save rejection details
+                save_rejected_pr(
+                    output_dir,
+                    task_id,
+                    {
+                        "quality_score": llm_schema.quality_score,
+                        "task_type": str(llm_schema.task_type.value)
+                        if llm_schema.task_type
+                        else None,
+                        "difficulty": str(llm_schema.difficulty.value)
+                        if llm_schema.difficulty
+                        else None,
+                        "rejection_reason": rejection_reason,
+                        "pr_title": pr_details.title,
+                        "pr_url": pr_details.url,
+                    },
+                )
                 continue
 
             # Create task
@@ -707,15 +1077,28 @@ def main():
 
     # Print summary
     print("\n" + "=" * 60)
-    print("MINING COMPLETE")
+    if args.dry_run:
+        print("DRY RUN COMPLETE")
+    else:
+        print("MINING COMPLETE")
     print("=" * 60)
     print(f"Repositories processed: {stats['repos_processed']}")
     print(f"Total PRs found: {stats['prs_found']}")
-    print(f"PRs with test changes: {stats['prs_with_tests']}")
-    print(f"PRs with linked issues: {stats['prs_with_issues']}")
-    print(f"Tasks created: {stats['tasks_created']}")
-    print(f"Tasks rejected: {stats['tasks_rejected']}")
-    print(f"\nOutput directory: {output_dir.absolute()}")
+    if stats["already_mined"] > 0:
+        print(f"PRs skipped (already mined): {stats['already_mined']}")
+    if stats["previously_rejected"] > 0:
+        print(f"PRs skipped (previously rejected): {stats['previously_rejected']}")
+    if args.dry_run:
+        print(f"PRs would be filtered (no tests): {stats['prs_filtered_no_tests']}")
+        print(f"PRs would be filtered (no issue): {stats['prs_filtered_no_issue']}")
+        print(f"PRs would be evaluated by LLM: {stats['would_evaluate']}")
+        print("Tasks might be created: unknown (requires LLM evaluation)")
+    else:
+        print(f"PRs filtered (no tests): {stats['prs_filtered_no_tests']}")
+        print(f"PRs filtered (no issue): {stats['prs_filtered_no_issue']}")
+        print(f"Tasks created: {stats['tasks_created']}")
+        print(f"Tasks rejected: {stats['tasks_rejected']}")
+        print(f"\nOutput directory: {output_dir.absolute()}")
 
 
 if __name__ == "__main__":

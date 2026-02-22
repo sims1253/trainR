@@ -1,0 +1,20 @@
+{
+  "task_id": "task-144eb141",
+  "source_package": "renv",
+  "source_file": "R/aaa.R",
+  "difficulty": "easy",
+  "instruction": "Add snapshot tests for `renv::ci` to capture complex output.\n\n\nExisting snapshot tests in this package:\n```r\nexpect_snapshot(. <- dependencies())\n```\n```r\nexpect_snapshot(. <- dependencies())\n```\n\n\nSnapshot testing is appropriate when the function produces:\n- Formatted text output (messages, errors, warnings)\n- Complex data structures that are hard to test with expect_equal\n- Console output with ANSI formatting\n\nRequirements:\n1. Use expect_snapshot() for capturing printed output\n2. Use expect_snapshot(error = TRUE) for error message snapshots\n3. Use expect_snapshot(transform = ...) if output contains volatile data (timestamps, paths)\n4. Test with representative inputs that exercise different output formats\n",
+  "context": "Package: renv v1.1.7.9000\nDescription: Project Environments\nFunction: ci\nTest patterns used: expect_snapshot\nExpectations used: expect_snapshot\n\nFunction Code:\n```r\nci <- function() {\n  !is.na(Sys.getenv(\"CI\", unset = NA))\n}\n```",
+  "reference_test": "expect_snapshot(. <- dependencies())\n\nexpect_snapshot(. <- dependencies())\n\nexpect_snapshot(. <- renv_snapshot_dependencies(project))",
+  "test_type": "snapshot",
+  "patterns": [
+    "expect_snapshot"
+  ],
+  "dependencies": [
+    "testthat"
+  ],
+  "split": "train",
+  "function_name": "ci",
+  "quality_score": 0.645,
+  "constraints": {}
+}
