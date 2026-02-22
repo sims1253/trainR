@@ -2,15 +2,15 @@
 
 import logging
 import os
-from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 from typing import Any, Literal
 
 import gepa.optimize_anything as oa
 from gepa.core.result import GEPAResult
 from gepa.optimize_anything import EngineConfig, GEPAConfig, ReflectionConfig
 
-from evaluation import EvaluationSandbox, DockerPiRunnerConfig
+from evaluation import DockerPiRunnerConfig, EvaluationSandbox
 from task_generator.models import TestingTask
 
 logger = logging.getLogger(__name__)
@@ -236,7 +236,7 @@ class MultiModelSkillEvaluator:
 
         # Build combined side info
         # Use the info from the worst-performing model for reflection
-        worst_model = min(per_model_scores, key=per_model_scores.get)
+        worst_model = min(per_model_scores.keys(), key=lambda k: per_model_scores[k])
 
         side_info: dict[str, Any] = {
             "task_id": example.task_id,

@@ -1,160 +1,109 @@
 # trainR
 
-> Evolutionary optimization of Claude Skills for R package testing using GEPA
+> Evolutionary optimization of AI coding skills for R package testing using GEPA
 
-Automatically improve Claude Code skills for R package testing by generating synthetic tasks, running agents in Docker, and evolving skill prompts based on failures. Also serves as a benchmark harness for comparing model performance on R testing tasks.
+TrainR automatically improves AI coding skills for R package testing by generating tasks, running agents in Docker, and evolving skill prompts. It also serves as a benchmark harness for comparing model performance on R testing tasks.
+
+## Status: v0.1.0-alpha
+
+Early development release. Core functionality works, but APIs may change.
+
+| Component | Status |
+|-----------|--------|
+| Task Generator | ✅ Done |
+| Evaluation (DockerPiRunner) | ✅ Done |
+| GEPA Integration | ✅ Done |
+| Baseline Comparisons | ✅ Done |
+| PR Mining | ✅ Done |
+| Multi-package Support | ✅ Done (17 packages, 125 tasks) |
 
 ## Quick Start
 
 ### 1. Prerequisites
 
-- Python 3.10+
+- Python 3.12+
 - Docker
 - [uv](https://docs.astral.sh/uv/) (`curl -LsSf https://astral.sh/uv/install.sh | sh`)
-- z.ai API key (get one at [z.ai/model-api](https://z.ai/model-api))
+- [gh CLI](https://cli.github.com/) authenticated (`gh auth login`)
+- OpenRouter API key (get one at [openrouter.ai](https://openrouter.ai))
 
 ### 2. Setup
 
 ```bash
-# Clone and enter
+# Clone
 git clone <repo-url>
 cd trainR
 
-# Set your API key in shell config (not in project files)
-# Fish: add to ~/.config/fish/conf.d/secrets.fish
-#   set -gx Z_AI_API_KEY "your-zai-api-key"
-# Bash/Zsh: add to ~/.bashrc or ~/.zshrc
-#   export Z_AI_API_KEY="your-zai-api-key"
+# Set API key in shell config
+# Fish: add to ~/.config/fish/config.fish
+#   set -gx OPENROUTER_API_KEY "your-key"
+# Bash: add to ~/.bashrc
+#   export OPENROUTER_API_KEY="your-key"
 
-# Install Python dependencies
+# Install dependencies
 uv sync
 
-# Build Docker image for evaluation
+# Build Docker image
 make docker-build
 ```
 
 ### 3. Generate Tasks
 
 ```bash
-# Generate 15 testing tasks from cli package
-uv run python scripts/generate_tasks.py --package cli --num-tasks 15
+# Generate from a single package
+uv run python scripts/generate_tasks.py --package dplyr --num-tasks 10
 
-# Generate tasks from all packages (cli, withr, rlang, vctrs)
-make generate-all-tasks
-
-# View generated tasks
+# Or use pre-generated tasks (125 tasks from 17 packages)
 ls tasks/train/ tasks/dev/ tasks/held_out/
 ```
 
-### 4. Run a Single Evaluation
+### 4. Run Baselines
 
 ```bash
-uv run python scripts/run_evaluation.py \
-  --task tasks/train/task-19305555.json \
-  --skill skills/testing-r-packages-orig.md \
-  --verbose
+# Run baseline with a specific model
+make baseline-openai-no-skill
+make baseline-openai-skill
+
+# Compare results
+uv run python scripts/compare_results.py
 ```
 
 ### 5. Run Optimization
 
 ```bash
-# Short optimization test (5 generations)
+# Quick test (3 metric calls)
 make optimize-test
 
-# Full optimization (50 generations)
-make optimize
+# Full optimization (30+ calls)
+make optimize-fresh OPT_MAX_CALLS=30
 ```
 
-### 6. Run Benchmark
+### 6. Mine Tasks from GitHub PRs
 
 ```bash
-# Compare models across the task set
-make benchmark
+# Mine from a single repo
+uv run python scripts/mine_prs.py --repo tidyverse/dplyr --since-days 30
 
-# Generate report from results
-make benchmark-report
-```
-
-## Testing the System
-
-### Verify setup (no API key needed)
-
-```bash
-# 1. Python imports work
-uv run python -c "from evaluation import EvaluationSandbox; from optimization import optimize_skill; from benchmark import BenchmarkRun; print('OK')"
-
-# 2. Run unit tests
-uv run pytest tests/ -v
-
-# 3. Lint checks pass
-make lint
-```
-
-### Verify Docker (no API key needed for build)
-
-```bash
-# Build the image
-make docker-build
-
-# Test R packages are installed
-make docker-test
-```
-
-### Verify task generation (no API key needed)
-
-```bash
-# Clone cli package and generate tasks
-uv run python scripts/generate_tasks.py --package cli --num-tasks 10 --verbose
-
-# Check quality scores (should be >= 0.5)
-uv run python -c "
-from task_generator import TaskGenerator
-gen = TaskGenerator('tasks')
-tasks = gen.load_all_tasks()
-for t in sorted(tasks, key=lambda x: x.quality_score):
-    print(f'{t.task_id}: score={t.quality_score:.2f} difficulty={t.difficulty} type={t.test_type}')
-"
-```
-
-### End-to-end evaluation (requires Z_AI_API_KEY)
-
-```bash
-# Pick any task and run it
-uv run python scripts/run_evaluation.py \
-  --task tasks/dev/$(ls tasks/dev/ | head -1) \
-  --skill skills/testing-r-packages-orig.md \
-  --verbose
+# Mine from configured repos
+uv run python scripts/mine_prs.py --repos-file configs/repos_to_mine.yaml
 ```
 
 ## Configuration
 
 ### Environment Variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `Z_AI_API_KEY` | z.ai API key (set in shell config, not .env) | - |
-| `LLM_MODEL_REFLECTION` | Model for GEPA reflection | `openai/glm-5` |
-| `LLM_API_BASE` | API endpoint | `https://api.z.ai` |
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `OPENROUTER_API_KEY` | OpenRouter API key | Yes |
+| `GITHUB_TOKEN` | GitHub PAT (for PR mining) | Via gh CLI |
+| `LLM_MODEL_REFLECTION` | Model for GEPA reflection | Default: openrouter/openai/gpt-oss-120b:free |
 
 ### Model Selection
 
-| Purpose | Model | Why |
-|---------|-------|-----|
-| **Task Agent** | `glm-4.7-flash` | Fast, efficient for test generation |
-| **Reflection/Judge** | `glm-5` | Stronger reasoning for optimization |
-
-### Benchmark Model Config
-
-Edit `configs/benchmark_models.yaml` to define which models to compare:
-
-```yaml
-models:
-  - name: glm-4.7-flash
-    provider: zai
-    cc_mirror_provider: zai
-    env:
-      ANTHROPIC_BASE_URL: "https://api.z.ai/api/anthropic"
-```
+| Purpose | Default Model | Alternative |
+|---------|---------------|-------------|
+| **Task Agent** | `openrouter/openai/gpt-oss-120b:free` | Any OpenRouter model |
+| **Reflection/Judge** | Same as task agent | Stronger model recommended |
 
 ## Project Structure
 
@@ -162,112 +111,107 @@ models:
 trainR/
 ├── task_generator/      # Generate tasks from R packages
 │   ├── ast_parser.py    # R code parsing (tree-sitter)
-│   ├── pattern_extractor.py  # Extract test patterns
 │   ├── templates.py     # Task templates (7 types)
-│   ├── quality_gate.py  # Composite quality scoring (min 0.5)
-│   └── generator.py     # Main pipeline
+│   ├── quality_gate.py  # Quality scoring
+│   └── mined_task.py    # PR mining schemas
 │
 ├── evaluation/          # Evaluate skills on tasks
-│   ├── test_runner.py   # Docker test execution
-│   ├── sandbox.py       # Orchestration
+│   ├── pi_runner.py     # DockerPiRunner (pi CLI)
+│   ├── sandbox.py       # EvaluationSandbox
 │   └── models.py        # Result types
 │
 ├── optimization/        # GEPA integration
-│   ├── adapter.py       # SkillEvaluator + optimize_skill
+│   ├── adapter.py       # SkillEvaluator
 │   └── config.py        # OptimizationConfig
 │
-├── benchmark/           # Benchmark infrastructure
-│   └── schema.py        # BenchmarkResult, BenchmarkRun
+├── scripts/             # CLI tools
+│   ├── generate_tasks.py
+│   ├── evaluate_batch.py
+│   ├── mine_prs.py
+│   └── compare_results.py
+│
+├── configs/             # YAML configs
+│   ├── baseline_*.yaml  # Baseline configs per model
+│   └── repos_to_mine.yaml
 │
 ├── tasks/               # Generated tasks (60/20/20 split)
-│   ├── train/
-│   ├── dev/
-│   └── held_out/
+│   ├── train/           # 75 tasks
+│   ├── dev/             # 25 tasks
+│   └── held_out/        # 25 tasks
 │
 ├── skills/              # Skill definitions
-├── configs/             # YAML configs (GEPA, benchmark models)
-├── docker/              # Dockerfile + entrypoint
-├── scripts/             # CLI tools
 ├── tests/               # pytest suite
-└── packages/            # Cloned R packages (cli, withr, rlang, vctrs)
+├── packages/            # Cloned R packages
+├── PACKAGES.md          # Package documentation
+└── PLAN.md              # Project roadmap
 ```
 
 ## Commands
 
 ```bash
 # Setup
-make setup              # Full setup (Python + R)
 make docker-build       # Build evaluation Docker image
-make docker-test        # Test Docker environment
 
 # Tasks
-make clone-packages     # Clone all R packages
-make generate-tasks     # Generate from single package (PACKAGES=cli)
-make generate-all-tasks # Generate from all packages
-make validate-tasks     # Validate task quality
+make generate-tasks     # Generate from package (PACKAGES=dplyr)
 
-# Evaluation & Optimization
+# Evaluation
 make evaluate           # Single task evaluation
-make optimize           # Full GEPA optimization
-make optimize-test      # Short optimization (5 generations)
+make baseline-all-free  # Run all free model baselines
 
-# Benchmarking
-make benchmark          # Run all models across task set
-make benchmark-report   # Generate comparison report
+# Optimization
+make optimize-test      # Quick test (3 calls)
+make optimize-fresh     # Full optimization
 
 # Testing & Linting
-make test               # Run all tests (lint + format + pytest)
-make lint               # Run ruff linter
-make format             # Format with ruff
-make check              # Lint + typecheck
+make test               # Run tests
+make lint               # Ruff linter
+make format             # Ruff format
+uv run ty check .       # Type checking
+
+# PR Mining
+uv run python scripts/mine_prs.py --repo tidyverse/dplyr
+./scripts/scheduled_mine.sh  # Scheduled mining
 ```
 
 ## Architecture
 
 ```
-  R Packages (cli, withr, rlang, vctrs)
+  R Packages (17 packages)
            │
            ▼
-  Task Generator (tree-sitter AST) → Task Dataset
-           │                           │
-           │                           ▼
+  Task Generator (tree-sitter) → 125 Tasks
+           │                        │
+           │                        ▼
            │    ┌─────────────────────────────────────┐
            │    │         EVALUATION LOOP              │
            │    │                                      │
-           │    │  Skill → Agent (cc-mirror) → Tests   │
-           │    │                    │                  │
-           │    │              Docker Runner            │
-           │    │                    │                  │
-           │    │              Pass/Fail + Score        │
-           │    │                    │                  │
-           │    │         Trajectory → Reflection       │
-           │    │                         │             │
-           │    │     GEPA Evolution ←────┘             │
+           │    │  Skill → pi CLI → Tests (Docker)     │
+           │    │                │                     │
+           │    │          Pass/Fail + Score           │
+           │    │                │                     │
+           │    │     GEPA Evolution (LiteLLM)         │
            │    └─────────────────────────────────────┘
            │                    │
            │                    ▼
            │           Evolved Skill
            │
-           ├── Benchmark Runner → Model Comparison Report
-           └── Trajectory Logs → Failure Analysis
+           └── Baseline Comparison → Model Report
 ```
 
-## Development Status
+## Packages
 
-| Component | Status |
-|-----------|--------|
-| Task Generator | Done |
-| Evaluation Sandbox | Done |
-| Docker Environment | Done |
-| GEPA Adapter | Done |
-| Quality Gate (0.5 threshold) | Done |
-| Benchmark Infrastructure | Done |
-| Multi-package Support | Done |
-| Optimization Loop | Needs end-to-end testing |
+See [PACKAGES.md](PACKAGES.md) for the full list of 17 R packages and rationale for each.
+
+## Development Roadmap
+
+See [PLAN.md](PLAN.md) for the full project roadmap.
 
 ## Acknowledgments
 
 - [GEPA](https://github.com/gepa-ai/gepa) - Evolutionary prompt optimization
-- [z.ai](https://z.ai) - GLM models and Claude Code integration
+- [OpenRouter](https://openrouter.ai) - Multi-provider LLM access
+- [LiteLLM](https://github.com/BerriAI/litellm) - Unified LLM interface
 - [tree-sitter-language-pack](https://github.com/Goldziher/tree-sitter-language-pack) - R parsing
-- [r-lib/cli](https://github.com/r-lib/cli), [r-lib/withr](https://github.com/r-lib/withr), [r-lib/rlang](https://github.com/r-lib/rlang), [r-lib/vctrs](https://github.com/r-lib/vctrs) - Source packages
+- [SWE-bench](https://github.com/swe-bench/SWE-bench) - Task collection methodology
+- All R package authors (see PACKAGES.md)

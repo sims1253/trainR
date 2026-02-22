@@ -15,13 +15,13 @@ import os
 import re
 import subprocess
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 import yaml
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 # Add parent to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -32,6 +32,9 @@ from task_generator.mined_task import (
     PRAnalysisInput,
     TaskType,
 )
+
+if TYPE_CHECKING:
+    from openai.types.chat import ChatCompletionMessageParam
 
 
 @dataclass
@@ -67,7 +70,7 @@ class GitHubPRMiner:
     """Mine GitHub PRs using gh CLI"""
 
     # Patterns to identify test files in R packages
-    TEST_FILE_PATTERNS = [
+    TEST_FILE_PATTERNS: ClassVar[list[str]] = [
         "tests/",
         "test-",
         "_test.",
@@ -75,7 +78,7 @@ class GitHubPRMiner:
     ]
 
     # Patterns to find linked issues in PR body
-    ISSUE_PATTERNS = [
+    ISSUE_PATTERNS: ClassVar[list[str]] = [
         r"(?:fixes|closes|resolves|fix|close|resolve)\s*#(\d+)",
         r"(?:fixes|closes|resolves|fix|close|resolve)\s+https://github\.com/[^/]+/[^/]+/issues/(\d+)",
         r"issue\s*#?(\d+)",
@@ -176,7 +179,6 @@ class GitHubPRMiner:
             Test changes portion or None if no test changes
         """
         test_sections = []
-        current_file = None
         in_test_file = False
         current_diff = []
 
@@ -187,7 +189,6 @@ class GitHubPRMiner:
                     test_sections.append("\n".join(current_diff))
 
                 # Start new file
-                current_file = line
                 current_diff = [line]
                 in_test_file = any(p in line.lower() for p in self.TEST_FILE_PATTERNS)
             else:
@@ -251,7 +252,7 @@ class GitHubPRMiner:
                     "title": issue_details.get("title", ""),
                     "body": issue_details.get("body", ""),
                     "url": issue_details.get("url", ""),
-                    "labels": [l.get("name", "") for l in issue_details.get("labels", [])],
+                    "labels": [label.get("name", "") for label in issue_details.get("labels", [])],
                 }
 
         # Parse merged_at
@@ -279,7 +280,7 @@ class LLMTaskJudge:
     """Use LLM to evaluate PR quality and extract structured task data"""
 
     SYSTEM_PROMPT = """You are an expert R package developer and testing specialist.
-Your task is to analyze GitHub pull requests and evaluate their suitability as 
+Your task is to analyze GitHub pull requests and evaluate their suitability as
 testing/evaluation tasks for training AI coding assistants.
 
 Evaluate each PR on:
@@ -349,20 +350,27 @@ Provide a structured evaluation of this PR as a potential testing task.
         if not self.api_key:
             print("Warning: No API key found. Set OPENAI_API_KEY or ANTHROPIC_API_KEY env var.")
 
-    def _call_openai(self, messages: list[dict], response_format: type[BaseModel]) -> BaseModel:
+    def _call_openai(
+        self, messages: list[dict[str, Any]], response_format: type[BaseModel]
+    ) -> BaseModel:
         """Call OpenAI API with structured output"""
         from openai import OpenAI
 
         client = OpenAI(api_key=self.api_key)
         response = client.beta.chat.completions.parse(
             model=self.model,
-            messages=messages,
+            messages=cast("list[ChatCompletionMessageParam]", messages),
             response_format=response_format,
             temperature=0.3,
         )
-        return response.choices[0].message.parsed
+        parsed = response.choices[0].message.parsed
+        if parsed is None:
+            raise ValueError("OpenAI returned no parsed response")
+        return parsed
 
-    def _call_litellm(self, messages: list[dict], response_format: type[BaseModel]) -> BaseModel:
+    def _call_litellm(
+        self, messages: list[dict[str, Any]], response_format: type[BaseModel]
+    ) -> BaseModel:
         """Call LiteLLM for model-agnostic access"""
         import litellm
 
@@ -407,23 +415,23 @@ Provide a structured evaluation of this PR as a potential testing task.
 
         try:
             if self.provider == "openai":
-                return self._call_openai(messages, MinedTaskSchema)
+                return cast("MinedTaskSchema", self._call_openai(messages, MinedTaskSchema))
             else:
-                return self._call_litellm(messages, MinedTaskSchema)
+                return cast("MinedTaskSchema", self._call_litellm(messages, MinedTaskSchema))
         except Exception as e:
             # Return a failed evaluation
             return MinedTaskSchema(
                 task_type=TaskType.BUG_FIX,
                 difficulty=Difficulty.MEDIUM,
                 quality_score=0,
-                instruction=f"Error evaluating PR: {str(e)}",
+                instruction=f"Error evaluating PR: {e!s}",
                 context="",
                 fail_to_pass=[],
                 pass_to_pass=[],
                 key_changes=[],
                 potential_pitfalls=[],
                 is_good_task=False,
-                rejection_reason=f"LLM evaluation failed: {str(e)}",
+                rejection_reason=f"LLM evaluation failed: {e!s}",
             )
 
 
@@ -508,10 +516,9 @@ def load_repos_from_file(file_path: str) -> list[dict]:
     with open(file_path) as f:
         for line in f:
             line = line.strip()
-            if line and not line.startswith("#"):
-                if "/" in line:
-                    owner, repo = line.split("/", 1)
-                    repos.append({"owner": owner, "repo": repo, "name": line})
+            if line and not line.startswith("#") and "/" in line:
+                owner, repo = line.split("/", 1)
+                repos.append({"owner": owner, "repo": repo, "name": line})
     return repos
 
 

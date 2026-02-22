@@ -1484,6 +1484,85 @@ Proposed strategy:
 
 ---
 
+## Phase 5 Completion Summary (2026-02-22)
+
+### Accomplishments
+
+#### 1. Task Expansion ✅
+- **125 tasks** from **17 packages** (up from 18 tasks / 1 package)
+- **Difficulty distribution**: 50 hard (40%) / 50 medium (40%) / 25 easy (20%)
+- **Split distribution**: 75 train / 25 dev / 25 held_out
+
+#### 2. Package Coverage
+| Domain | Packages |
+|--------|----------|
+| Data manipulation | dplyr, tidyr, purrr, tibble |
+| Visualization | ggplot2, bayesplot |
+| Infrastructure | cli, rlang, vctrs, withr, glue |
+| Testing | testthat |
+| Strings | stringr |
+| Bayesian | posterior |
+| Documents | officer, flextable |
+| Colors | farver |
+
+See `PACKAGES.md` for detailed rationale.
+
+#### 3. PR Mining System ✅
+Created automated system for collecting tasks from GitHub PRs:
+
+- `scripts/mine_prs.py` - Main mining script using **gh CLI** + **LiteLLM**
+- `configs/repos_to_mine.yaml` - Target repos by priority
+- `scripts/scheduled_mine.sh` - Scheduled mining (cron-ready)
+- `task_generator/mined_task.py` - Pydantic schemas for structured output
+
+**Task types supported**:
+- `write_test` - Write tests for code
+- `bug_fix` - Fix bugs (from real PRs)
+- `feature_impl` - Implement features (from real PRs)
+
+#### 4. Research Summary
+Studied SWE-bench, SWE-smith, and SkillsBench methodologies:
+- **FAIL_TO_PASS / PASS_TO_PASS** structure for validation
+- **AST-level bug injection** techniques
+- **LLM judge** for task quality evaluation
+
+### Decisions Made
+
+1. **LLM Provider**: LiteLLM as single source of truth (consistent with GEPA optimization)
+2. **GitHub Access**: gh CLI (simpler auth, uses existing GITHUB_PAT)
+3. **Structured Output**: LiteLLM JSON mode + Pydantic validation
+4. **Task Distribution**: Kept legacy 30 cli tasks, balanced new packages at 5-10 each
+
+### Next Steps (Future)
+
+1. [ ] Run scheduled mining monthly to collect real PR-based tasks
+2. [ ] Implement AST-level bug injection for synthetic tasks
+3. [ ] Add feature implementation task templates
+4. [ ] Rebalance task counts (reduce cli, increase others)
+5. [ ] Re-run baselines with expanded 125-task dataset
+
+### Files Created/Modified
+
+```
+Phase 4:
+- scripts/evaluate_batch.py (DockerPiRunner migration)
+- evaluation/sandbox.py (DockerPiRunner integration)
+- evaluation/__init__.py (updated exports)
+- optimization/adapter.py (DockerPiRunnerConfig)
+- configs/baseline_*_{stepfun,openai,nvidia,minimax}.yaml (8 configs)
+- Makefile (new baseline targets)
+
+Phase 5:
+- PACKAGES.md (package documentation)
+- scripts/mine_prs.py (PR mining)
+- scripts/scheduled_mine.sh (scheduled mining)
+- configs/repos_to_mine.yaml (repo targets)
+- task_generator/mined_task.py (schemas)
+- tasks/ (125 tasks from 17 packages)
+```
+
+---
+
 ## 8.1 MVP v1.1 (Revised Scope)
 
 > **Architect Review Feedback Integration** - This section addresses the revised MVP parameters and new components identified during architectural review.

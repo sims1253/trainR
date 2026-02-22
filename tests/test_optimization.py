@@ -10,7 +10,8 @@ from task_generator.models import Difficulty, TestingTask, TestPattern
 
 
 def _make_task(
-    task_id: str = "task-test001", function_name: str | None = "cli_alert",
+    task_id: str = "task-test001",
+    function_name: str | None = "cli_alert",
 ) -> TestingTask:
     """Create a minimal TestingTask for testing."""
     return TestingTask(
@@ -33,13 +34,17 @@ def _make_task(
 class TestSkillEvaluator:
     """Tests for SkillEvaluator."""
 
-    def test_init_without_api_key_param(self):
+    @patch("evaluation.sandbox.DockerPiRunner")
+    def test_init_without_api_key_param(self, mock_runner):
         """SkillEvaluator no longer requires api_key."""
+        mock_runner.return_value = MagicMock()
         evaluator = SkillEvaluator(docker_image="test:latest", timeout=60)
         assert evaluator.sandbox is not None
 
-    def test_handles_missing_function_name(self):
+    @patch("evaluation.sandbox.DockerPiRunner")
+    def test_handles_missing_function_name(self, mock_runner):
         """Tasks without function_name should not crash."""
+        mock_runner.return_value = MagicMock()
         evaluator = SkillEvaluator()
         task = _make_task(function_name=None)
 
@@ -57,8 +62,10 @@ class TestSkillEvaluator:
         assert score == 0.0
         assert info["function_name"] == "unknown"
 
-    def test_handles_task_with_function_name(self):
+    @patch("evaluation.sandbox.DockerPiRunner")
+    def test_handles_task_with_function_name(self, mock_runner):
         """Tasks with function_name should use it."""
+        mock_runner.return_value = MagicMock()
         evaluator = SkillEvaluator()
         task = _make_task(function_name="cli_alert")
 
@@ -75,8 +82,10 @@ class TestSkillEvaluator:
         assert score == 1.0
         assert info["function_name"] == "cli_alert"
 
-    def test_side_info_on_failure(self):
+    @patch("evaluation.sandbox.DockerPiRunner")
+    def test_side_info_on_failure(self, mock_runner):
         """Failed evaluations should include error details in side_info."""
+        mock_runner.return_value = MagicMock()
         evaluator = SkillEvaluator()
         task = _make_task()
 
@@ -98,13 +107,16 @@ class TestSkillEvaluator:
 class TestOptimizeSkill:
     """Tests for optimize_skill function."""
 
-    def test_raises_without_api_key(self):
-        """Should raise ValueError when Z_AI_API_KEY is not set."""
+    @patch("optimization.adapter.oa.optimize_anything")
+    @patch("evaluation.sandbox.DockerPiRunner")
+    def test_raises_without_api_key(self, mock_runner, mock_oa):
+        """Should raise ValueError when OPENROUTER_API_KEY is not set."""
+        mock_runner.return_value = MagicMock()
         env = os.environ.copy()
-        env.pop("Z_AI_API_KEY", None)
+        env.pop("OPENROUTER_API_KEY", None)
         with (
             patch.dict(os.environ, env, clear=True),
-            pytest.raises(ValueError, match="Z_AI_API_KEY"),
+            pytest.raises(ValueError, match="OPENROUTER_API_KEY"),
         ):
             optimize_skill(
                 seed_skill="# test",
@@ -112,8 +124,10 @@ class TestOptimizeSkill:
                 val_tasks=[_make_task()],
             )
 
-    def test_reads_reflection_lm_from_env(self):
+    @patch("evaluation.sandbox.DockerPiRunner")
+    def test_reads_reflection_lm_from_env(self, mock_runner):
         """Should read reflection model from LLM_MODEL_REFLECTION env."""
+        mock_runner.return_value = MagicMock()
         with (
             patch.dict(
                 os.environ, {"Z_AI_API_KEY": "test", "LLM_MODEL_REFLECTION": "openai/custom-model"}

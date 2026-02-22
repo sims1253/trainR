@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Compare evaluation results across models and skill conditions."""
 
-import json
+import argparse
 import glob
-from pathlib import Path
+import json
+
 from rich.console import Console
 from rich.table import Table
-import argparse
 
 
 def main():

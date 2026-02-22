@@ -20,7 +20,7 @@ from rich.progress import BarColumn, Progress, SpinnerColumn, TaskProgressColumn
 from rich.table import Table
 
 from benchmark.schema import BenchmarkResult, BenchmarkRun
-from evaluation import EvaluationSandbox, TestRunnerConfig
+from evaluation import DockerPiRunnerConfig, EvaluationSandbox
 from task_generator import TaskGenerator
 
 console = Console()
@@ -123,7 +123,7 @@ def run_benchmark(
                 env_backup[key] = os.environ.get(key)
                 os.environ[key] = value
 
-            runner_config = TestRunnerConfig(
+            runner_config = DockerPiRunnerConfig(
                 docker_image=docker_image,
                 timeout=timeout,
             )

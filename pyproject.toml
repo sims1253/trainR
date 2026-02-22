@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "posit-gskill"
-version = "0.1.0"
+version = "0.1.0a1"
 description = "Evolutionary optimization of Claude Skills for R package development using GEPA"
 readme = "README.md"
 license = "MIT"

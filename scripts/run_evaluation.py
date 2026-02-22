@@ -16,7 +16,7 @@ from rich.panel import Panel
 from rich.syntax import Syntax
 from rich.table import Table
 
-from evaluation import EvaluationSandbox, TestRunnerConfig
+from evaluation import DockerPiRunnerConfig, EvaluationSandbox
 from task_generator.models import TestingTask
 
 console = Console()
@@ -82,7 +82,7 @@ def main() -> None:
         sys.exit(1)
 
     # Build runner config
-    runner_config = TestRunnerConfig(
+    runner_config = DockerPiRunnerConfig(
         docker_image=args.docker_image,
         timeout=args.timeout,
     )

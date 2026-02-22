@@ -20,7 +20,7 @@ Usage:
     result = llm_client.parse(input_data, MinedTaskSchema)
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
 
@@ -301,7 +301,7 @@ class MinedTask(BaseModel):
                 task_type=llm_schema.task_type.value,
                 difficulty=llm_schema.difficulty.value,
                 quality_score=llm_schema.quality_score,
-                mined_at=datetime.utcnow().isoformat(),
+                mined_at=datetime.now(timezone.utc).isoformat(),
             ),
             task=TaskDefinition(
                 instruction=llm_schema.instruction,

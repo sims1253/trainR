@@ -4,6 +4,7 @@ Replaces cc-mirror + Docker with direct Pi CLI calls.
 Simpler, faster, and supports free models via OpenRouter.
 """
 
+import contextlib
 import json
 import os
 import subprocess
@@ -13,10 +14,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from rich.console import Console
-
 # Load environment variables from .env file
 from dotenv import load_dotenv
+from rich.console import Console
 
 load_dotenv()
 
@@ -94,7 +94,7 @@ class PiRunner:
             raise RuntimeError(
                 f"Pi CLI not found at '{self.config.pi_binary}'. "
                 "Install with: bun add @mariozechner/pi-coding-agent"
-            )
+            ) from None
 
     def _build_prompt(self, skill_content: str, task_instruction: str, task_context: str) -> str:
         """Build the full prompt for Pi agent."""
@@ -262,10 +262,8 @@ Write the tests now.
         finally:
             # Cleanup temp files
             if skill_file:
-                try:
+                with contextlib.suppress(OSError):
                     os.unlink(skill_file)
-                except OSError:
-                    pass
 
     def _run_testthat(self, package_dir: Path) -> dict[str, Any]:
         """Run testthat tests in the package directory."""
@@ -281,10 +279,6 @@ Write the tests now.
             output = result.stdout + result.stderr
 
             # Parse testthat output
-            # Look for patterns like "X passed", "Y failed"
-            passed = "passed" in output.lower() and "failed" not in output.lower()
-
-            # More nuanced parsing
             import re
 
             pass_match = re.search(r"(\d+)\s+passed", output, re.IGNORECASE)
@@ -462,10 +456,10 @@ Write the tests now."""
             rm -f tests/testthat/test-generated.R tests/testthat/_snaps/generated.md 2>/dev/null || true
             echo "[docker-pi] OPENROUTER_API_KEY set: $(if [ -n "$OPENROUTER_API_KEY" ]; then echo 'YES'; else echo 'NO'; fi)"
             echo "[docker-pi] ZAI_API_KEY set: $(if [ -n \"$ZAI_API_KEY\" ]; then echo 'YES'; else echo 'NO'; fi)"
-            
+
             # Decode prompt
             PROMPT=$(echo "$PROMPT_B64" | base64 -d)
-            
+
             # Write skill to temp file if provided
             if [ -n "$SKILL_B64" ]; then
                 SKILL_FILE=/tmp/skill.md
@@ -474,11 +468,11 @@ Write the tests now."""
             else
                 SKILL_FLAG=""
             fi
-            
+
             # Run Pi
             cd /workspace
             pi --print --mode json --no-session --model "$PI_MODEL" $SKILL_FLAG "$PROMPT" 2>&1 || true
-            
+
             echo ""
             echo "[docker-pi] Running testthat..."
             # Run only the generated test file if it exists, otherwise run all tests
