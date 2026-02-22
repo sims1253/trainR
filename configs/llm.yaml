@@ -11,8 +11,9 @@ provider: openrouter
 # - OPENAI_API_KEY → openai
 # - ANTHROPIC_API_KEY → anthropic
 
+# Default models
 models:
-  # Task agent: Runs in Docker, executes tests
+  # Task agent: Runs in Docker, executes tasks
   task_agent: openrouter/openai/gpt-oss-120b:free
   
   # Reflection: GEPA optimization judge
@@ -20,10 +21,6 @@ models:
 
   # Mining: PR quality evaluation
   mining: opencode/glm-5-free
-
-parameters:
-  temperature: 0.3
-  max_tokens: 4096
 
 # Custom endpoints (for providers NOT natively supported by LiteLLM)
 custom_endpoints:

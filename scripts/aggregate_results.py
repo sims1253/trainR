@@ -172,7 +172,7 @@ def main():
             "results": {},
         }
 
-        for skill_key, (timestamp, data) in skills.items():
+        for skill_key, (_timestamp, data) in skills.items():
             model_data["results"][skill_key] = calculate_aggregations(data.get("results", []))
 
         models_output.append(model_data)
