@@ -351,7 +351,7 @@ Provide a structured evaluation of this PR as a potential testing task.
             self.provider = "litellm"
 
         if not self.api_key:
-            print(f"Warning: No API key found for provider. Set appropriate env var.")
+            print("Warning: No API key found for provider. Set appropriate env var.")
 
     def _call_openai(
         self, messages: list[dict[str, Any]], response_format: type[BaseModel]
