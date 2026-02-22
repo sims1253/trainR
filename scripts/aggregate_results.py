@@ -51,10 +51,13 @@ def get_provider(model: str) -> str:
 
 
 def parse_filename(filename: str) -> str | None:
-    if not filename.startswith("eval_") or not filename.endswith(".json"):
+    if not filename.endswith(".json"):
         return None
 
-    base = filename[5:-5]
+    base = filename[:-5]
+    if filename.startswith("eval_"):
+        base = base[5:]
+
     parts = base.split("_")
 
     if len(parts) < 3:
@@ -119,7 +122,11 @@ def main():
         print(f"Results directory not found: {results_dir}")
         return
 
-    eval_files = list(results_dir.glob("eval_*.json"))
+    eval_files = (
+        list(results_dir.rglob("eval_*.json"))
+        + list(results_dir.rglob("*_no_skill_*.json"))
+        + list(results_dir.rglob("*_testing-r-packages-orig_*.json"))
+    )
     if not eval_files:
         print(f"No eval files found in {results_dir}")
         return
@@ -142,13 +149,14 @@ def main():
             continue
 
         config = data.get("config", {})
-        model = config.get("model", "unknown")
+        model_full = config.get("model", "unknown")
+        model_name = model_full.split("/")[-1] if "/" in model_full else model_full
         file_skill = config.get("skill", "unknown")
         skill_key = SKILL_MAP.get(file_skill, file_skill)
 
-        existing = model_skill_runs[model].get(skill_key)
+        existing = model_skill_runs[model_name].get(skill_key)
         if existing is None or timestamp > existing[0]:
-            model_skill_runs[model][skill_key] = (timestamp, data)
+            model_skill_runs[model_name][skill_key] = (timestamp, data)
 
         for r in data.get("results", []):
             if pkg := r.get("source_package"):

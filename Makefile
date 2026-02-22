@@ -336,70 +336,31 @@ for m in ['glm-4.5', 'glm-4.6', 'glm-4.7']: \
     print(f'| {m} | {sk:.1%} | {ns:.1%} | {delta:+.1f}pp |')\
 "
 
-# === Free Model Baselines (DockerPiRunner) ===
+# === Baseline Evaluation ===
 
-# StepFun Step-3.5-Flash
-baseline-stepfun-no-skill:
-	@echo "Running StepFun no-skill baseline..."
-	uv run python scripts/evaluate_batch.py --config configs/baseline_no_skill_stepfun.yaml
+# Single baseline run (usage: make baseline MODEL=openai SKILL=skill)
+MODEL ?= openai
+SKILL ?= no_skill
 
-baseline-stepfun-skill:
-	@echo "Running StepFun skill baseline..."
-	uv run python scripts/evaluate_batch.py --config configs/baseline_skill_stepfun.yaml
+baseline:
+	@echo "Running baseline: $(MODEL) / $(SKILL)"
+	@uv run python scripts/evaluate_batch.py \
+		--model $$(python3 -c "import yaml; d=yaml.safe_load(open('configs/baselines.yaml')); print(next(m['model'] for m in d['models'] if m['name']=='$(MODEL)'))") \
+		$$(if [ "$(SKILL)" = "no_skill" ]; then echo "--no-skill"; else echo "--skill skills/testing-r-packages-orig.md"; fi) \
+		--output results/baselines/$(MODEL)_$(SKILL).json
 
-# OpenAI GPT-OSS-120B
-baseline-openai-no-skill:
-	@echo "Running OpenAI no-skill baseline..."
-	uv run python scripts/evaluate_batch.py --config configs/baseline_no_skill_openai.yaml
+# Run all baselines
+baseline-all:
+	@for model in stepfun openai nvidia minimax; do \
+		for skill in no_skill skill; do \
+			echo "=== $$model / $$skill ===" && \
+			$(MAKE) baseline MODEL=$$model SKILL=$$skill; \
+		done \
+	done
 
-baseline-openai-skill:
-	@echo "Running OpenAI skill baseline..."
-	uv run python scripts/evaluate_batch.py --config configs/baseline_skill_openai.yaml
-
-# NVIDIA Nemotron
-baseline-nvidia-no-skill:
-	@echo "Running NVIDIA no-skill baseline..."
-	uv run python scripts/evaluate_batch.py --config configs/baseline_no_skill_nvidia.yaml
-
-baseline-nvidia-skill:
-	@echo "Running NVIDIA skill baseline..."
-	uv run python scripts/evaluate_batch.py --config configs/baseline_skill_nvidia.yaml
-
-# Minimax M2.5
-baseline-minimax-no-skill:
-	@echo "Running Minimax no-skill baseline..."
-	uv run python scripts/evaluate_batch.py --config configs/baseline_no_skill_minimax.yaml
-
-baseline-minimax-skill:
-	@echo "Running Minimax skill baseline..."
-	uv run python scripts/evaluate_batch.py --config configs/baseline_skill_minimax.yaml
-
-# Run all free model baselines
-baseline-all-free: baseline-stepfun-no-skill baseline-stepfun-skill baseline-openai-no-skill baseline-openai-skill baseline-nvidia-no-skill baseline-nvidia-skill baseline-minimax-no-skill baseline-minimax-skill
-	@echo "All free model baselines complete!"
-
-# Compare all free model baselines
-compare-free-models:
-	@echo "Comparing all free model baselines..."
-	@uv run python -c "\
-import json, glob; \
-results = {}; \
-for f in sorted(glob.glob('results/baselines/eval_*.json')): \
-    d = json.load(open(f)); \
-    model = d['config']['model']; \
-    skill = d['config']['skill']; \
-    rate = d['summary']['pass_rate']; \
-    results[(model, skill)] = rate; \
-print('\\n| Model | Skill | No-Skill | Delta |'); \
-print('|-------|-------|----------|-------|'); \
-models = ['openrouter/stepfun/step-3.5-flash:free', 'openrouter/openai/gpt-oss-120b:free', 'openrouter/nvidia/nemotron-3-nano-30b-a3b:free', 'opencode/minimax-m2.5-free']; \
-for m in models: \
-    sk = results.get((m, 'testing-r-packages-orig'), 0); \
-    ns = results.get((m, 'no_skill'), 0); \
-    delta = (sk - ns) * 100; \
-    name = m.split('/')[-1].replace(':free', ''); \
-    print(f'| {name} | {sk:.1%} | {ns:.1%} | {delta:+.1f}pp |')\
-"
+# Compare baseline results
+compare-baselines:
+	@uv run python scripts/compare_results.py --output results/baselines/COMPARISON.md
 
 # === Pi SDK Evaluation ===
 

@@ -18,23 +18,20 @@ models:
   # Reflection: GEPA optimization judge
   reflection: openrouter/openai/gpt-oss-120b:free
   
-  # Mining: PR quality evaluation (defaults to reflection model)
-  # mining: openrouter/openai/gpt-oss-120b:free
+  # Mining: PR quality evaluation
+  mining: opencode/glm-5-free
 
 parameters:
   temperature: 0.3
   max_tokens: 4096
 
-# Custom endpoints (only for providers NOT natively supported by LiteLLM)
+# Custom endpoints (for providers NOT natively supported by LiteLLM)
 # LiteLLM natively supports: openrouter, zai, gemini, openai, anthropic
-# 
-# For custom endpoints, set base_url here AND use openai/ prefix in model name
 custom_endpoints:
   opencode:
-    base_url: https://api.opencode.ai/v1
-  
+    base_url: https://opencode.ai/zen/v1
   zai_coding_plan:
-    base_url: https://api.zukijourney.com/v1
+    base_url: https://api.z.ai/api/coding/paas/v4
 
 # PR mining thresholds
 mining:
