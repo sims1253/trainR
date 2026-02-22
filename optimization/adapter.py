@@ -299,7 +299,7 @@ def optimize_skill(
         raise ValueError("Z_AI_API_KEY not set in environment.")
 
     if reflection_lm is None:
-        reflection_lm = os.environ.get("LLM_MODEL_REFLECTION", "zai-coding-plan/glm-5")
+        reflection_lm = os.environ.get("LLM_MODEL_REFLECTION", "opencode/glm-5-free")
 
     # Create evaluator(s)
     if models and len(models) > 1:

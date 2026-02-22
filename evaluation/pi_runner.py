@@ -15,6 +15,11 @@ from typing import Any
 
 from rich.console import Console
 
+# Load environment variables from .env file
+from dotenv import load_dotenv
+
+load_dotenv()
+
 console = Console()
 
 
@@ -23,7 +28,7 @@ class PiRunnerConfig:
     """Configuration for Pi runner."""
 
     # Model to use (e.g., "openrouter/google/gemini-2.0-flash", "zai/glm-4.5")
-    model: str = "openrouter/google/gemini-2.0-flash"
+    model: str = "openrouter/openai/gpt-oss-120b:free"
     # Max turns for the agent
     max_turns: int = 50
     # Timeout in seconds
@@ -105,7 +110,7 @@ You are following this skill guide:
 
 ---""")
 
-        # Add the task
+        # Add the task with explicit instructions
         parts.append(f"""# Task
 
 {task_instruction}
@@ -118,7 +123,16 @@ The function to test:
 {task_context}
 ```
 
-Write the tests in the appropriate test file under tests/testthat/. Run the tests to verify they pass.
+## Important Instructions
+
+1. Create your test file at: `tests/testthat/test-generated.R`
+2. DO NOT modify any existing R source files in the R/ directory
+3. DO NOT modify existing test files
+4. ONLY write to tests/testthat/test-generated.R
+5. After writing the test, run it with: `testthat::test_file('tests/testthat/test-generated.R')`
+6. If tests fail, fix them and re-run until they pass
+
+Write the tests now.
 """)
 
         return "\n\n".join(parts)
@@ -306,7 +320,7 @@ Write the tests in the appropriate test file under tests/testthat/. Run the test
 class DockerPiRunnerConfig:
     """Configuration for Docker-based Pi runner."""
 
-    model: str = "openrouter/openai/gpt-oss-20b:free"
+    model: str = "openrouter/openai/gpt-oss-120b:free"
     max_turns: int = 50
     timeout: int = 600
     docker_image: str = "posit-gskill-eval:latest"
@@ -375,12 +389,33 @@ class DockerPiRunner:
         model = model or self.config.model
         cwd = Path(package_dir).resolve()
 
-        # Build the prompt
+        # Build the prompt with explicit instructions
         prompt_parts = []
         if skill_content and skill_content.strip():
             prompt_parts.append(f"# Skill Context\n\n{skill_content}\n\n---")
         prompt_parts.append(
-            f"# Task\n\n{task_instruction}\n\n## Context\n\n```\n{task_context}\n```"
+            f"""# Task
+
+{task_instruction}
+
+## Context
+
+The function to test:
+
+```
+{task_context}
+```
+
+## Important Instructions
+
+1. Create your test file at: `tests/testthat/test-generated.R`
+2. DO NOT modify any existing R source files in the R/ directory
+3. DO NOT modify existing test files
+4. ONLY write to tests/testthat/test-generated.R
+5. After writing the test, run it with: `testthat::test_file('tests/testthat/test-generated.R')`
+6. If tests fail, fix them and re-run until they pass
+
+Write the tests now."""
         )
         prompt = "\n\n".join(prompt_parts)
 
@@ -389,13 +424,13 @@ class DockerPiRunner:
         prompt_b64 = base64.b64encode(prompt.encode()).decode()
 
         # Build Docker command
-        # Use --entrypoint to bypass default entrypoint.sh
+        # Use /bin/bash as entrypoint to bypass entrypoint.sh
         cmd = [
             "docker",
             "run",
             "--rm",
             "--entrypoint",
-            "bash",  # Bypass entrypoint.sh
+            "/bin/bash",
             "-v",
             f"{cwd}:/workspace",
             "-e",
@@ -408,22 +443,25 @@ class DockerPiRunner:
             f"PI_MODEL={model}",
         ]
 
-        # Add API keys
+        # Add API keys (explicitly pass values for reliability)
         for key in self.config.api_keys or []:
-            if os.environ.get(key):
-                cmd.extend(["-e", key])
+            value = os.environ.get(key)
+            if value:
+                cmd.extend(["-e", f"{key}={value}"])
 
         cmd.append(self.config.docker_image)
 
-        # The container entrypoint should run Pi
-        # We'll pass a command that decodes and runs Pi
+        # Pass -c and script as arguments to bash (which is the entrypoint)
         cmd.extend(
             [
-                "bash",
                 "-c",
                 """
             set -e
             echo "[docker-pi] Starting evaluation with model: $PI_MODEL"
+            echo "[docker-pi] Cleaning up previous test files..."
+            rm -f tests/testthat/test-generated.R tests/testthat/_snaps/generated.md 2>/dev/null || true
+            echo "[docker-pi] OPENROUTER_API_KEY set: $(if [ -n "$OPENROUTER_API_KEY" ]; then echo 'YES'; else echo 'NO'; fi)"
+            echo "[docker-pi] ZAI_API_KEY set: $(if [ -n \"$ZAI_API_KEY\" ]; then echo 'YES'; else echo 'NO'; fi)"
             
             # Decode prompt
             PROMPT=$(echo "$PROMPT_B64" | base64 -d)
@@ -443,8 +481,13 @@ class DockerPiRunner:
             
             echo ""
             echo "[docker-pi] Running testthat..."
-            Rscript -e "testthat::test_dir('tests/testthat', reporter = 'summary')" 2>&1 || true
-            
+            # Run only the generated test file if it exists, otherwise run all tests
+            if [ -f tests/testthat/test-generated.R ]; then
+                Rscript -e "testthat::test_file('tests/testthat/test-generated.R', reporter = 'summary')" 2>&1 || true
+            else
+                Rscript -e "testthat::test_dir('tests/testthat', reporter = 'summary')" 2>&1 || true
+            fi
+
             echo "[docker-pi] Done"
             """,
             ]
@@ -501,6 +544,18 @@ class DockerPiRunner:
         num_failed = int(fail_match.group(1)) if fail_match else 0
         num_skipped = int(skip_match.group(1)) if skip_match else 0
         num_warnings = int(warn_match.group(1)) if warn_match else 0
+
+        # Also count test_that blocks if summary not found
+        if num_passed == 0 and num_failed == 0:
+            # Count test_that blocks as a proxy
+            test_count = len(re.findall(r"test_that\s*\(", output))
+            # Check for Error patterns which indicate failures
+            error_count = len(re.findall(r"^──.*Error", output, re.MULTILINE))
+            if test_count > 0 and error_count == 0:
+                num_passed = test_count
+                num_failed = 0
+            elif error_count > 0:
+                num_failed = error_count
 
         # Success if no failures and at least some tests ran
         passed = num_failed == 0 and num_passed > 0

@@ -2482,6 +2482,115 @@ open results/comparison/improvement_analysis.md
 
 ---
 
+## 9. Phase 4 Progress & Learnings (2026-02-21)
+
+### Current Status
+
+**Completed:**
+- ✅ Parallel batch evaluation infrastructure (`evaluate_batch.py`)
+- ✅ Multi-model optimization support (`MultiModelSkillEvaluator`)
+- ✅ YAML configuration system for evaluation runs
+- ✅ Pi SDK runner prototype (`PiRunner`, `DockerPiRunner`)
+- ✅ Baseline comparison framework
+
+**In Progress:**
+- 🔄 Docker + Pi integration (env vars not passing correctly)
+- 🔄 GEPA optimization with reflection model
+
+**Not Started:**
+- ⏳ Full optimization runs
+- ⏳ Held-out evaluation
+- ⏳ Failure mode analysis
+
+### Key Learnings
+
+#### 1. Current Skill Hurts Performance
+
+| Condition | Pass Rate | Model |
+|-----------|-----------|-------|
+| No-skill baseline | 58.3% | glm-4.5 |
+| With current skill | 33.3% | glm-4.5 |
+| **Delta** | **-25.0pp** | |
+
+The hand-authored `testing-r-packages-orig.md` skill actively harms performance on glm-4.5. This is valuable signal for GEPA - there's clear room for improvement.
+
+#### 2. cc-mirror Stack Issues
+
+The current Docker + cc-mirror + LiteLLM stack has multiple issues:
+- **~70s overhead** per container for variant creation
+- **Streaming errors** from LiteLLM parsing z.ai responses
+- **Rate limits** with parallel execution
+- **Prompt passing failures** ("Input must be provided")
+- **Burns paid credits** (no free model support)
+
+#### 3. Pi SDK as Alternative
+
+Pi (`@mariozechner/pi-coding-agent`) offers a simpler alternative:
+- **~2-5s startup** (no variant creation)
+- **Agent Skills standard** (drop-in compatible with existing skills)
+- **Free model support** via OpenRouter
+- **Stable JSON output** mode
+- **Built-in tools** (read, bash, edit, write)
+
+**Status:** Pi runner code created, Docker integration pending env var fix.
+
+#### 4. Multi-Model Optimization Strategy
+
+For robust skill optimization, evaluate on multiple models simultaneously:
+- **Models:** glm-4.5 (weak), glm-4.6 (medium), glm-4.7 (strong)
+- **Aggregation:** Use `min()` to optimize worst-case performance
+- **Goal:** Skill that generalizes across model capabilities
+
+#### 5. Model Concurrency Limits
+
+| Model | Concurrent Requests | Recommended Workers |
+|-------|---------------------|---------------------|
+| glm-4.5 | 10 | 5-8 |
+| glm-4.6 | 10 | 5-8 |
+| glm-4.7 | 5 | 3-4 |
+| glm-5 | 3 | 2 |
+
+### Architecture Decision
+
+**Recommended path forward:** Replace cc-mirror with Docker + Pi:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│               Target Architecture                           │
+├─────────────────────────────────────────────────────────────┤
+│  Python (GEPA)                                              │
+│       ↓                                                     │
+│  DockerPiRunner                                             │
+│       ↓                                                     │
+│  docker run --entrypoint "" posit-gskill-eval:latest        │
+│       ↓                                                     │
+│  pi --print --mode json --model <provider/model> "prompt"   │
+│       ↓                                                     │
+│  testthat verification                                      │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Benefits:**
+- Sandbox isolation (Docker)
+- Fast startup (no cc-mirror variant)
+- Free models (OpenRouter)
+- Simpler code (no LiteLLM)
+
+### Blocking Issues
+
+1. **Pi env vars in Docker** - API keys not reaching Pi inside container
+2. **Reflection model** - Need to verify `zai-coding-plan/glm-5` works for GEPA reflection
+
+### Next Steps
+
+1. Fix Docker + Pi env var passing
+2. Run baseline comparison with Pi runner
+3. Run GEPA optimization with working stack
+4. Compare optimized skill vs no-skill baseline
+5. Expand task set if ceiling effect persists
+
+---
+
 *Document Version: 1.1.0*  
 *Last Updated: 2026-02-20*  
 *Status: Revised MVP Scope - Architect Review Feedback Integrated*
