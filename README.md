@@ -15,7 +15,7 @@ Early development release. Core functionality works, but APIs may change.
 | GEPA Integration | ✅ Done |
 | Baseline Comparisons | ✅ Done |
 | PR Mining | ✅ Done |
-| Multi-package Support | ✅ Done (17 packages, 125 tasks) |
+| Multi-package Support | ✅ Done (20 packages, 138 tasks) |
 
 ## Quick Start
 
@@ -53,7 +53,7 @@ make docker-build
 # Generate from a single package
 uv run python scripts/generate_tasks.py --package dplyr --num-tasks 10
 
-# Or use pre-generated tasks (125 tasks from 17 packages)
+# Or use pre-generated tasks (138 tasks from 20 packages)
 ls tasks/train/ tasks/dev/ tasks/held_out/
 ```
 
@@ -135,9 +135,9 @@ trainR/
 │   └── repos_to_mine.yaml
 │
 ├── tasks/               # Generated tasks (60/20/20 split)
-│   ├── train/           # 75 tasks
-│   ├── dev/             # 25 tasks
-│   └── held_out/        # 25 tasks
+│   ├── train/           # 83 tasks
+│   ├── dev/             # 28 tasks
+│   └── held_out/        # 27 tasks
 │
 ├── skills/              # Skill definitions
 ├── tests/               # pytest suite
@@ -177,10 +177,10 @@ uv run python scripts/mine_prs.py --repo tidyverse/dplyr
 ## Architecture
 
 ```
-  R Packages (17 packages)
+  R Packages (20 packages)
            │
            ▼
-  Task Generator (tree-sitter) → 125 Tasks
+   Task Generator (tree-sitter) → 138 Tasks
            │                        │
            │                        ▼
            │    ┌─────────────────────────────────────┐
@@ -201,7 +201,7 @@ uv run python scripts/mine_prs.py --repo tidyverse/dplyr
 
 ## Packages
 
-See [PACKAGES.md](PACKAGES.md) for the full list of 17 R packages and rationale for each.
+See [PACKAGES.md](PACKAGES.md) for the full list of 20 R packages and rationale for each.
 
 ## Development Roadmap
 

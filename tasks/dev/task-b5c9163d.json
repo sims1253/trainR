@@ -1,0 +1,20 @@
+{
+  "task_id": "task-b5c9163d",
+  "source_package": "httr2",
+  "source_file": "R/curl.R",
+  "difficulty": "hard",
+  "instruction": "Add comprehensive edge case tests for `encode_string2`.\n\n\nExisting tests for reference:\n```r\n\n```\n\n\nThe existing tests cover basic functionality. Add tests for:\n1. NULL inputs to each argument\n2. Empty vectors/strings: character(0), \"\", integer(0)\n3. Boundary values: 0, 1, -1, NA, NaN, Inf\n4. Invalid input types (passing numeric where character expected, etc.)\n5. Missing arguments (use expect_error with class matching)\n6. Very long inputs (strings > 1000 chars, vectors > 10000 elements)\n",
+  "context": "Package: httr2 v1.2.2.9000\nDescription: Perform HTTP Requests and Process the Responses\nFunction: encode_string2\nParameters: x\nTest patterns used: test_that\nExpectations used: expect_equal, expect_snapshot\n\nFunction Code:\n```r\nencode_string2 <- function(x) {\n  supports_raw_string <- getRversion() >= \"4.0.0\"\n\n  has_double_quote <- grepl('\"', x, fixed = TRUE)\n  has_single_quote <- grepl(\"'\", x, fixed = TRUE)\n  use_double <- !has_double_quote | has_single_quote\n  out <- ifelse(\n    use_double,\n    encodeString(x, quote = '\"'),\n    encodeString(x, quote = \"'\")\n  )\n  if (supports_raw_string) {\n    has_unprintable <- grepl(\"[^[[:cntrl:]]]\", x)\n    x_encoded <- encodeString(x)\n    has_both_quotes <- has_double_quote & has_single_quote\n    use_raw_string <- !has_unprintable & (x != x_encoded | has_both_quotes)\n    out[use_raw_string] <- paste0('r\"---{', x[use_raw_string], '}---\"')\n  }\n\n  names(out) <- names(x)\n  out\n}\n```",
+  "reference_test": "# No substantive reference patterns available",
+  "test_type": "unit",
+  "patterns": [
+    "test_that"
+  ],
+  "dependencies": [
+    "testthat"
+  ],
+  "split": "dev",
+  "function_name": "encode_string2",
+  "quality_score": 0.56,
+  "constraints": {}
+}

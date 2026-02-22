@@ -1,0 +1,20 @@
+{
+  "task_id": "task-c488e4dc",
+  "source_package": "lubridate",
+  "source_file": "R/accessors-date.R",
+  "difficulty": "hard",
+  "instruction": "Add comprehensive edge case tests for `date`.\n\n\nExisting tests for reference:\n```r\n\n```\n\n\nThe existing tests cover basic functionality. Add tests for:\n1. NULL inputs to each argument\n2. Empty vectors/strings: character(0), \"\", integer(0)\n3. Boundary values: 0, 1, -1, NA, NaN, Inf\n4. Invalid input types (passing numeric where character expected, etc.)\n5. Missing arguments (use expect_error with class matching)\n6. Very long inputs (strings > 1000 chars, vectors > 10000 elements)\n",
+  "context": "Package: lubridate v1.9.5.9000\nDescription: Make Dealing with Dates a Little Easier\nFunction: date\nParameters: x\nTest patterns used: test_that\nExpectations used: expect_equal\n\nFunction Code:\n```r\ndate <- function(x) {\n  UseMethod(\"date\")\n}\n```",
+  "reference_test": "# No substantive reference patterns available",
+  "test_type": "unit",
+  "patterns": [
+    "test_that"
+  ],
+  "dependencies": [
+    "testthat"
+  ],
+  "split": "train",
+  "function_name": "date",
+  "quality_score": 0.56,
+  "constraints": {}
+}

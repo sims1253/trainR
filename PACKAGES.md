@@ -4,10 +4,10 @@ This document lists all R packages used to generate testing tasks, along with th
 
 ## Overview
 
-- **Total Tasks**: 125
-- **Total Packages**: 17
-- **Split Distribution**: 75 train / 25 dev / 25 held_out
-- **Difficulty Distribution**: 50 hard (40%) / 50 medium (40%) / 25 easy (20%)
+- **Total Tasks**: 138
+- **Total Packages**: 20
+- **Split Distribution**: 83 train / 28 dev / 27 held_out
+- **Difficulty Distribution**: 55 hard (40%) / 55 medium (40%) / 28 easy (20%)
 
 ### Task Distribution Rationale
 
@@ -173,6 +173,36 @@ Packages were selected based on:
 - **Rationale**: Color space manipulation and conversion. Mathematical transformations between color spaces (RGB, HSL, LAB, etc.) provide distinct testing challenges.
 - **Categories**: Color conversion, color comparison, color mixing, palette operations
 - **GitHub**: https://github.com/thomasp85/farver
+
+---
+
+## Tier 6: HTTP Requests
+
+### httr2 (5 tasks)
+- **Downloads**: 928K/month
+- **Rationale**: HTTP request library with mocking, async, and authentication patterns. Good for testing API interactions.
+- **Categories**: Request handling, authentication, mocking, async
+- **GitHub**: https://github.com/r-lib/httr2
+
+---
+
+## Tier 7: Date/Time Handling
+
+### lubridate (3 tasks)
+- **Downloads**: 835K/month
+- **Rationale**: Date/time manipulation with timezone handling. Complex edge cases around parsing and intervals.
+- **Categories**: Date parsing, time zones, intervals, periods
+- **GitHub**: https://github.com/tidyverse/lubridate
+
+---
+
+## Tier 8: Spatial Data
+
+### sf (5 tasks)
+- **Downloads**: 437K/month
+- **Rationale**: Simple Features for spatial data. CRS transformations and geometric operations provide distinct testing challenges.
+- **Categories**: Spatial operations, CRS, geometry, GeoJSON
+- **GitHub**: https://github.com/r-spatial/sf
 
 ---
 

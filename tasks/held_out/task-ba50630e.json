@@ -1,0 +1,20 @@
+{
+  "task_id": "task-ba50630e",
+  "source_package": "httr2",
+  "source_file": "R/curl.R",
+  "difficulty": "medium",
+  "instruction": "Write a complete testthat test file for `httr2::encode_string2`.\n\nPackage: httr2 v1.2.2.9000\nDescription: Perform HTTP Requests and Process the Responses\nFunction: encode_string2\nParameters: x\nTest patterns used: test_that\nExpectations used: expect_equal, expect_snapshot\n\nFunction Code:\n```r\nencode_string2 <- function(x) {\n  supports_raw_string <- getRversion() >= \"4.0.0\"\n\n  has_double_quote <- grepl('\"', x, fixed = TRUE)\n  has_single_quote <- grepl(\"'\", x, fixed = TRUE)\n  use_double <- !has_double_quote | has_single_quote\n  out <- ifelse(\n    use_double,\n    encodeString(x, quote = '\"'),\n    encodeString(x, quote = \"'\")\n  )\n  if (supports_raw_string) {\n    has_unprintable <- grepl(\"[^[[:cntrl:]]]\", x)\n    x_encoded <- encodeString(x)\n    has_both_quotes <- has_double_quote & has_single_quote\n    use_raw_string <- !has_unprintable & (x != x_encoded | has_both_quotes)\n    out[use_raw_string] <- paste0('r\"---{', x[use_raw_string], '}---\"')\n  }\n\n  names(out) <- names(x)\n  out\n}\n```\n\nRequirements:\n1. Use test_that() blocks with descriptive names that reference `encode_string2`\n2. Test basic functionality using appropriate expectations (expect_equal, expect_snapshot)\n3. Test edge cases: NULL input, empty strings, missing arguments\n4. Test error conditions with expect_error()\n5. Each test_that() block should test one logical behavior\n",
+  "context": "Package: httr2 v1.2.2.9000\nDescription: Perform HTTP Requests and Process the Responses\nFunction: encode_string2\nParameters: x\nTest patterns used: test_that\nExpectations used: expect_equal, expect_snapshot\n\nFunction Code:\n```r\nencode_string2 <- function(x) {\n  supports_raw_string <- getRversion() >= \"4.0.0\"\n\n  has_double_quote <- grepl('\"', x, fixed = TRUE)\n  has_single_quote <- grepl(\"'\", x, fixed = TRUE)\n  use_double <- !has_double_quote | has_single_quote\n  out <- ifelse(\n    use_double,\n    encodeString(x, quote = '\"'),\n    encodeString(x, quote = \"'\")\n  )\n  if (supports_raw_string) {\n    has_unprintable <- grepl(\"[^[[:cntrl:]]]\", x)\n    x_encoded <- encodeString(x)\n    has_both_quotes <- has_double_quote & has_single_quote\n    use_raw_string <- !has_unprintable & (x != x_encoded | has_both_quotes)\n    out[use_raw_string] <- paste0('r\"---{', x[use_raw_string], '}---\"')\n  }\n\n  names(out) <- names(x)\n  out\n}\n```",
+  "reference_test": "# No substantive reference patterns available",
+  "test_type": "unit",
+  "patterns": [
+    "test_that"
+  ],
+  "dependencies": [
+    "testthat"
+  ],
+  "split": "held_out",
+  "function_name": "encode_string2",
+  "quality_score": 0.585,
+  "constraints": {}
+}

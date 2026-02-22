@@ -1,0 +1,20 @@
+{
+  "task_id": "task-68852068",
+  "source_package": "sf",
+  "source_file": "R/collection_extract.R",
+  "difficulty": "medium",
+  "instruction": "Write a complete testthat test file for `sf::st_collection_extract`.\n\nPackage: sf v1.1-0\nDescription: Simple Features for R\nFunction: st_collection_extract\nParameters: x, type, warn\nTest patterns used: test_that\nExpectations used: expect_error, expect_length, expect_s3_class, expect_true, expect_warning\n\nFunction Code:\n```r\nst_collection_extract = function(x, type = c(\"POLYGON\", \"POINT\", \"LINESTRING\"), warn = FALSE) {\n\tUseMethod(\"st_collection_extract\")\n}\n```\n\nRequirements:\n1. Use test_that() blocks with descriptive names that reference `st_collection_extract`\n2. Test basic functionality using appropriate expectations (expect_error, expect_length, expect_s3_class, expect_true, expect_warning)\n3. Test edge cases: NULL input, empty strings, missing arguments\n4. Test error conditions with expect_error()\n5. Each test_that() block should test one logical behavior\n",
+  "context": "Package: sf v1.1-0\nDescription: Simple Features for R\nFunction: st_collection_extract\nParameters: x, type, warn\nTest patterns used: test_that\nExpectations used: expect_error, expect_length, expect_s3_class, expect_true, expect_warning\n\nFunction Code:\n```r\nst_collection_extract = function(x, type = c(\"POLYGON\", \"POINT\", \"LINESTRING\"), warn = FALSE) {\n\tUseMethod(\"st_collection_extract\")\n}\n```",
+  "reference_test": "# No substantive reference patterns available",
+  "test_type": "unit",
+  "patterns": [
+    "test_that"
+  ],
+  "dependencies": [
+    "testthat"
+  ],
+  "split": "train",
+  "function_name": "st_collection_extract",
+  "quality_score": 0.585,
+  "constraints": {}
+}

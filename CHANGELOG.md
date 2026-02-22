@@ -16,10 +16,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - GEPA integration for skill optimization
 
 #### Task Expansion (Phase 5)
-- 125 tasks from 17 R packages
+- 138 tasks from 20 R packages
 - Difficulty distribution: 40% hard, 40% medium, 20% easy
-- Split distribution: 75 train, 25 dev, 25 held_out
-- Packages: cli, dplyr, ggplot2, tidyr, stringr, purrr, rlang, vctrs, tibble, withr, glue, posterior, bayesplot, officer, flextable, farver, testthat
+- Split distribution: 83 train, 28 dev, 27 held_out
+- Packages: cli, dplyr, ggplot2, tidyr, stringr, purrr, rlang, vctrs, tibble, withr, glue, posterior, bayesplot, officer, flextable, farver, testthat, httr2, lubridate, sf
 
 #### Baseline System (Phase 4)
 - Baseline configs for 4 free OpenRouter models:

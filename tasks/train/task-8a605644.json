@@ -1,0 +1,20 @@
+{
+  "task_id": "task-8a605644",
+  "source_package": "sf",
+  "source_file": "R/collection_extract.R",
+  "difficulty": "hard",
+  "instruction": "Add comprehensive edge case tests for `st_collection_extract`.\n\n\nExisting tests for reference:\n```r\n\n```\n```r\n\n```\n```r\n\n```\n\n\nThe existing tests cover basic functionality. Add tests for:\n1. NULL inputs to each argument\n2. Empty vectors/strings: character(0), \"\", integer(0)\n3. Boundary values: 0, 1, -1, NA, NaN, Inf\n4. Invalid input types (passing numeric where character expected, etc.)\n5. Missing arguments (use expect_error with class matching)\n6. Very long inputs (strings > 1000 chars, vectors > 10000 elements)\n",
+  "context": "Package: sf v1.1-0\nDescription: Simple Features for R\nFunction: st_collection_extract\nParameters: x, type, warn\nTest patterns used: test_that\nExpectations used: expect_error, expect_length, expect_s3_class, expect_true, expect_warning\n\nFunction Code:\n```r\nst_collection_extract = function(x, type = c(\"POLYGON\", \"POINT\", \"LINESTRING\"), warn = FALSE) {\n\tUseMethod(\"st_collection_extract\")\n}\n```",
+  "reference_test": "# No substantive reference patterns available",
+  "test_type": "unit",
+  "patterns": [
+    "test_that"
+  ],
+  "dependencies": [
+    "testthat"
+  ],
+  "split": "train",
+  "function_name": "st_collection_extract",
+  "quality_score": 0.56,
+  "constraints": {}
+}
