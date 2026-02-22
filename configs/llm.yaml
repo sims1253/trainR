@@ -21,15 +21,13 @@ models:
   # Mining: PR quality evaluation
   mining: opencode/glm-5-free
 
+parameters:
+  temperature: 0.3
+  max_tokens: 4096
+
 # Custom endpoints (for providers NOT natively supported by LiteLLM)
 custom_endpoints:
   opencode:
     base_url: https://opencode.ai/zen/v1
   zai_coding_plan:
     base_url: https://api.z.ai/api/coding/paas/v4
-
-# PR mining thresholds
-mining:
-  min_quality_score: 7
-  require_test_changes: true
-  require_linked_issue: true

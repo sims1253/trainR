@@ -1,0 +1,20 @@
+# PR Mining Configuration
+# Used by: scripts/mine_prs.py
+
+# LLM settings come from llm.yaml
+# This file only has mining-specific settings
+
+quality:
+  min_score: 7
+  require_test_changes: true
+  require_linked_issue: true
+
+limits:
+  max_prs_per_repo: 50
+  since_days: 30
+
+repos:
+  # Can also specify via --repo or --repos-file
+  - tidyverse/dplyr
+  - tidyverse/ggplot2
+  - r-lib/cli
