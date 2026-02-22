@@ -1,0 +1,20 @@
+{
+  "task_id": "task-83682371",
+  "source_package": "dplyr",
+  "source_file": "R/across.R",
+  "difficulty": "medium",
+  "instruction": "Refactor the existing tests for `if_all` to follow better testing practices.\n\n\nCurrent test patterns to refactor:\n- test_that at tests/testthat/test-across.R:1017\n\n\nGoals:\n1. Use describe()/it() blocks for better organization where appropriate\n2. Reduce code duplication with helper functions or local fixtures\n3. Improve test descriptions to be specific about what behavior is verified\n4. Extract common setup into withr::local_* fixtures\n5. Each test should have a single responsibility\n",
+  "context": "Package: dplyr v1.2.0.9000\nDescription: A Grammar of Data Manipulation\nFunction: if_all\nParameters: .cols, .fns, .names\nTest patterns used: test_that\nExpectations used: expect_equal\n\nFunction Code:\n```r\nif_all <- function(.cols, .fns, ..., .names = NULL) {\n  context_local(\"across_if_fn\", \"if_all\")\n  context_local(\"across_frame\", current_env())\n  df <- across({{ .cols }}, .fns, ..., .names = .names)\n  x <- dplyr_new_list(df)\n  size <- vec_size(df)\n  dplyr_list_pall(x, size = size)\n}\n```",
+  "reference_test": "# No substantive reference patterns available",
+  "test_type": "unit",
+  "patterns": [
+    "test_that"
+  ],
+  "dependencies": [
+    "testthat"
+  ],
+  "split": "held_out",
+  "function_name": "if_all",
+  "quality_score": 0.51,
+  "constraints": {}
+}

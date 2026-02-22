@@ -1,0 +1,23 @@
+{
+  "task_id": "task-5a43ce6d",
+  "source_package": "tibble",
+  "source_file": "R/add.R",
+  "difficulty": "hard",
+  "instruction": "Add comprehensive edge case tests for `add_row`.\n\n\nExisting tests for reference:\n```r\n\n```\n```r\n\n```\n```r\n\n```\n\n\nThe existing tests cover basic functionality. Add tests for:\n1. NULL inputs to each argument\n2. Empty vectors/strings: character(0), \"\", integer(0)\n3. Boundary values: 0, 1, -1, NA, NaN, Inf\n4. Invalid input types (passing numeric where character expected, etc.)\n5. Missing arguments (use expect_error with class matching)\n6. Very long inputs (strings > 1000 chars, vectors > 10000 elements)\n",
+  "context": "Package: tibble v3.3.1.9004\nDescription: Simple Data Frames\nFunction: add_row\nParameters: .data, .before, .after\nTest patterns used: expect_snapshot, test_that\nExpectations used: expect_equal, expect_identical, expect_snapshot, expect_tibble_abort\n\nFunction Code:\n```r\nadd_row <- function(.data, ..., .before = NULL, .after = NULL) {\n  if (inherits(.data, \"grouped_df\")) {\n    abort_add_rows_to_grouped_df()\n  }\n\n  if (!is.data.frame(.data)) {\n    deprecate_stop(\"2.1.1\", \"add_row(.data = 'must be a data frame')\")\n  }\n\n  if (dots_n(...) == 0L) {\n    # A single row of missing values is added if no input is supplied\n    df <- new_tibble(list(), nrow = 1L)\n  } else {\n    df <- tibble(...)\n  }\n\n  extra_vars <- setdiff(names(df), names(.data))\n  if (has_length(extra_vars)) {\n    abort_incompatible_new_rows(extra_vars)\n  }\n\n  pos <- pos_from_before_after(.before, .after, nrow(.data))\n  out <- rbind_at(.data, df, pos)\n\n  vectbl_restore(out, .data)\n}\n```",
+  "reference_test": "# No substantive reference patterns available",
+  "test_type": "snapshot",
+  "patterns": [
+    "expect_snapshot",
+    "test_that"
+  ],
+  "dependencies": [
+    "R",
+    "dplyr",
+    "testthat"
+  ],
+  "split": "train",
+  "function_name": "add_row",
+  "quality_score": 0.566,
+  "constraints": {}
+}

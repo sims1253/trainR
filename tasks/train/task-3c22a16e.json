@@ -1,0 +1,20 @@
+{
+  "task_id": "task-3c22a16e",
+  "source_package": "stringr",
+  "source_file": "R/case.R",
+  "difficulty": "medium",
+  "instruction": "Refactor the existing tests for `to_words` to follow better testing practices.\n\n\nCurrent test patterns to refactor:\n- test_that at tests/testthat/test-case.R:52\n\n\nGoals:\n1. Use describe()/it() blocks for better organization where appropriate\n2. Reduce code duplication with helper functions or local fixtures\n3. Improve test descriptions to be specific about what behavior is verified\n4. Extract common setup into withr::local_* fixtures\n5. Each test should have a single responsibility\n",
+  "context": "Package: stringr v1.6.0.9000\nDescription: Simple, Consistent Wrappers for Common String Operations\nFunction: to_words\nParameters: string\nTest patterns used: test_that\nExpectations used: expect_equal\n\nFunction Code:\n```r\nto_words <- function(string) {\n  breakpoints <- paste(\n    # non-word characters\n    \"[^\\\\p{L}\\\\p{N}]+\",\n    # lowercase followed by uppercase\n    \"(?<=\\\\p{Ll})(?=\\\\p{Lu})\",\n    # letter followed by number\n    \"(?<=\\\\p{L})(?=\\\\p{N})\",\n    # number followed by letter\n    \"(?<=\\\\p{N})(?=\\\\p{L})\",\n    # uppercase followed uppercase then lowercase (i.e. end of acronym)\n    \"(?<=\\\\p{Lu})(?=\\\\p{Lu}\\\\p{Ll})\",\n    sep = \"|\"\n  )\n  out <- str_replace_all(string, breakpoints, \" \")\n  out <- str_to_lower(out)\n  str_trim(out)\n}\n```",
+  "reference_test": "# No substantive reference patterns available",
+  "test_type": "unit",
+  "patterns": [
+    "test_that"
+  ],
+  "dependencies": [
+    "testthat"
+  ],
+  "split": "train",
+  "function_name": "to_words",
+  "quality_score": 0.51,
+  "constraints": {}
+}

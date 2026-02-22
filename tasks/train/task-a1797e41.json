@@ -1,0 +1,20 @@
+{
+  "task_id": "task-a1797e41",
+  "source_package": "ggplot2",
+  "source_file": "R/aes-variants.R",
+  "difficulty": "hard",
+  "instruction": "Add comprehensive edge case tests for `aes_all`.\n\n\nExisting tests for reference:\n```r\n\n```\n\n\nThe existing tests cover basic functionality. Add tests for:\n1. NULL inputs to each argument\n2. Empty vectors/strings: character(0), \"\", integer(0)\n3. Boundary values: 0, 1, -1, NA, NaN, Inf\n4. Invalid input types (passing numeric where character expected, etc.)\n5. Missing arguments (use expect_error with class matching)\n6. Very long inputs (strings > 1000 chars, vectors > 10000 elements)\n",
+  "context": "Package: ggplot2 v4.0.2.9000\nDescription: Create Elegant Data Visualisations Using the Grammar of Graphics\nFunction: aes_all\nParameters: vars\nTest patterns used: test_that\nExpectations used: expect_equal\n\nFunction Code:\n```r\naes_all <- function(vars) {\n  names(vars) <- vars\n  vars <- rename_aes(vars)\n\n  # Quosure the symbols in the empty environment because they can only\n  # refer to the data mask\n  x <- class_mapping(lapply(vars, function(x) new_quosure(as.name(x), emptyenv())))\n  add_class(x, \"unlabelled\")\n}\n```",
+  "reference_test": "# No substantive reference patterns available",
+  "test_type": "unit",
+  "patterns": [
+    "test_that"
+  ],
+  "dependencies": [
+    "testthat"
+  ],
+  "split": "train",
+  "function_name": "aes_all",
+  "quality_score": 0.56,
+  "constraints": {}
+}

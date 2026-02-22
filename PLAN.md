@@ -1267,6 +1267,223 @@ uv run python scripts/compare_results.py \
 
 ---
 
+## Phase 4 Progress (Updated 2026-02-22)
+
+### Completed Tasks
+
+1. **DockerPiRunner Migration** ✅
+   - Updated `evaluate_batch.py` to use `DockerPiRunner` instead of `DockerTestRunner`
+   - Updated `evaluation/sandbox.py` to use `DockerPiRunner` and `DockerPiRunnerConfig`
+   - Updated `optimization/adapter.py` to use `DockerPiRunnerConfig`
+   - Added `--max-tasks` CLI argument for testing
+   - Changed API key check from `Z_AI_API_KEY` to `OPENROUTER_API_KEY`
+
+2. **Baseline Configuration** ✅
+   - Created 8 baseline config files for 4 free models:
+     - `openrouter/stepfun/step-3.5-flash:free`
+     - `openrouter/openai/gpt-oss-120b:free`
+     - `openrouter/nvidia/nemotron-3-nano-30b-a3b:free`
+     - `opencode/minimax-m2.5-free`
+   - Each model has no-skill and skill config variants
+   - Configs use `train` split (all 18 tasks)
+   - Set to 1 worker to avoid OOM issues
+
+3. **Makefile Updates** ✅
+   - Added `baseline-{model}-no-skill` targets for all 4 models
+   - Added `baseline-{model}-skill` targets for all 4 models
+   - Added `baseline-all-free` target to run all 8 baselines
+   - Added `compare-free-models` target for comparison table
+
+4. **Optimization Test** ✅
+   - Verified GEPA optimization works with DockerPiRunner
+   - Quick test (3 metric calls) completed successfully
+   - Base program score: 66.67% on 6 validation tasks
+
+### In Progress
+
+1. **Baseline Runs** 🔄
+   - Started all 8 baselines running in background (script: `scripts/run_all_baselines.sh`)
+   - Estimated time: ~3 min/task × 18 tasks × 8 baselines = ~7 hours total
+   - Logs: `logs/baselines/{model}-{skill}.log`
+   - Results: `results/baselines/eval_*.json`
+
+### Decisions Made
+
+1. **Free Models**: Using OpenRouter free tier models for baselines due to cost constraints
+   - Trade-off: Slower inference vs cost savings
+   - May need to upgrade to paid models for faster iteration if signal is promising
+
+2. **Worker Count**: Reduced to 1 worker per baseline run
+   - Reason: Multiple Docker containers cause OOM issues
+   - Each container runs the `pi` CLI with model inference
+
+3. **Task Split**: Using `train` split for all tasks
+   - Current dataset only has 18 tasks in `train` split
+   - No dev/held_out splits currently defined
+   - **DECISION NEEDED**: Define proper split strategy before optimization
+
+### Next Steps
+
+1. Wait for baseline runs to complete
+2. Run GEPA optimization with free models (`make optimize-fresh OPT_MAX_CALLS=30`)
+3. Compare optimized skill vs baselines across all 4 models
+4. If signal is promising:
+   - Define proper train/dev/held_out splits
+   - Consider paid models for faster iteration
+   - Expand task set from other packages
+
+### Phase 4 Results (Completed 2026-02-22)
+
+#### Baseline Comparison (18 tasks)
+
+| Model | No-Skill | With Skill | Delta |
+|-------|----------|------------|-------|
+| StepFun Step-3.5-Flash | 50.0% | 50.0% | 0pp |
+| OpenAI GPT-OSS-120B | 33.3% | 83.3% | **+50.0pp** |
+| NVIDIA Nemotron-3-Nano | 83.3% | 72.2% | -11.1pp |
+| Minimax M2.5 | 44.4% | **100.0%** | **+55.6pp** |
+
+#### Key Findings
+
+1. **Minimax M2.5** achieves 100% pass rate with skill guidance
+   - Best performing model with the hand-crafted skill
+   - 55.6pp improvement from no-skill baseline
+   - **RECOMMENDATION**: Use Minimax M2.5 for future optimization
+
+2. **OpenAI GPT-OSS-120B** shows strong skill benefit (+50pp)
+   - No-skill baseline is weakest (33.3%)
+   - With skill: 83.3% (strong improvement)
+   - Good candidate for optimization
+
+3. **NVIDIA Nemotron-3-Nano** performs worse with skill (-11.1pp)
+   - High no-skill baseline (83.3%)
+   - Skill may be confusing this model
+   - Consider different skill format for this model
+
+4. **StepFun Step-3.5-Flash** shows no skill benefit
+   - Baseline and skill performance identical (~50%)
+   - Model may not follow instructions well
+
+#### GEPA Optimization Results
+
+- **Best Score**: 33.3% (on OpenAI GPT-OSS-120B validation)
+- **Total Metric Calls**: 39
+- **Result**: Optimization did NOT improve over hand-crafted skill
+  - Hand-crafted skill: 83.3% on OpenAI
+  - Optimized skill: 33.3% on OpenAI
+- **Analysis**: 
+  - Free model rate limiting may have affected optimization quality
+  - Need more optimization budget with better models
+  - Original skill is already well-tuned
+
+#### Conclusions
+
+1. **Hand-crafted skill works well** for Minimax and OpenAI models
+2. **GEPA optimization needs refinement**:
+   - Use paid models for reflection (not free tier)
+   - Increase optimization budget (more than 30 calls)
+   - Consider multi-model optimization
+3. **Model selection matters**:
+   - Different models respond differently to skill guidance
+   - Minimax M2.5 is best candidate for production use
+
+#### Files Generated
+
+- Baseline configs: `configs/baseline_*_{stepfun,openai,nvidia,minimax}.yaml`
+- Baseline results: `results/baselines/eval_*/`
+- Optimization run: `results/optimization/free_model_run/run_20260222_033958/`
+- Comparison script: `scripts/compare_results.py`
+- Runner script: `scripts/run_all_baselines.sh`
+
+---
+
+## Phase 5: Dataset Expansion (2026-02-22)
+
+### Goals
+
+1. **Expand task diversity** - Add tasks from multiple R packages
+2. **Improve task difficulty** - Create more challenging testing scenarios
+3. **Define proper splits** - Establish train/dev/held_out split strategy
+4. **Document methodology** - Create reproducible task generation pipeline
+
+### Target Packages for Task Generation
+
+Based on CRAN download statistics and package quality:
+
+#### Tier 1: High Priority (Widely Used, Well-Documented)
+| Package | Category | Rationale |
+|---------|----------|-----------|
+| dplyr | Data manipulation | Core tidyverse, diverse functions |
+| ggplot2 | Visualization | Complex API, many edge cases |
+| stringr | String operations | Clear function contracts |
+| tidyr | Data tidying | Multiple function families |
+| readr | Data import | File handling edge cases |
+| purrr | Functional programming | Higher-order functions |
+
+#### Tier 2: Medium Priority (Infrastructure)
+| Package | Category | Rationale |
+|---------|----------|-----------|
+| vctrs | Custom types | Type coercion patterns |
+| rlang | Metaprogramming | Quosures, tidy eval |
+| withr | State management | Cleanup patterns |
+| glue | String interpolation | Simple but useful |
+
+#### Tier 3: Domain-Specific
+| Package | Category | Rationale |
+|---------|----------|-----------|
+| httr | HTTP requests | API mocking complexity |
+| checkmate | Argument validation | Assertion patterns |
+| R6 | OOP | Reference semantics |
+
+### Task Generation Methodology
+
+#### Option A: Synthetic Bug Generation
+1. Take well-tested function from target package
+2. Introduce controlled bug (wrong operator, missing edge case)
+3. Create instruction asking to write test that catches bug
+4. Validate with existing tests
+
+#### Option B: Documentation Mining
+1. Extract function examples from roxygen2 docs
+2. Create tasks from examples that demonstrate edge cases
+3. Use doc examples as reference tests
+
+#### Option C: GitHub Issue Mining (Future)
+1. Scrape bug reports from package GitHub repos
+2. Extract minimal reproducible examples
+3. Create tasks from real-world issues
+
+### Split Strategy
+
+**DECISION NEEDED**: Define proper split for optimization
+
+Current state: 18 tasks, all in `train` split
+
+Proposed strategy:
+- **Train (60%)**: 10-12 tasks for skill optimization
+- **Dev (20%)**: 3-4 tasks for early stopping/hyperparameter tuning
+- **Held-out (20%)**: 3-4 tasks for final evaluation
+
+### Implementation Steps
+
+1. [ ] Create task generation script for new packages
+2. [ ] Generate 20+ tasks from dplyr package
+3. [ ] Generate 20+ tasks from stringr package
+4. [ ] Define and implement split strategy
+5. [ ] Re-run baselines with expanded dataset
+6. [ ] Document task generation methodology
+
+### Estimated Effort
+
+- Task generation script: 2-3 hours
+- Generate tasks from 2 packages: 1-2 hours
+- Re-run baselines: 8-10 hours (with free models)
+- Documentation: 1 hour
+
+**Total**: ~15 hours
+
+---
+
 ## 8.1 MVP v1.1 (Revised Scope)
 
 > **Architect Review Feedback Integration** - This section addresses the revised MVP parameters and new components identified during architectural review.

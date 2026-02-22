@@ -1,0 +1,20 @@
+{
+  "task_id": "task-6a50686b",
+  "source_package": "shiny",
+  "source_file": "R/conditions.R",
+  "difficulty": "medium",
+  "instruction": "Refactor the existing tests for `pruneStackTrace` to follow better testing practices.\n\n\nCurrent test patterns to refactor:\n- describe_it at tests/testthat/test-stacks-pruning.R:29\n  ```r\n  it(\"passes basic example\", {\n      expect_equal(pruneStackTrace(res$parents), c(T, F, F, T, T, T))\n      expect_equal(lapply(list(res$parents), pruneStackTrace), list(c(T, F, F, T, T, T)))\n  ```\n\n\nGoals:\n1. Use describe()/it() blocks for better organization where appropriate\n2. Reduce code duplication with helper functions or local fixtures\n3. Improve test descriptions to be specific about what behavior is verified\n4. Extract common setup into withr::local_* fixtures\n5. Each test should have a single responsibility\n",
+  "context": "Package: shiny v1.12.1.9000\nDescription: Web Application Framework for R\nFunction: pruneStackTrace\nParameters: parents\nTest patterns used: describe_it\nExpectations used: expect_equal\n\nFunction Code:\n```r\npruneStackTrace <- function(parents) {\n  # Detect nodes that are not the last child. This is necessary, but not\n  # sufficient; we also need to drop nodes that are the last child, but one of\n  # their ancestors is not.\n  is_dupe <- duplicated(parents, fromLast = TRUE)\n\n  # The index of the most recently seen node that was actually kept instead of\n  # dropped.\n  current_node <- 0\n\n  # Loop over the parent indices. Anything that is not parented by current_node\n  # (a.k.a. last-known-good node), or is a dupe, can be discarded. Anything that\n  # is kept becomes the new current_node.\n  #\n  # jcheng 2022-03-18: Two more reasons a node can be kept:\n  #   1. parent is 0\n  #   2. parent is i\n  # Not sure why either of these situations happen, but they're common when\n  # interacting with rlang/dplyr errors. See issue rstudio/shiny#3250 for repro\n  # cases.\n  include <- vapply(seq_along(parents), function(i) {\n    if ((!is_dupe[[i]] && parents[[i]] == current_node) ||\n        parents[[i]] == 0 ||\n        parents[[i]] == i) {\n      current_node <<- i\n      TRUE\n    } else {\n      FALSE\n    }\n  }, FUN.VALUE = logical(1))\n\n  include\n}\n```",
+  "reference_test": "it(\"passes basic example\", {\n    expect_equal(pruneStackTrace(res$parents), c(T, F, F, T, T, T))\n    expect_equal(lapply(list(res$parents), pruneStackTrace), list(c(T, F, F, T, T, T)))\n  })",
+  "test_type": "unit",
+  "patterns": [
+    "describe_it"
+  ],
+  "dependencies": [
+    "testthat"
+  ],
+  "split": "train",
+  "function_name": "pruneStackTrace",
+  "quality_score": 0.62,
+  "constraints": {}
+}

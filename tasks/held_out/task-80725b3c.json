@@ -1,0 +1,20 @@
+{
+  "task_id": "task-80725b3c",
+  "source_package": "tibble",
+  "source_file": "R/add.R",
+  "difficulty": "hard",
+  "instruction": "Add comprehensive edge case tests for `add_column`.\n\n\nExisting tests for reference:\n```r\n\n```\n```r\n\n```\n```r\n\n```\n\n\nThe existing tests cover basic functionality. Add tests for:\n1. NULL inputs to each argument\n2. Empty vectors/strings: character(0), \"\", integer(0)\n3. Boundary values: 0, 1, -1, NA, NaN, Inf\n4. Invalid input types (passing numeric where character expected, etc.)\n5. Missing arguments (use expect_error with class matching)\n6. Very long inputs (strings > 1000 chars, vectors > 10000 elements)\n",
+  "context": "Package: tibble v3.3.1.9004\nDescription: Simple Data Frames\nFunction: add_column\nParameters: .data, .before, .after, .name_repair\nTest patterns used: test_that\nExpectations used: expect_equal, expect_identical\n\nFunction Code:\n```r\nadd_column <- function(\n  .data,\n  ...,\n  .before = NULL,\n  .after = NULL,\n  .name_repair = c(\n    \"check_unique\",\n    \"unique\",\n    \"universal\",\n    \"minimal\",\n    \"unique_quiet\",\n    \"universal_quiet\"\n  )\n) {\n  if (!is.data.frame(.data)) {\n    deprecate_stop(\"2.1.1\", \"add_column(.data = 'must be a data frame')\")\n  }\n\n  if (\n    has_length(.data) &&\n      (!is_named(.data) || anyDuplicated(names2(.data))) &&\n      missing(.name_repair)\n  ) {\n    deprecate_stop(\n      \"3.0.0\",\n      \"add_column(.data = 'must have unique names')\",\n      details = 'Use `.name_repair = \"minimal\"`.'\n    )\n  }\n\n  df <- tibble(..., .name_repair = .name_repair)\n\n  if (ncol(df) == 0L) {\n    return(.data)\n  }\n\n  if (nrow(df) != nrow(.data)) {\n    if (nrow(df) == 1) {\n      df <- df[rep(1L, nrow(.data)), ]\n    } else {\n      abort_incompatible_new_cols(nrow(.data), df)\n    }\n  }\n\n  pos <- pos_from_before_after_names(.before, .after, colnames(.data))\n\n  end_pos <- ncol(.data) + seq_len(ncol(df))\n\n  indexes_before <- rlang::seq2(1L, pos)\n  indexes_after <- rlang::seq2(pos + 1L, ncol(.data))\n  indexes <- c(indexes_before, end_pos, indexes_after)\n\n  new_data <- .data\n  new_data[end_pos] <- df\n\n  out <- new_data[indexes]\n\n  out <- set_repaired_names(out, repair_hint = TRUE, .name_repair)\n  vectbl_restore(out, .data)\n}\n```",
+  "reference_test": "# No substantive reference patterns available",
+  "test_type": "unit",
+  "patterns": [
+    "test_that"
+  ],
+  "dependencies": [
+    "testthat"
+  ],
+  "split": "held_out",
+  "function_name": "add_column",
+  "quality_score": 0.56,
+  "constraints": {}
+}

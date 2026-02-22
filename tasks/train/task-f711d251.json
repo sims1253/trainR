@@ -1,0 +1,20 @@
+{
+  "task_id": "task-f711d251",
+  "source_package": "vctrs",
+  "source_file": "R/arith.R",
+  "difficulty": "easy",
+  "instruction": "A test for `vec_arith` is failing. Diagnose and fix the issue.\n\n\nFailing test:\n```r\n\n```\n\n\nSteps:\n1. Read the function source code to understand expected behavior\n2. Compare the test expectations with actual function behavior\n3. Fix the test if expectations are wrong, or fix the function if it has a bug\n4. Ensure the fix maintains backward compatibility\n5. Run the tests to verify the fix\n",
+  "context": "Package: vctrs v0.7.1.9000\nDescription: Vector Helpers\nFunction: vec_arith\nParameters: op, x, y\nTest patterns used: test_that\nExpectations used: expect_identical\n\nFunction Code:\n```r\nvec_arith <- function(op, x, y, ...) {\n  check_dots_empty0(...)\n  UseMethod(\"vec_arith\", x)\n}\n```",
+  "reference_test": "# No substantive reference patterns available",
+  "test_type": "unit",
+  "patterns": [
+    "test_that"
+  ],
+  "dependencies": [
+    "testthat"
+  ],
+  "split": "train",
+  "function_name": "vec_arith",
+  "quality_score": 0.51,
+  "constraints": {}
+}

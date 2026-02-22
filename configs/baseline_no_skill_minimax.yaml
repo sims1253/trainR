@@ -1,0 +1,22 @@
+# No-Skill Baseline Configuration - Minimax M2.5
+# Measures raw model capability without skill guidance
+
+model:
+  task: opencode/minimax-m2.5-free
+
+workers:
+  count: 1  # Conservative for free models
+
+skill:
+  no_skill: true
+
+tasks:
+  splits:
+    - train
+
+execution:
+  timeout: 600
+
+output:
+  dir: results/baselines
+  save_trajectories: true

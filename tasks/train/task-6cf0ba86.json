@@ -1,0 +1,20 @@
+{
+  "task_id": "task-6cf0ba86",
+  "source_package": "ggplot2",
+  "source_file": "R/aes-variants.R",
+  "difficulty": "hard",
+  "instruction": "Add comprehensive edge case tests for `aes_string`.\n\n\nExisting tests for reference:\n```r\n\n```\n```r\n\n```\n\n\nThe existing tests cover basic functionality. Add tests for:\n1. NULL inputs to each argument\n2. Empty vectors/strings: character(0), \"\", integer(0)\n3. Boundary values: 0, 1, -1, NA, NaN, Inf\n4. Invalid input types (passing numeric where character expected, etc.)\n5. Missing arguments (use expect_error with class matching)\n6. Very long inputs (strings > 1000 chars, vectors > 10000 elements)\n",
+  "context": "Package: ggplot2 v4.0.2.9000\nDescription: Create Elegant Data Visualisations Using the Grammar of Graphics\nFunction: aes_string\nParameters: x, y\nTest patterns used: test_that\nExpectations used: expect_equal, expect_identical\n\nFunction Code:\n```r\naes_string <- function(x, y, ...) {\n  deprecate(\n    \"3.0.0\",\n    \"aes_string()\",\n    details = c(\n      \"Please use tidy evaluation idioms with `aes()`. \",\n      'See also `vignette(\"ggplot2-in-packages\")` for more information.'\n    )\n  )\n  mapping <- list(...)\n  if (!missing(x)) mapping[\"x\"] <- list(x)\n  if (!missing(y)) mapping[\"y\"] <- list(y)\n\n  caller_env <- parent.frame()\n  mapping <- lapply(mapping, function(x) {\n    if (is.character(x)) {\n      x <- parse_expr(x)\n    }\n    new_aesthetic(x, env = caller_env)\n  })\n\n  class_mapping(rename_aes(mapping))\n}\n```",
+  "reference_test": "# No substantive reference patterns available",
+  "test_type": "unit",
+  "patterns": [
+    "test_that"
+  ],
+  "dependencies": [
+    "testthat"
+  ],
+  "split": "train",
+  "function_name": "aes_string",
+  "quality_score": 0.56,
+  "constraints": {}
+}

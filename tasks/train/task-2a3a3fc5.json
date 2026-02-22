@@ -1,0 +1,22 @@
+{
+  "task_id": "task-2a3a3fc5",
+  "source_package": "vctrs",
+  "source_file": "R/assert.R",
+  "difficulty": "medium",
+  "instruction": "Write a complete testthat test file for `vctrs::vec_assert`.\n\nPackage: vctrs v0.7.1.9000\nDescription: Vector Helpers\nFunction: vec_assert\nParameters: x, ptype, size, arg, call\nTest patterns used: expect_snapshot, test_that\nExpectations used: expect_error, expect_snapshot\n\nFunction Code:\n```r\nvec_assert <- function(\n  x,\n  ptype = NULL,\n  size = NULL,\n  arg = caller_arg(x),\n  call = caller_env()\n) {\n  if (!obj_is_vector(x)) {\n    stop_scalar_type(x, arg, call = call)\n  }\n\n  if (!is_null(ptype)) {\n    ptype <- vec_ptype(ptype)\n    x_type <- vec_ptype_finalise(vec_ptype(x))\n    if (!is_same_type(x_type, ptype)) {\n      msg <- vec_assert_type_explain(x_type, ptype, arg)\n      abort(\n        msg,\n        class = c(\"vctrs_error_assert_ptype\", \"vctrs_error_assert\"),\n        required = ptype,\n        actual = x_type,\n        call = call\n      )\n    }\n  }\n\n  if (!is_null(size)) {\n    size <- vec_cast(size, integer(), x_arg = \"size\")\n\n    n_size <- length(size)\n    if (n_size != 1L) {\n      abort(glue::glue(\"`size` must be length 1, not length {n_size}.\"))\n    }\n\n    x_size <- vec_size(x)\n    if (!identical(x_size, size)) {\n      stop_assert_size(\n        x_size,\n        size,\n        arg,\n        call = call\n      )\n    }\n  }\n\n  invisible(x)\n}\n```\n\nRequirements:\n1. Use test_that() blocks with descriptive names that reference `vec_assert`\n2. Test basic functionality using appropriate expectations (expect_error, expect_snapshot)\n3. Test edge cases: NULL input, empty strings, missing arguments\n4. Test error conditions with expect_error()\n5. Each test_that() block should test one logical behavior\n",
+  "context": "Package: vctrs v0.7.1.9000\nDescription: Vector Helpers\nFunction: vec_assert\nParameters: x, ptype, size, arg, call\nTest patterns used: expect_snapshot, test_that\nExpectations used: expect_error, expect_snapshot\n\nFunction Code:\n```r\nvec_assert <- function(\n  x,\n  ptype = NULL,\n  size = NULL,\n  arg = caller_arg(x),\n  call = caller_env()\n) {\n  if (!obj_is_vector(x)) {\n    stop_scalar_type(x, arg, call = call)\n  }\n\n  if (!is_null(ptype)) {\n    ptype <- vec_ptype(ptype)\n    x_type <- vec_ptype_finalise(vec_ptype(x))\n    if (!is_same_type(x_type, ptype)) {\n      msg <- vec_assert_type_explain(x_type, ptype, arg)\n      abort(\n        msg,\n        class = c(\"vctrs_error_assert_ptype\", \"vctrs_error_assert\"),\n        required = ptype,\n        actual = x_type,\n        call = call\n      )\n    }\n  }\n\n  if (!is_null(size)) {\n    size <- vec_cast(size, integer(), x_arg = \"size\")\n\n    n_size <- length(size)\n    if (n_size != 1L) {\n      abort(glue::glue(\"`size` must be length 1, not length {n_size}.\"))\n    }\n\n    x_size <- vec_size(x)\n    if (!identical(x_size, size)) {\n      stop_assert_size(\n        x_size,\n        size,\n        arg,\n        call = call\n      )\n    }\n  }\n\n  invisible(x)\n}\n```",
+  "reference_test": "# No substantive reference patterns available",
+  "test_type": "snapshot",
+  "patterns": [
+    "expect_snapshot",
+    "test_that"
+  ],
+  "dependencies": [
+    "R",
+    "testthat"
+  ],
+  "split": "train",
+  "function_name": "vec_assert",
+  "quality_score": 0.591,
+  "constraints": {}
+}

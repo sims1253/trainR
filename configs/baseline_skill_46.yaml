@@ -10,8 +10,7 @@ skill:
 
 tasks:
   splits:
-    - dev
-    - held_out
+    - train
 
 execution:
   timeout: 600

@@ -1,0 +1,22 @@
+{
+  "task_id": "task-5f56c545",
+  "source_package": "glue",
+  "source_file": "R/color.R",
+  "difficulty": "easy",
+  "instruction": "A test for `glue_col` is failing. Diagnose and fix the issue.\n\n\nFailing test:\n```r\n\n```\n\n\nSteps:\n1. Read the function source code to understand expected behavior\n2. Compare the test expectations with actual function behavior\n3. Fix the test if expectations are wrong, or fix the function if it has a bug\n4. Ensure the fix maintains backward compatibility\n5. Run the tests to verify the fix\n",
+  "context": "Package: glue v1.8.0.9000\nDescription: Interpreted String Literals\nFunction: glue_col\nParameters: .envir, .na, .literal\nTest patterns used: expect_snapshot, test_that\nExpectations used: expect_identical, expect_snapshot\n\nFunction Code:\n```r\nglue_col <- function(..., .envir = parent.frame(), .na = \"NA\", .literal = FALSE) {\n  glue(..., .envir = .envir, .na = .na, .literal = .literal, .transformer = color_transformer)\n}\n```",
+  "reference_test": "# No substantive reference patterns available",
+  "test_type": "snapshot",
+  "patterns": [
+    "test_that",
+    "expect_snapshot"
+  ],
+  "dependencies": [
+    "R",
+    "testthat"
+  ],
+  "split": "train",
+  "function_name": "glue_col",
+  "quality_score": 0.541,
+  "constraints": {}
+}

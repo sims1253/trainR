@@ -1,0 +1,20 @@
+{
+  "task_id": "task-d7d441c5",
+  "source_package": "dplyr",
+  "source_file": "R/across.R",
+  "difficulty": "medium",
+  "instruction": "Add proper test fixtures to the tests for `c_across` using the withr package.\n\n\n\nRequirements:\n1. Identify tests that modify global state (options, env vars, working directory)\n2. Wrap state modifications with withr::local_* for automatic cleanup:\n   - withr::local_options() for R options\n   - withr::local_envvar() for environment variables\n   - withr::local_tempdir() for temporary directories\n   - withr::local_file() for temporary files\n3. Ensure tests can run in any order without side effects\n4. Use local_* (not with_*) inside test_that() blocks\n",
+  "context": "Package: dplyr v1.2.0.9000\nDescription: A Grammar of Data Manipulation\nFunction: c_across\nParameters: cols\nTest patterns used: test_that\nExpectations used: expect_identical, expect_snapshot\n\nFunction Code:\n```r\nc_across <- function(cols) {\n  mask <- peek_mask()\n  cols <- enquo(cols)\n\n  if (quo_is_missing(cols)) {\n    c_across_missing_cols_deprecate_warn()\n    cols <- quo_set_expr(cols, expr(everything()))\n  }\n\n  vars <- c_across_setup(!!cols, mask = mask)\n\n  cols <- mask$current_cols(vars)\n  vec_c(!!!cols, .name_spec = zap())\n}\n```",
+  "reference_test": "# No substantive reference patterns available",
+  "test_type": "unit",
+  "patterns": [
+    "test_that"
+  ],
+  "dependencies": [
+    "testthat"
+  ],
+  "split": "train",
+  "function_name": "c_across",
+  "quality_score": 0.51,
+  "constraints": {}
+}

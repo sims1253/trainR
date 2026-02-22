@@ -1,0 +1,20 @@
+{
+  "task_id": "task-cbb12311",
+  "source_package": "vctrs",
+  "source_file": "R/arith.R",
+  "difficulty": "medium",
+  "instruction": "Write a complete testthat test file for `vctrs::vec_arith`.\n\nPackage: vctrs v0.7.1.9000\nDescription: Vector Helpers\nFunction: vec_arith\nParameters: op, x, y\nTest patterns used: test_that\nExpectations used: expect_identical\n\nFunction Code:\n```r\nvec_arith <- function(op, x, y, ...) {\n  check_dots_empty0(...)\n  UseMethod(\"vec_arith\", x)\n}\n```\n\nRequirements:\n1. Use test_that() blocks with descriptive names that reference `vec_arith`\n2. Test basic functionality using appropriate expectations (expect_identical)\n3. Test edge cases: NULL input, empty strings, missing arguments\n4. Test error conditions with expect_error()\n5. Each test_that() block should test one logical behavior\n",
+  "context": "Package: vctrs v0.7.1.9000\nDescription: Vector Helpers\nFunction: vec_arith\nParameters: op, x, y\nTest patterns used: test_that\nExpectations used: expect_identical\n\nFunction Code:\n```r\nvec_arith <- function(op, x, y, ...) {\n  check_dots_empty0(...)\n  UseMethod(\"vec_arith\", x)\n}\n```",
+  "reference_test": "# No substantive reference patterns available",
+  "test_type": "unit",
+  "patterns": [
+    "test_that"
+  ],
+  "dependencies": [
+    "testthat"
+  ],
+  "split": "dev",
+  "function_name": "vec_arith",
+  "quality_score": 0.585,
+  "constraints": {}
+}

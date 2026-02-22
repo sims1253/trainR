@@ -1,0 +1,20 @@
+{
+  "task_id": "task-079a63a9",
+  "source_package": "withr",
+  "source_file": "R/aaa.R",
+  "difficulty": "easy",
+  "instruction": "Add snapshot tests for `withr::run` to capture complex output.\n\n\nExisting snapshot tests in this package:\n```r\nexpect_snapshot(deferred_run())\n```\n\n\nSnapshot testing is appropriate when the function produces:\n- Formatted text output (messages, errors, warnings)\n- Complex data structures that are hard to test with expect_equal\n- Console output with ANSI formatting\n\nRequirements:\n1. Use expect_snapshot() for capturing printed output\n2. Use expect_snapshot(error = TRUE) for error message snapshots\n3. Use expect_snapshot(transform = ...) if output contains volatile data (timestamps, paths)\n4. Test with representative inputs that exercise different output formats\n",
+  "context": "Package: withr v3.0.2.9001\nDescription: Run Code 'With' Temporarily Modified Global State\nFunction: run\nTest patterns used: expect_snapshot\nExpectations used: expect_snapshot\n\nFunction Code:\n```r\nrun <- function(...) {\n    # Evaluate with promise semantics rather than `base::eval()`\n    do <- NULL\n    do.call(delayedAssign, list(\"do\", expr, env))\n    do\n  }\n```",
+  "reference_test": "expect_snapshot(deferred_run())",
+  "test_type": "snapshot",
+  "patterns": [
+    "expect_snapshot"
+  ],
+  "dependencies": [
+    "testthat"
+  ],
+  "split": "train",
+  "function_name": "run",
+  "quality_score": 0.615,
+  "constraints": {}
+}

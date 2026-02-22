@@ -1,0 +1,21 @@
+{
+  "task_id": "task-44e60a77",
+  "source_package": "tidyr",
+  "source_file": "R/append.R",
+  "difficulty": "easy",
+  "instruction": "Add snapshot tests for `tidyr::df_append` to capture complex output.\n\n\nExisting snapshot tests in this package:\n```r\nexpect_snapshot(df_append(df1, df2, after = 1.5), error = TRUE)\n```\n\n\nSnapshot testing is appropriate when the function produces:\n- Formatted text output (messages, errors, warnings)\n- Complex data structures that are hard to test with expect_equal\n- Console output with ANSI formatting\n\nRequirements:\n1. Use expect_snapshot() for capturing printed output\n2. Use expect_snapshot(error = TRUE) for error message snapshots\n3. Use expect_snapshot(transform = ...) if output contains volatile data (timestamps, paths)\n4. Test with representative inputs that exercise different output formats\n",
+  "context": "Package: tidyr v1.3.2.9000\nDescription: Tidy Messy Data\nFunction: df_append\nParameters: x, y, after, remove\nTest patterns used: expect_snapshot\nExpectations used: expect_snapshot\n\nFunction Code:\n```r\ndf_append <- function(x, y, after = NULL, remove = FALSE) {\n  size <- vec_size(x)\n  row_names <- .row_names_info(x, type = 0L)\n\n  x <- tidyr_new_list(x)\n  y <- tidyr_new_list(y)\n\n  x_names <- names(x)\n  y_names <- names(y)\n\n  n <- length(x)\n\n  if (is.null(after)) {\n    after <- n\n  } else if (is.character(after)) {\n    after <- match(after, x_names)\n  }\n\n  # r-lib/rlang#1702\n  check_number_whole(after, min = 0, max = as.numeric(n), .internal = TRUE)\n\n  if (remove) {\n    lhs <- seq2(1L, after - 1L)\n  } else {\n    lhs <- seq2(1L, after)\n  }\n\n  rhs <- seq2(after + 1L, n)\n\n  # Prefer `y` if names are duplicated\n  lhs <- setdiff(x_names[lhs], y_names)\n  rhs <- setdiff(x_names[rhs], y_names)\n\n  out <- vec_c(x[lhs], y, x[rhs])\n  out <- new_data_frame(out, n = size, row.names = row_names)\n\n  out\n}\n```",
+  "reference_test": "expect_snapshot(df_append(df1, df2, after = 1.5), error = TRUE)",
+  "test_type": "snapshot",
+  "patterns": [
+    "expect_snapshot"
+  ],
+  "dependencies": [
+    "R",
+    "testthat"
+  ],
+  "split": "held_out",
+  "function_name": "df_append",
+  "quality_score": 0.615,
+  "constraints": {}
+}

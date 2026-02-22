@@ -1,0 +1,20 @@
+{
+  "task_id": "task-a48702e7",
+  "source_package": "ggplot2",
+  "source_file": "R/aes-delayed-eval.R",
+  "difficulty": "hard",
+  "instruction": "Add comprehensive edge case tests for `stage`.\n\n\nExisting tests for reference:\n```r\n\n```\n\n\nThe existing tests cover basic functionality. Add tests for:\n1. NULL inputs to each argument\n2. Empty vectors/strings: character(0), \"\", integer(0)\n3. Boundary values: 0, 1, -1, NA, NaN, Inf\n4. Invalid input types (passing numeric where character expected, etc.)\n5. Missing arguments (use expect_error with class matching)\n6. Very long inputs (strings > 1000 chars, vectors > 10000 elements)\n",
+  "context": "Package: ggplot2 v4.0.2.9000\nDescription: Create Elegant Data Visualisations Using the Grammar of Graphics\nFunction: stage\nParameters: start, after_stat, after_scale\nTest patterns used: test_that\nExpectations used: expect_equal\n\nFunction Code:\n```r\nstage <- function(start = NULL, after_stat = NULL, after_scale = NULL) {\n  start\n}\n```",
+  "reference_test": "# No substantive reference patterns available",
+  "test_type": "unit",
+  "patterns": [
+    "test_that"
+  ],
+  "dependencies": [
+    "testthat"
+  ],
+  "split": "held_out",
+  "function_name": "stage",
+  "quality_score": 0.56,
+  "constraints": {}
+}

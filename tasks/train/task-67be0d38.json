@@ -1,0 +1,20 @@
+{
+  "task_id": "task-67be0d38",
+  "source_package": "officer",
+  "source_file": "R/dev-utils.R",
+  "difficulty": "medium",
+  "instruction": "Write a complete testthat test file for `officer::as_base64`.\n\nPackage: officer v0.7.3\nDescription: Manipulation of Microsoft Word and PowerPoint Documents\nFunction: as_base64\nParameters: x\nTest patterns used: test_that\nExpectations used: expect_equal, expect_error, expect_false, expect_length, expect_true\n\nFunction Code:\n```r\nas_base64 <- function(x) {\n  if (!is.character(x)) {\n    stop(\"'x' must be a character vector.\")\n  }\n  z <- vapply(\n    x,\n    function(elem) {\n      if (is.na(elem)) {\n        NA_character_\n      } else {\n        base64_encode(charToRaw(elem))\n      }\n    },\n    NA_character_\n  )\n  unname(z)\n}\n```\n\nRequirements:\n1. Use test_that() blocks with descriptive names that reference `as_base64`\n2. Test basic functionality using appropriate expectations (expect_equal, expect_error, expect_false, expect_length, expect_true)\n3. Test edge cases: NULL input, empty strings, missing arguments\n4. Test error conditions with expect_error()\n5. Each test_that() block should test one logical behavior\n",
+  "context": "Package: officer v0.7.3\nDescription: Manipulation of Microsoft Word and PowerPoint Documents\nFunction: as_base64\nParameters: x\nTest patterns used: test_that\nExpectations used: expect_equal, expect_error, expect_false, expect_length, expect_true\n\nFunction Code:\n```r\nas_base64 <- function(x) {\n  if (!is.character(x)) {\n    stop(\"'x' must be a character vector.\")\n  }\n  z <- vapply(\n    x,\n    function(elem) {\n      if (is.na(elem)) {\n        NA_character_\n      } else {\n        base64_encode(charToRaw(elem))\n      }\n    },\n    NA_character_\n  )\n  unname(z)\n}\n```",
+  "reference_test": "# No substantive reference patterns available",
+  "test_type": "unit",
+  "patterns": [
+    "test_that"
+  ],
+  "dependencies": [
+    "testthat"
+  ],
+  "split": "train",
+  "function_name": "as_base64",
+  "quality_score": 0.585,
+  "constraints": {}
+}

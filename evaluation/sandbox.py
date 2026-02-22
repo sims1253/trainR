@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from .models import EvaluationResult, FailureCategory, TestResult, TrajectoryRecord
-from .test_runner import DockerTestRunner, TestRunnerConfig
+from .pi_runner import DockerPiRunner, DockerPiRunnerConfig
 
 logger = logging.getLogger(__name__)
 
@@ -17,9 +17,11 @@ class EvaluationSandbox:
 
     def __init__(
         self,
-        runner_config: TestRunnerConfig | None = None,
+        runner_config: DockerPiRunnerConfig | None = None,
     ):
-        self.runner = DockerTestRunner(runner_config)
+        if runner_config is None:
+            runner_config = DockerPiRunnerConfig()
+        self.runner = DockerPiRunner(runner_config)
 
     def evaluate_task(
         self,
@@ -41,12 +43,12 @@ class EvaluationSandbox:
         """
         start_time = time.time()
 
-        if not os.environ.get("Z_AI_API_KEY"):
+        if not os.environ.get("OPENROUTER_API_KEY"):
             return EvaluationResult(
                 task_id=task.task_id,
                 success=False,
                 score=0.0,
-                error_message="Z_AI_API_KEY not set in environment",
+                error_message="OPENROUTER_API_KEY not set in environment",
                 failure_category=FailureCategory.SYNTAX_ERROR,
                 execution_time=time.time() - start_time,
             )
@@ -86,7 +88,7 @@ class EvaluationSandbox:
             task_id=task.task_id,
             success=success,
             score=1.0 if success else 0.0,
-            generated_code=result.get("agent_output", ""),
+            generated_code=result.get("output", ""),
             test_results=test_results,
             failure_category=failure_category,
             execution_time=time.time() - start_time,
@@ -97,35 +99,25 @@ class EvaluationSandbox:
         """Parse test results from Docker output."""
         test_results = []
 
-        for item in result.get("results", []):
-            # Flat format: each item has test/passed/failed directly
-            if "test" in item:
+        # DockerPiRunner format: test_results is a dict with 'passed', 'failed', 'total', 'tests' list
+        tr = result.get("test_results", {})
+        if isinstance(tr, dict):
+            for test in tr.get("tests", []):
                 test_results.append(
                     TestResult(
-                        name=item.get("test", "unknown"),
-                        passed=item.get("passed", 0) > 0 and item.get("failed", 0) == 0,
-                        message=item.get("error", ""),
+                        name=test.get("name", "unknown"),
+                        passed=test.get("passed", False),
+                        message=test.get("message", ""),
                     )
                 )
-            # Legacy nested format: suite with tests array
-            elif "tests" in item:
-                for test in item["tests"]:
-                    test_results.append(
-                        TestResult(
-                            name=test.get("test", "unknown"),
-                            passed=test.get("passed", 0) > 0 and test.get("failed", 0) == 0,
-                            message=test.get("error", ""),
-                        )
-                    )
 
-        # Fallback: create single result from summary
+        # Fallback: create single result from success
         if not test_results:
-            summary = result.get("summary", {})
             test_results.append(
                 TestResult(
                     name="evaluation",
-                    passed=summary.get("success", False),
-                    message=result.get("error", result.get("raw_output", "")),
+                    passed=result.get("success", False),
+                    message=result.get("error", result.get("output", "")),
                 )
             )
 
@@ -133,7 +125,7 @@ class EvaluationSandbox:
 
     def _classify_failure(self, result: dict) -> FailureCategory:
         """Classify failure type from result."""
-        error = result.get("error", "") or result.get("raw_output", "")
+        error = result.get("error", "") or result.get("output", "")
         error_lower = error.lower()
 
         if "timeout" in error_lower:

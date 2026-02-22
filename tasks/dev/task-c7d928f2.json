@@ -1,0 +1,20 @@
+{
+  "task_id": "task-c7d928f2",
+  "source_package": "posterior",
+  "source_file": "R/as_draws.R",
+  "difficulty": "hard",
+  "instruction": "Add comprehensive edge case tests for `as_draws`.\n\n\nExisting tests for reference:\n```r\n\n```\n\n\nThe existing tests cover basic functionality. Add tests for:\n1. NULL inputs to each argument\n2. Empty vectors/strings: character(0), \"\", integer(0)\n3. Boundary values: 0, 1, -1, NA, NaN, Inf\n4. Invalid input types (passing numeric where character expected, etc.)\n5. Missing arguments (use expect_error with class matching)\n6. Very long inputs (strings > 1000 chars, vectors > 10000 elements)\n",
+  "context": "Package: posterior v1.6.1.9000\nDescription: Tools for Working with Posterior Distributions\nFunction: as_draws\nParameters: x\nTest patterns used: test_that\nExpectations used: expect_error\n\nFunction Code:\n```r\nas_draws <- function(x, ...) {\n  UseMethod(\"as_draws\")\n}\n```",
+  "reference_test": "# No substantive reference patterns available",
+  "test_type": "unit",
+  "patterns": [
+    "test_that"
+  ],
+  "dependencies": [
+    "testthat"
+  ],
+  "split": "dev",
+  "function_name": "as_draws",
+  "quality_score": 0.56,
+  "constraints": {}
+}

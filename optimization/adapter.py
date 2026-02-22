@@ -10,7 +10,7 @@ import gepa.optimize_anything as oa
 from gepa.core.result import GEPAResult
 from gepa.optimize_anything import EngineConfig, GEPAConfig, ReflectionConfig
 
-from evaluation import EvaluationSandbox, TestRunnerConfig
+from evaluation import EvaluationSandbox, DockerPiRunnerConfig
 from task_generator.models import TestingTask
 
 logger = logging.getLogger(__name__)
@@ -40,7 +40,7 @@ class SkillEvaluator:
         self.packages_dir = packages_dir
         self.model = model
 
-        config = TestRunnerConfig(
+        config = DockerPiRunnerConfig(
             docker_image=docker_image,
             timeout=timeout,
         )
@@ -295,8 +295,8 @@ def optimize_skill(
     Returns:
         GEPAResult with best_candidate and optimization history.
     """
-    if not os.environ.get("Z_AI_API_KEY"):
-        raise ValueError("Z_AI_API_KEY not set in environment.")
+    if not os.environ.get("OPENROUTER_API_KEY"):
+        raise ValueError("OPENROUTER_API_KEY not set in environment.")
 
     if reflection_lm is None:
         reflection_lm = os.environ.get("LLM_MODEL_REFLECTION", "opencode/glm-5-free")

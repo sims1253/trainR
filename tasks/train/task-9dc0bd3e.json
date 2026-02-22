@@ -1,0 +1,20 @@
+{
+  "task_id": "task-9dc0bd3e",
+  "source_package": "posterior",
+  "source_file": "R/as_draws.R",
+  "difficulty": "medium",
+  "instruction": "Refactor the existing tests for `as_draws` to follow better testing practices.\n\n\nCurrent test patterns to refactor:\n- test_that at tests/testthat/test-as_draws.R:310\n\n\nGoals:\n1. Use describe()/it() blocks for better organization where appropriate\n2. Reduce code duplication with helper functions or local fixtures\n3. Improve test descriptions to be specific about what behavior is verified\n4. Extract common setup into withr::local_* fixtures\n5. Each test should have a single responsibility\n",
+  "context": "Package: posterior v1.6.1.9000\nDescription: Tools for Working with Posterior Distributions\nFunction: as_draws\nParameters: x\nTest patterns used: test_that\nExpectations used: expect_error\n\nFunction Code:\n```r\nas_draws <- function(x, ...) {\n  UseMethod(\"as_draws\")\n}\n```",
+  "reference_test": "# No substantive reference patterns available",
+  "test_type": "unit",
+  "patterns": [
+    "test_that"
+  ],
+  "dependencies": [
+    "testthat"
+  ],
+  "split": "train",
+  "function_name": "as_draws",
+  "quality_score": 0.51,
+  "constraints": {}
+}

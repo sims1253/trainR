@@ -2,14 +2,14 @@
 
 from .models import EvaluationResult, FailureCategory, TestResult, TrajectoryRecord
 from .sandbox import EvaluationSandbox
-from .test_runner import DockerTestRunner, TestRunnerConfig
+from .pi_runner import DockerPiRunner, DockerPiRunnerConfig
 
 __all__ = [
-    "DockerTestRunner",
+    "DockerPiRunner",
+    "DockerPiRunnerConfig",
     "EvaluationResult",
     "EvaluationSandbox",
     "FailureCategory",
     "TestResult",
-    "TestRunnerConfig",
     "TrajectoryRecord",
 ]

@@ -1,0 +1,22 @@
+{
+  "task_id": "task-205d2411",
+  "source_package": "tidyr",
+  "source_file": "R/chop.R",
+  "difficulty": "medium",
+  "instruction": "Write a complete testthat test file for `tidyr::chop`.\n\nPackage: tidyr v1.3.2.9000\nDescription: Tidy Messy Data\nFunction: chop\nParameters: data, cols, error_call\nTest patterns used: expect_snapshot, test_that\nExpectations used: expect_snapshot\n\nFunction Code:\n```r\nchop <- function(data, cols, ..., error_call = current_env()) {\n  check_dots_empty0(...)\n  check_data_frame(data, call = error_call)\n  check_required(cols, call = error_call)\n\n  cols <- tidyselect::eval_select(\n    expr = enquo(cols),\n    data = data,\n    allow_rename = FALSE,\n    error_call = error_call\n  )\n\n  cols <- tidyr_new_list(data[cols])\n  keys <- data[setdiff(names(data), names(cols))]\n\n  info <- vec_group_loc(keys)\n  keys <- info$key\n  indices <- info$loc\n\n  size <- vec_size(keys)\n\n  cols <- map(cols, col_chop, indices = indices)\n  cols <- new_data_frame(cols, n = size)\n\n  out <- vec_cbind(keys, cols, .error_call = error_call)\n\n  reconstruct_tibble(data, out)\n}\n```\n\nRequirements:\n1. Use test_that() blocks with descriptive names that reference `chop`\n2. Test basic functionality using appropriate expectations (expect_snapshot)\n3. Test edge cases: NULL input, empty strings, missing arguments\n4. Test error conditions with expect_error()\n5. Each test_that() block should test one logical behavior\n",
+  "context": "Package: tidyr v1.3.2.9000\nDescription: Tidy Messy Data\nFunction: chop\nParameters: data, cols, error_call\nTest patterns used: expect_snapshot, test_that\nExpectations used: expect_snapshot\n\nFunction Code:\n```r\nchop <- function(data, cols, ..., error_call = current_env()) {\n  check_dots_empty0(...)\n  check_data_frame(data, call = error_call)\n  check_required(cols, call = error_call)\n\n  cols <- tidyselect::eval_select(\n    expr = enquo(cols),\n    data = data,\n    allow_rename = FALSE,\n    error_call = error_call\n  )\n\n  cols <- tidyr_new_list(data[cols])\n  keys <- data[setdiff(names(data), names(cols))]\n\n  info <- vec_group_loc(keys)\n  keys <- info$key\n  indices <- info$loc\n\n  size <- vec_size(keys)\n\n  cols <- map(cols, col_chop, indices = indices)\n  cols <- new_data_frame(cols, n = size)\n\n  out <- vec_cbind(keys, cols, .error_call = error_call)\n\n  reconstruct_tibble(data, out)\n}\n```",
+  "reference_test": "expect_snapshot(error = TRUE, {\n    chop(df$x)\n  })\n\nexpect_snapshot(error = TRUE, {\n    chop(df)\n  })",
+  "test_type": "snapshot",
+  "patterns": [
+    "test_that",
+    "expect_snapshot"
+  ],
+  "dependencies": [
+    "R",
+    "testthat"
+  ],
+  "split": "train",
+  "function_name": "chop",
+  "quality_score": 0.681,
+  "constraints": {}
+}

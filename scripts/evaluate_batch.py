@@ -7,6 +7,7 @@ import logging
 import os
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
 
@@ -18,7 +19,7 @@ from rich.progress import BarColumn, Progress, SpinnerColumn, TaskProgressColumn
 from rich.table import Table
 
 from evaluation.config import EvaluationConfig
-from evaluation.test_runner import DockerTestRunner, EvaluationJob, TestRunnerConfig
+from evaluation.pi_runner import DockerPiRunner, DockerPiRunnerConfig
 from task_generator import TaskGenerator
 
 console = Console()
@@ -43,7 +44,7 @@ def load_config(config_path: Path, cli_overrides: dict) -> EvaluationConfig:
     return config
 
 
-def run_batch_evaluation(config: EvaluationConfig) -> dict:
+def run_batch_evaluation(config: EvaluationConfig, cli_args: dict | None = None) -> dict:
     """Run batch evaluation with the given configuration."""
     # Load tasks
     generator = TaskGenerator(Path(config.tasks.dir))
@@ -70,26 +71,28 @@ def run_batch_evaluation(config: EvaluationConfig) -> dict:
         skill_content = ""
         skill_name = "no_skill"
 
-    # Build evaluation jobs
+    # Build task list with package directories
     packages_dir = Path("packages")
-    jobs = []
+    task_items = []
     for task in tasks:
         package_dir = packages_dir / task.source_package
         if not package_dir.exists():
             console.print(f"[yellow]Warning: Package not found: {package_dir}[/yellow]")
             continue
-        jobs.append(
-            EvaluationJob(
-                task_id=task.task_id,
-                skill_content=skill_content,
-                task_instruction=task.instruction,
-                task_context=task.context,
-                package_dir=package_dir,
-            )
+        task_items.append(
+            {
+                "task": task,
+                "package_dir": package_dir,
+            }
         )
 
-    if not jobs:
-        console.print("[red]No valid evaluation jobs created[/red]")
+    # Apply max-tasks limit if specified
+    if cli_args and cli_args.get("max_tasks"):
+        task_items = task_items[: cli_args["max_tasks"]]
+        console.print(f"[yellow]Limiting to {len(task_items)} tasks (--max-tasks)[/yellow]")
+
+    if not task_items:
+        console.print("[red]No valid tasks with existing packages[/red]")
         sys.exit(1)
 
     # Setup output
@@ -98,30 +101,26 @@ def run_batch_evaluation(config: EvaluationConfig) -> dict:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Trajectories directory
+    traj_dir = None
     if config.output.save_trajectories:
         traj_dir = output_dir / f"trajectories_{timestamp}"
         traj_dir.mkdir(parents=True, exist_ok=True)
 
     # Run evaluation
     console.print(
-        f"\n[blue]Starting batch evaluation: {len(jobs)} tasks, {config.workers.count} workers[/blue]"
+        f"\n[blue]Starting batch evaluation: {len(task_items)} tasks, {config.workers.count} workers[/blue]"
     )
     console.print(f"[dim]Model: {config.model.task}, Skill: {skill_name}[/dim]")
 
-    runner_config = TestRunnerConfig(
-        docker_image=config.execution.docker_image,
+    runner_config = DockerPiRunnerConfig(
+        model=config.model.task,
         timeout=config.execution.timeout,
+        docker_image=config.execution.docker_image,
     )
-    runner = DockerTestRunner(runner_config)
+    runner = DockerPiRunner(runner_config)
 
     results = []
     start_time = time.time()
-
-    # Progress tracking
-    progress_status = {}
-
-    def progress_callback(task_id: str, status: str) -> None:
-        progress_status[task_id] = status
 
     with Progress(
         SpinnerColumn(),
@@ -130,52 +129,90 @@ def run_batch_evaluation(config: EvaluationConfig) -> dict:
         TaskProgressColumn(),
         console=console,
     ) as progress:
-        eval_task = progress.add_task("Evaluating...", total=len(jobs))
+        eval_task = progress.add_task("Evaluating...", total=len(task_items))
 
-        def callback_wrapper(task_id: str, status: str) -> None:
-            progress_callback(task_id, status)
-            if status in ("done", "failed"):
+        def evaluate_single(task_item: dict) -> dict:
+            """Run evaluation for a single task."""
+            task = task_item["task"]
+            package_dir = task_item["package_dir"]
+
+            result = runner.run_evaluation(
+                skill_content=skill_content,
+                task_instruction=task.instruction,
+                task_context=task.context,
+                package_dir=package_dir,
+                model=config.model.task,
+            )
+
+            return {
+                "task": task,
+                "package_dir": package_dir,
+                "result": result,
+            }
+
+        # Run evaluations in parallel using ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=config.workers.count) as executor:
+            futures = {executor.submit(evaluate_single, item): item for item in task_items}
+
+            for future in as_completed(futures):
                 progress.advance(eval_task)
-
-        batch_results = runner.run_evaluations_batch(
-            jobs=jobs,
-            max_workers=config.workers.count,
-            model=config.model.task,
-            progress_callback=callback_wrapper,
-        )
+                try:
+                    eval_result = future.result()
+                    results.append(eval_result)
+                except Exception as e:
+                    item = futures[future]
+                    task = item["task"]
+                    results.append(
+                        {
+                            "task": task,
+                            "package_dir": item["package_dir"],
+                            "result": {
+                                "success": False,
+                                "score": 0.0,
+                                "output": "",
+                                "error": str(e),
+                                "execution_time": 0,
+                            },
+                        }
+                    )
 
     total_time = time.time() - start_time
+
+    # Sort results by task_id for consistent output
+    results.sort(key=lambda x: x["task"].task_id)
 
     # Aggregate results
     passed = 0
     failed = 0
-    for i, (job, result) in enumerate(zip(jobs, batch_results)):
-        task = tasks[i] if i < len(tasks) else None
+    output_results = []
+
+    for eval_result in results:
+        task = eval_result["task"]
+        result = eval_result["result"]
         success = result.get("success", False)
+
         if success:
             passed += 1
         else:
             failed += 1
 
         result_entry = {
-            "task_id": job.task_id,
+            "task_id": task.task_id,
             "success": success,
-            "score": 1.0 if success else 0.0,
+            "score": result.get("score", 1.0 if success else 0.0),
             "error": result.get("error"),
-            "latency_s": 0,  # Not tracked per-task in batch
+            "latency_s": result.get("execution_time", 0),
+            "source_package": task.source_package,
+            "difficulty": str(task.difficulty),
+            "split": task.split,
         }
 
-        if task:
-            result_entry["source_package"] = task.source_package
-            result_entry["difficulty"] = str(task.difficulty)
-            result_entry["split"] = task.split
-
         # Save trajectory if enabled
-        if config.output.save_trajectories and result.get("agent_output"):
-            traj_file = traj_dir / f"{job.task_id}.txt"
-            traj_file.write_text(result["agent_output"])
+        if config.output.save_trajectories and traj_dir and result.get("output"):
+            traj_file = traj_dir / f"{task.task_id}.txt"
+            traj_file.write_text(result["output"])
 
-        results.append(result_entry)
+        output_results.append(result_entry)
 
     # Build final output
     output = {
@@ -188,13 +225,13 @@ def run_batch_evaluation(config: EvaluationConfig) -> dict:
             "timeout": config.execution.timeout,
         },
         "summary": {
-            "total": len(jobs),
+            "total": len(task_items),
             "passed": passed,
             "failed": failed,
-            "pass_rate": passed / len(jobs) if jobs else 0,
+            "pass_rate": passed / len(task_items) if task_items else 0,
             "total_time_s": total_time,
         },
-        "results": results,
+        "results": output_results,
     }
 
     return output
@@ -255,6 +292,12 @@ def main() -> None:
         help="Override task splits (comma-separated)",
     )
     parser.add_argument(
+        "--max-tasks",
+        type=int,
+        default=None,
+        help="Maximum number of tasks to run (for testing)",
+    )
+    parser.add_argument(
         "--output",
         "-o",
         default=None,
@@ -269,8 +312,8 @@ def main() -> None:
     )
 
     # Check API key
-    if not os.environ.get("Z_AI_API_KEY"):
-        console.print("[red]Z_AI_API_KEY not set in environment[/red]")
+    if not os.environ.get("OPENROUTER_API_KEY"):
+        console.print("[red]OPENROUTER_API_KEY not set in environment[/red]")
         sys.exit(1)
 
     # Load config
@@ -284,6 +327,7 @@ def main() -> None:
         "model": args.model,
         "no_skill": args.no_skill,
         "splits": args.splits.split(",") if args.splits else None,
+        "max_tasks": args.max_tasks,
     }
 
     config = load_config(config_path, cli_overrides)
@@ -302,7 +346,7 @@ def main() -> None:
     )
 
     # Run evaluation
-    output = run_batch_evaluation(config)
+    output = run_batch_evaluation(config, cli_overrides)
 
     # Save results
     output_path = Path(args.output) if args.output else None

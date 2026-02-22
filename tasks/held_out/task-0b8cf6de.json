@@ -1,0 +1,20 @@
+{
+  "task_id": "task-0b8cf6de",
+  "source_package": "bayesplot",
+  "source_file": "R/available-module-functions.R",
+  "difficulty": "easy",
+  "instruction": "A test for `available_ppc` is failing. Diagnose and fix the issue.\n\n\nFailing test:\n```r\n\n```\n\n\nSteps:\n1. Read the function source code to understand expected behavior\n2. Compare the test expectations with actual function behavior\n3. Fix the test if expectations are wrong, or fix the function if it has a bug\n4. Ensure the fix maintains backward compatibility\n5. Run the tests to verify the fix\n",
+  "context": "Package: bayesplot v1.15.0.9000\nDescription: Plotting for Bayesian Models\nFunction: available_ppc\nParameters: pattern, fixed, invert, plots_only\nTest patterns used: test_that\nExpectations used: expect_false, expect_identical, expect_length, expect_s3_class\n\nFunction Code:\n```r\navailable_ppc <-\n  function(pattern = NULL,\n           fixed = FALSE,\n           invert = FALSE,\n           plots_only = TRUE) {\n    .list_module_functions(\n      .module = \"ppc\",\n      .pattern = pattern,\n      fixed = fixed,\n      invert = invert,\n      plots_only = plots_only\n    )\n  }\n```",
+  "reference_test": "# No substantive reference patterns available",
+  "test_type": "unit",
+  "patterns": [
+    "test_that"
+  ],
+  "dependencies": [
+    "testthat"
+  ],
+  "split": "held_out",
+  "function_name": "available_ppc",
+  "quality_score": 0.51,
+  "constraints": {}
+}

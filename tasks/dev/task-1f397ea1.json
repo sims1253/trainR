@@ -1,0 +1,20 @@
+{
+  "task_id": "task-1f397ea1",
+  "source_package": "flextable",
+  "source_file": "R/05_content.R",
+  "difficulty": "easy",
+  "instruction": "A test for `as_qmd` is failing. Diagnose and fix the issue.\n\n\nFailing test:\n```r\n\n```\n\n\nSteps:\n1. Read the function source code to understand expected behavior\n2. Compare the test expectations with actual function behavior\n3. Fix the test if expectations are wrong, or fix the function if it has a bug\n4. Ensure the fix maintains backward compatibility\n5. Run the tests to verify the fix\n",
+  "context": "Package: flextable v0.9.12.004\nDescription: Functions for Tabular Reporting\nFunction: as_qmd\nParameters: x, display\nTest patterns used: test_that\nExpectations used: expect_equal, expect_true\n\nFunction Code:\n```r\nas_qmd <- function(x, display = x) {\n  x <- as.character(x)\n  display <- as.character(display)\n  if (length(display) != length(x)) {\n    stop(\n      sprintf(\"`display` must be the same length as `x`: %.0f.\", length(x)),\n      call. = FALSE\n    )\n  }\n  chunk_dataframe(\n    txt = display,\n    qmd_data = x\n  )\n}\n```",
+  "reference_test": "# No substantive reference patterns available",
+  "test_type": "unit",
+  "patterns": [
+    "test_that"
+  ],
+  "dependencies": [
+    "testthat"
+  ],
+  "split": "dev",
+  "function_name": "as_qmd",
+  "quality_score": 0.51,
+  "constraints": {}
+}

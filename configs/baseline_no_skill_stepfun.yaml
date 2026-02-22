@@ -1,0 +1,22 @@
+# No-Skill Baseline Configuration - StepFun Step-3.5-Flash
+# Measures raw model capability without skill guidance
+
+model:
+  task: openrouter/stepfun/step-3.5-flash:free
+
+workers:
+  count: 1  # Conservative for free models
+
+skill:
+  no_skill: true
+
+tasks:
+  splits:
+    - train
+
+execution:
+  timeout: 600
+
+output:
+  dir: results/baselines
+  save_trajectories: true

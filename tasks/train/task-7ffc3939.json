@@ -1,0 +1,20 @@
+{
+  "task_id": "task-7ffc3939",
+  "source_package": "officer",
+  "source_file": "R/dev-utils.R",
+  "difficulty": "medium",
+  "instruction": "Refactor the existing tests for `plot_in_png` to follow better testing practices.\n\n\nCurrent test patterns to refactor:\n- test_that at tests/testthat/test-images.R:728\n- test_that at tests/testthat/test-images.R:747\n- test_that at tests/testthat/test-images.R:763\n\n\nGoals:\n1. Use describe()/it() blocks for better organization where appropriate\n2. Reduce code duplication with helper functions or local fixtures\n3. Improve test descriptions to be specific about what behavior is verified\n4. Extract common setup into withr::local_* fixtures\n5. Each test should have a single responsibility\n",
+  "context": "Package: officer v0.7.3\nDescription: Manipulation of Microsoft Word and PowerPoint Documents\nFunction: plot_in_png\nParameters: ggobj, code, width, height, res, units, pointsize, scaling, path\nTest patterns used: test_that\nExpectations used: expect_equal, expect_match, expect_true\n\nFunction Code:\n```r\nplot_in_png <- function(\n  ggobj = NULL,\n  code = NULL,\n  width,\n  height,\n  res = 200,\n  units = \"in\",\n  pointsize = 11,\n  scaling = 1,\n  path = NULL\n) {\n  if (is.null(path)) {\n    path <- tempfile(fileext = \".png\")\n  }\n\n  if (!is.null(ggobj)) {\n    code <- str2lang(\"print(ggobj)\")\n  }\n\n  agg_png(\n    filename = path,\n    width = width,\n    height = height,\n    units = units,\n    background = \"transparent\",\n    res = res,\n    pointsize = pointsize,\n    scaling = scaling\n  )\n  tryCatch(\n    {\n      eval(code)\n    },\n    finally = dev.off()\n  )\n  path\n}\n```",
+  "reference_test": "# No substantive reference patterns available",
+  "test_type": "unit",
+  "patterns": [
+    "test_that"
+  ],
+  "dependencies": [
+    "testthat"
+  ],
+  "split": "train",
+  "function_name": "plot_in_png",
+  "quality_score": 0.51,
+  "constraints": {}
+}
