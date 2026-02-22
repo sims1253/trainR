@@ -34,7 +34,7 @@ PROVIDER_PREFIXES: dict[str, str] = {
 }
 
 # Default base URLs for providers (can be overridden in config)
-DEFAULT_BASE_URLS: dict[str, str] = {
+DEFAULT_BASE_URLS: dict[str, str | None] = {
     "openrouter": "https://openrouter.ai/api/v1",
     "zai": "https://open.bigmodel.cn/api/paas/v4",  # Zhipu API
     "zai_coding_plan": "https://api.zukijourney.com/v1",  # ZAI Coding Plan
