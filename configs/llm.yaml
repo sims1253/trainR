@@ -16,7 +16,7 @@ provider: openrouter
 
 models:
   task_agent: openrouter/openai/gpt-oss-120b:free
-  reflection: openrouter/openai/gpt-oss-120b:free
+  reflection: opencode/glm-5-free
 
 parameters:
   temperature: 0.3
@@ -31,9 +31,9 @@ providers:
   
   zai:
     # Zhipu AI official endpoint (default)
-    base_url: https://open.bigmodel.cn/api/paas/v4
+    # base_url: https://api.z.ai/api/paas/v4
     # For ZAI Coding Plan, uncomment:
-    # base_url: https://api.zukijourney.com/v1
+    base_url: https://api.z.ai/api/coding/paas/v4
   
   gemini:
     base_url: https://generativelanguage.googleapis.com/v1beta

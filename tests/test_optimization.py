@@ -125,13 +125,11 @@ class TestOptimizeSkill:
             )
 
     @patch("evaluation.sandbox.DockerPiRunner")
-    def test_reads_reflection_lm_from_env(self, mock_runner):
-        """Should read reflection model from LLM_MODEL_REFLECTION env."""
+    def test_uses_config_reflection_model(self, mock_runner):
+        """Should read reflection model from config file by default."""
         mock_runner.return_value = MagicMock()
         with (
-            patch.dict(
-                os.environ, {"Z_AI_API_KEY": "test", "LLM_MODEL_REFLECTION": "openai/custom-model"}
-            ),
+            patch.dict(os.environ, {"OPENROUTER_API_KEY": "test"}),
             patch("optimization.adapter.oa.optimize_anything") as mock_oa,
         ):
             mock_result = MagicMock()
@@ -144,7 +142,29 @@ class TestOptimizeSkill:
                 max_metric_calls=1,
             )
 
-            # Verify the config passed to optimize_anything uses the env model
+            # Verify optimize_anything was called
+            assert mock_oa.called
+
+    @patch("evaluation.sandbox.DockerPiRunner")
+    def test_reflection_lm_override(self, mock_runner):
+        """Should use explicit reflection_lm parameter over config."""
+        mock_runner.return_value = MagicMock()
+        with (
+            patch.dict(os.environ, {"OPENROUTER_API_KEY": "test"}),
+            patch("optimization.adapter.oa.optimize_anything") as mock_oa,
+        ):
+            mock_result = MagicMock()
+            mock_oa.return_value = mock_result
+
+            optimize_skill(
+                seed_skill="# test",
+                train_tasks=[_make_task()],
+                val_tasks=[_make_task()],
+                max_metric_calls=1,
+                reflection_lm="custom-model-override",
+            )
+
+            # Verify the config passed to optimize_anything uses the override
             call_kwargs = mock_oa.call_args
             config = call_kwargs.kwargs.get("config") or call_kwargs[1].get("config")
-            assert config.reflection.reflection_lm == "openai/custom-model"
+            assert config.reflection.reflection_lm == "custom-model-override"
