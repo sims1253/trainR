@@ -8,7 +8,7 @@
 workers:
   # Number of parallel Docker containers
   # Keep below model concurrency limit
-  count: 5
+  count: 2
   
   # Auto-detect based on available memory (overrides count if true)
   auto_detect: false

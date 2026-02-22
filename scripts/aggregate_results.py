@@ -7,7 +7,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-
 RESULTS_DIR = Path("results/baselines")
 OUTPUT_FILE = Path("visualizer/src/data/benchmark-results.json")
 
@@ -144,7 +143,7 @@ def main():
         try:
             with open(filepath) as f:
                 data = json.load(f)
-        except (json.JSONDecodeError, IOError) as e:
+        except (OSError, json.JSONDecodeError) as e:
             print(f"Error reading {filepath}: {e}")
             continue
 

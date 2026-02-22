@@ -16,17 +16,12 @@ models:
   task_agent: openrouter/openai/gpt-oss-120b:free
   
   # Reflection: GEPA optimization judge
-  reflection: openrouter/openai/gpt-oss-120b:free
-  
+  reflection: opencode/glm-5-free
+
   # Mining: PR quality evaluation
   mining: opencode/glm-5-free
 
-parameters:
-  temperature: 0.3
-  max_tokens: 4096
-
 # Custom endpoints (for providers NOT natively supported by LiteLLM)
-# LiteLLM natively supports: openrouter, zai, gemini, openai, anthropic
 custom_endpoints:
   opencode:
     base_url: https://opencode.ai/zen/v1

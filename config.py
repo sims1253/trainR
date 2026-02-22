@@ -34,6 +34,12 @@ PROVIDER_PREFIXES: dict[str, str] = {
     "zai_coding_plan": "openai/",  # OpenAI-compatible
 }
 
+# Model prefixes that indicate custom endpoints
+CUSTOM_ENDPOINT_PREFIXES: dict[str, str] = {
+    "opencode/": "opencode",
+    "zai/": "zai_coding_plan",  # If using coding plan endpoint
+}
+
 
 @dataclass
 class LLMConfig:
@@ -86,11 +92,24 @@ class LLMConfig:
         prefix = PROVIDER_PREFIXES.get(self.provider, "")
         return f"{prefix}{model}"
 
-    def get_base_url(self, config_path: str | Path = "configs/llm.yaml") -> str | None:
-        """Get custom base_url if provider uses one.
+    def get_base_url(
+        self, model: str | None = None, config_path: str | Path = "configs/llm.yaml"
+    ) -> str | None:
+        """Get custom base_url if needed for this model.
 
+        Detects provider from model prefix (e.g., 'opencode/' → opencode)
         Only needed for providers not natively supported by LiteLLM.
         """
+        # Determine which provider we need base_url for
+        provider = self.provider
+        if model:
+            # Check if model has a provider prefix
+            for prefix, prov in CUSTOM_ENDPOINT_PREFIXES.items():
+                if model.startswith(prefix):
+                    provider = prov
+                    break
+
+        # Load config and get base_url for this provider
         path = Path(config_path)
         if not path.exists():
             return None
@@ -99,12 +118,12 @@ class LLMConfig:
             data = yaml.safe_load(f) or {}
 
         custom_endpoints = data.get("custom_endpoints", {})
-        endpoint_config = custom_endpoints.get(self.provider, {})
+        endpoint_config = custom_endpoints.get(provider, {})
         return endpoint_config.get("base_url")
 
-    def get_litellm_kwargs(self) -> dict[str, Any]:
+    def get_litellm_kwargs(self, model: str | None = None) -> dict[str, Any]:
         """Get kwargs for litellm.completion()."""
-        base_url = self.get_base_url()
+        base_url = self.get_base_url(model)
         if base_url:
             return {"api_base": base_url}
         return {}
