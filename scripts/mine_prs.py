@@ -26,6 +26,7 @@ from pydantic import BaseModel
 # Add parent to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from config import get_llm_config
 from task_generator.mined_task import (
     Difficulty,
     MinedTaskSchema,
@@ -324,31 +325,33 @@ Reject PRs that:
 Provide a structured evaluation of this PR as a potential testing task.
 """
 
-    def __init__(self, model: str = "gpt-4o-mini", api_key: str | None = None):
+    def __init__(self, model: str | None = None, api_key: str | None = None):
         """
         Initialize LLM judge.
 
-        Args:
-            model: Model identifier (e.g., "gpt-4o-mini", "claude-3-haiku-20240307")
-            api_key: API key. Falls back to OPENAI_API_KEY or ANTHROPIC_API_KEY env vars.
+        Uses unified config from configs/llm.yaml by default.
         """
-        self.model = model
-        self.api_key = api_key
+        config = get_llm_config()
 
-        # Determine which client to use based on model name
-        if "gpt" in model.lower() or "o1" in model.lower() or "o3" in model.lower():
-            self.provider = "openai"
-            self.api_key = api_key or os.environ.get("OPENAI_API_KEY")
-        elif "claude" in model.lower():
-            self.provider = "anthropic"
-            self.api_key = api_key or os.environ.get("ANTHROPIC_API_KEY")
-        else:
-            # Default to litellm for other models
+        self.model = model or config.reflection
+        self.api_key = api_key or config.get_api_key()
+
+        # Determine provider based on model name
+        if self.model.startswith("openrouter/"):
             self.provider = "litellm"
-            self.api_key = api_key
+        elif "gpt" in self.model.lower() or "o1" in self.model.lower():
+            self.provider = "openai"
+            if not self.api_key:
+                self.api_key = os.environ.get("OPENAI_API_KEY")
+        elif "claude" in self.model.lower():
+            self.provider = "anthropic"
+            if not self.api_key:
+                self.api_key = os.environ.get("ANTHROPIC_API_KEY")
+        else:
+            self.provider = "litellm"
 
         if not self.api_key:
-            print("Warning: No API key found. Set OPENAI_API_KEY or ANTHROPIC_API_KEY env var.")
+            print(f"Warning: No API key found for provider. Set appropriate env var.")
 
     def _call_openai(
         self, messages: list[dict[str, Any]], response_format: type[BaseModel]
@@ -562,8 +565,8 @@ def main():
     )
     parser.add_argument(
         "--model",
-        default="gpt-4o-mini",
-        help="LLM model to use for evaluation (default: gpt-4o-mini)",
+        default=None,  # Now uses config file default
+        help="LLM model for evaluation (default: from configs/llm.yaml)",
     )
     parser.add_argument(
         "--require-tests",

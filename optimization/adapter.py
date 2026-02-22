@@ -10,6 +10,7 @@ import gepa.optimize_anything as oa
 from gepa.core.result import GEPAResult
 from gepa.optimize_anything import EngineConfig, GEPAConfig, ReflectionConfig
 
+from config import get_llm_config
 from evaluation import DockerPiRunnerConfig, EvaluationSandbox
 from task_generator.models import TestingTask
 
@@ -285,7 +286,7 @@ def optimize_skill(
         docker_image: Docker image for evaluation.
         timeout: Timeout per evaluation in seconds.
         max_metric_calls: Maximum number of evaluations.
-        reflection_lm: LiteLLM model string for reflection. Defaults to "zai-coding-plan/glm-5".
+        reflection_lm: LiteLLM model string for reflection. Defaults to config.
         model: Single model for task execution (ignored if models is set).
         models: List of models for multi-model optimization.
         aggregation: How to aggregate scores across models ("min", "mean", "weighted").
@@ -295,11 +296,13 @@ def optimize_skill(
     Returns:
         GEPAResult with best_candidate and optimization history.
     """
+    config = get_llm_config()
+
     if not os.environ.get("OPENROUTER_API_KEY"):
         raise ValueError("OPENROUTER_API_KEY not set in environment.")
 
     if reflection_lm is None:
-        reflection_lm = os.environ.get("LLM_MODEL_REFLECTION", "opencode/glm-5-free")
+        reflection_lm = config.reflection
 
     # Create evaluator(s)
     if models and len(models) > 1:

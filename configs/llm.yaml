@@ -1,0 +1,45 @@
+# LLM Configuration - Single Source of Truth
+# All LLM usage in trainR reads from this file
+
+# Default provider (openrouter, openai, anthropic)
+provider: openrouter
+
+# API keys are read from environment variables:
+# - OPENROUTER_API_KEY (for openrouter provider)
+# - OPENAI_API_KEY (for openai provider)
+# - ANTHROPIC_API_KEY (for anthropic provider)
+
+# Model selection by purpose
+models:
+  # Task evaluation agent (runs in Docker, executes tests)
+  task_agent: openrouter/openai/gpt-oss-120b:free
+  
+  # Reflection/judge model (GEPA optimization, PR mining quality evaluation)
+  reflection: openrouter/openai/gpt-oss-120b:free
+  
+  # Alternative stronger models for reflection (uncomment to use)
+  # reflection: openrouter/anthropic/claude-3.5-sonnet
+  # reflection: openrouter/openai/gpt-4o
+
+# Model parameters
+parameters:
+  temperature: 0.3
+  max_tokens: 4096
+
+# Provider-specific settings
+providers:
+  openrouter:
+    # OpenRouter-specific settings
+    base_url: https://openrouter.ai/api/v1
+    # Rate limiting (requests per minute)
+    rpm_limit: 20
+  openai:
+    base_url: https://api.openai.com/v1
+  anthropic:
+    base_url: https://api.anthropic.com/v1
+
+# Quality thresholds for PR mining
+mining:
+  min_quality_score: 7  # 1-10 scale
+  require_test_changes: true
+  require_linked_issue: true
