@@ -4,7 +4,7 @@ GitHub PR Mining System for R Testing Tasks
 
 This script mines merged PRs from target R packages to extract
 high-quality testing tasks. It uses:
-- PyGithub for GitHub API access
+- gh CLI for GitHub API access
 - LiteLLM/OpenAI for LLM-based task evaluation
 - Pydantic for structured outputs
 """
@@ -13,6 +13,7 @@ import argparse
 import json
 import os
 import re
+import subprocess
 import sys
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
@@ -20,8 +21,6 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from github import Github, GithubException, PullRequest, Repository
-from github.Issue import Issue
 from pydantic import BaseModel, Field
 
 # Add parent to path for imports
@@ -43,7 +42,7 @@ class PRDetails:
     title: str
     body: str
     url: str
-    merged_at: datetime
+    merged_at: datetime | None
     files_changed: list[str]
     code_diff: str
     test_diff: str | None
@@ -65,14 +64,14 @@ class PRDetails:
 
 
 class GitHubPRMiner:
-    """Mine merged PRs from GitHub repositories for testing tasks"""
+    """Mine GitHub PRs using gh CLI"""
 
     # Patterns to identify test files in R packages
     TEST_FILE_PATTERNS = [
-        r"tests/",
-        r"test-",
-        r"_test\.R$",
-        r"test/.+\.R$",
+        "tests/",
+        "test-",
+        "_test.",
+        "test/",
     ]
 
     # Patterns to find linked issues in PR body
@@ -82,74 +81,88 @@ class GitHubPRMiner:
         r"issue\s*#?(\d+)",
     ]
 
-    def __init__(self, token: str | None = None):
+    def __init__(self):
+        """Check gh is authenticated"""
+        result = subprocess.run(["gh", "auth", "status"], capture_output=True, text=True)
+        if result.returncode != 0:
+            raise RuntimeError("gh CLI not authenticated. Run 'gh auth login'")
+
+    def get_merged_prs(self, repo: str, since_days: int = 30, max_prs: int = 50) -> list[dict]:
         """
-        Initialize GitHub client.
+        Get merged PRs from repo using gh CLI.
 
         Args:
-            token: GitHub personal access token. Falls back to GITHUB_TOKEN env var.
-        """
-        self.token = token or os.environ.get("GITHUB_TOKEN")
-        if not self.token:
-            raise ValueError(
-                "GitHub token required. Set GITHUB_TOKEN env var or pass token parameter."
-            )
-        self.github = Github(self.token)
-
-    def get_merged_prs(
-        self, repo_name: str, since_days: int = 30, max_prs: int = 50
-    ) -> list[PullRequest.PullRequest]:
-        """
-        Fetch merged PRs from a repository within the specified time range.
-
-        Args:
-            repo_name: Repository in format "owner/repo"
+            repo: Repository in format "owner/repo"
             since_days: Number of days to look back
             max_prs: Maximum number of PRs to return
 
         Returns:
-            List of merged PullRequest objects
+            List of PR dicts with basic info
         """
-        repo = self.github.get_repo(repo_name)
-        since = datetime.now(timezone.utc) - timedelta(days=since_days)
-
-        merged_prs = []
-        try:
-            # Get closed PRs and filter for merged ones
-            prs = repo.get_pulls(state="closed", sort="updated", direction="desc")
-
-            for pr in prs:
-                if len(merged_prs) >= max_prs:
-                    break
-
-                # Check if merged and within time range
-                if pr.merged and pr.merged_at and pr.merged_at >= since:
-                    merged_prs.append(pr)
-
-        except GithubException as e:
-            print(f"Error fetching PRs from {repo_name}: {e}")
+        cmd = [
+            "gh",
+            "pr",
+            "list",
+            "--repo",
+            repo,
+            "--state",
+            "merged",
+            "--limit",
+            str(max_prs),
+            "--json",
+            "number,title,body,mergedAt,files,additions,deletions,url",
+            "--search",
+            f"merged:>{self._since_date(since_days)}",
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            print(f"Error fetching PRs from {repo}: {result.stderr}")
             return []
+        return json.loads(result.stdout)
 
-        return merged_prs
+    def _since_date(self, days: int) -> str:
+        """Calculate the since date string"""
+        return (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
 
-    def has_test_changes(self, pr: PullRequest.PullRequest) -> bool:
+    def _extract_linked_issues(self, body: str) -> list[str]:
+        """Extract issue numbers from PR body (e.g., 'Fixes #123')"""
+        issues = []
+        for pattern in self.ISSUE_PATTERNS:
+            issues.extend(re.findall(pattern, body or "", re.IGNORECASE))
+        return list(dict.fromkeys(issues))  # Preserve order, remove duplicates
+
+    def _get_issue_details(self, repo: str, issue_number: str) -> dict:
+        """Get issue details using gh CLI"""
+        cmd = [
+            "gh",
+            "issue",
+            "view",
+            issue_number,
+            "--repo",
+            repo,
+            "--json",
+            "number,title,body,labels,url",
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode == 0:
+            return json.loads(result.stdout)
+        return {}
+
+    def has_test_changes(self, pr_data: dict) -> bool:
         """
         Check if a PR modifies any test files.
 
         Args:
-            pr: PullRequest object
+            pr_data: PR dict from gh CLI
 
         Returns:
             True if PR modifies test files
         """
-        try:
-            files = pr.get_files()
-            for file in files:
-                for pattern in self.TEST_FILE_PATTERNS:
-                    if re.search(pattern, file.filename, re.IGNORECASE):
-                        return True
-        except GithubException:
-            pass
+        for f in pr_data.get("files", []):
+            path = f.get("path", "") if isinstance(f, dict) else str(f)
+            path_lower = path.lower()
+            if any(p in path_lower for p in self.TEST_FILE_PATTERNS):
+                return True
         return False
 
     def extract_test_changes(self, pr_diff: str) -> str | None:
@@ -176,9 +189,7 @@ class GitHubPRMiner:
                 # Start new file
                 current_file = line
                 current_diff = [line]
-                in_test_file = any(
-                    re.search(p, line, re.IGNORECASE) for p in self.TEST_FILE_PATTERNS
-                )
+                in_test_file = any(p in line.lower() for p in self.TEST_FILE_PATTERNS)
             else:
                 current_diff.append(line)
 
@@ -188,80 +199,79 @@ class GitHubPRMiner:
 
         return "\n\n".join(test_sections) if test_sections else None
 
-    def get_linked_issue(self, pr: PullRequest.PullRequest) -> dict[str, Any] | None:
+    def get_pr_details(self, repo: str, pr_data: dict) -> PRDetails:
         """
-        Extract linked issue from PR body and fetch its details.
+        Get full PR details including diff.
 
         Args:
-            pr: PullRequest object
-
-        Returns:
-            Dict with issue details or None
-        """
-        body = pr.body or ""
-        issue_numbers = []
-
-        for pattern in self.ISSUE_PATTERNS:
-            matches = re.findall(pattern, body, re.IGNORECASE)
-            issue_numbers.extend(int(m) for m in matches)
-
-        if not issue_numbers:
-            return None
-
-        # Try to fetch the first linked issue
-        repo = pr.base.repo
-        for issue_num in issue_numbers:
-            try:
-                issue = repo.get_issue(issue_num)
-                return {
-                    "number": issue.number,
-                    "title": issue.title,
-                    "body": issue.body,
-                    "url": issue.html_url,
-                    "labels": [label.name for label in issue.labels],
-                }
-            except GithubException:
-                continue
-
-        return None
-
-    def get_pr_details(self, pr: PullRequest.PullRequest) -> PRDetails:
-        """
-        Get comprehensive details about a PR.
-
-        Args:
-            pr: PullRequest object
+            repo: Repository in format "owner/repo"
+            pr_data: Basic PR dict from gh pr list
 
         Returns:
             PRDetails with all relevant information
         """
-        # Get files changed
-        files_changed = [f.filename for f in pr.get_files()]
+        pr_number = pr_data["number"]
+
+        # Get full PR info
+        cmd = [
+            "gh",
+            "pr",
+            "view",
+            str(pr_number),
+            "--repo",
+            repo,
+            "--json",
+            "number,title,body,baseRefName,headRefName,files,url,mergedAt",
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            raise RuntimeError(f"gh pr view failed: {result.stderr}")
+
+        full_pr_data = json.loads(result.stdout)
 
         # Get diff
-        try:
-            diff = pr.get_diff()
-            diff_text = diff if isinstance(diff, str) else diff.raw_data
-        except GithubException:
-            diff_text = "Unable to fetch diff"
+        cmd = ["gh", "pr", "diff", str(pr_number), "--repo", repo]
+        diff_result = subprocess.run(cmd, capture_output=True, text=True)
+        diff_text = diff_result.stdout if diff_result.returncode == 0 else "Unable to fetch diff"
+
+        # Get files changed
+        files_changed = [f.get("path", "") for f in full_pr_data.get("files", [])]
 
         # Extract test changes
         test_diff = self.extract_test_changes(diff_text)
 
-        # Get linked issue
-        linked_issue = self.get_linked_issue(pr)
+        # Get linked issues
+        linked_issue = None
+        issue_numbers = self._extract_linked_issues(full_pr_data.get("body", ""))
+        if issue_numbers:
+            issue_details = self._get_issue_details(repo, issue_numbers[0])
+            if issue_details:
+                linked_issue = {
+                    "number": issue_details.get("number"),
+                    "title": issue_details.get("title", ""),
+                    "body": issue_details.get("body", ""),
+                    "url": issue_details.get("url", ""),
+                    "labels": [l.get("name", "") for l in issue_details.get("labels", [])],
+                }
+
+        # Parse merged_at
+        merged_at_str = full_pr_data.get("mergedAt")
+        if merged_at_str:
+            merged_at = datetime.fromisoformat(merged_at_str.replace("Z", "+00:00"))
+        else:
+            merged_at = None
 
         return PRDetails(
-            number=pr.number,
-            title=pr.title,
-            body=pr.body or "",
-            url=pr.html_url,
-            merged_at=pr.merged_at,
+            number=full_pr_data["number"],
+            title=full_pr_data.get("title", ""),
+            body=full_pr_data.get("body", "") or "",
+            url=full_pr_data.get("url", ""),
+            merged_at=merged_at,
             files_changed=files_changed,
             code_diff=diff_text,
             test_diff=test_diff,
             linked_issue=linked_issue,
-            repo_name=pr.base.repo.full_name,
+            repo_name=repo,
         )
 
 
@@ -596,7 +606,7 @@ def main():
     # Initialize components
     try:
         miner = GitHubPRMiner()
-    except ValueError as e:
+    except RuntimeError as e:
         print(f"Error: {e}")
         sys.exit(1)
 
@@ -631,7 +641,7 @@ def main():
         stats["prs_found"] += len(prs)
 
         for pr in prs:
-            print(f"\n  PR #{pr.number}: {pr.title[:60]}...")
+            print(f"\n  PR #{pr['number']}: {pr['title'][:60]}...")
 
             # Check for test changes
             has_tests = miner.has_test_changes(pr)
@@ -642,7 +652,7 @@ def main():
 
             # Get PR details
             try:
-                pr_details = miner.get_pr_details(pr)
+                pr_details = miner.get_pr_details(repo_name, pr)
             except Exception as e:
                 print(f"    → Error fetching details: {e}")
                 continue
