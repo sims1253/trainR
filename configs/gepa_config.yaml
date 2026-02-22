@@ -1,5 +1,6 @@
 # GEPA Optimization Configuration
 # Settings for the Gradient-free Evolutionary Prompt Algorithm
+# Model settings come from configs/llm.yaml
 
 # GEPA Core Settings
 gepa:
@@ -68,10 +69,8 @@ constraints:
   max_skill_size: 50000
 
 # LLM Settings for Mutation
+# Note: Model comes from configs/llm.yaml
 llm:
-  # Model to use for reflection and mutation
-  model: "claude-3-5-sonnet-20241022"
-  
   # Temperature for mutation generation
   temperature: 0.8
   

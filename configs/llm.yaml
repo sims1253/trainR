@@ -1,84 +1,42 @@
 # LLM Configuration - Single Source of Truth
-# All LLM usage in trainR reads from this file
-#
-# LiteLLM docs: https://docs.litellm.ai/docs/providers
-# OpenAI-compatible: https://docs.litellm.ai/docs/providers/openai_compatible
+# LiteLLM providers: https://docs.litellm.ai/docs/providers
 
 provider: openrouter
 
-# API keys (set in environment):
+# API keys (environment variables):
 # - OPENROUTER_API_KEY → openrouter
-# - Z_AI_API_KEY → zai (Zhipu AI or Coding Plan)
-# - GEMINI_API_KEY or GOOGLE_API_KEY → gemini
+# - Z_AI_API_KEY → zai / zai_coding_plan
+# - GEMINI_API_KEY → gemini
+# - OPENCODE_API_KEY → opencode
 # - OPENAI_API_KEY → openai
 # - ANTHROPIC_API_KEY → anthropic
-# - OPENCODE_API_KEY → opencode (OpenCode Zen)
 
 models:
+  # Task agent: Runs in Docker, executes tests
   task_agent: openrouter/openai/gpt-oss-120b:free
-  reflection: opencode/glm-5-free
+  
+  # Reflection: GEPA optimization judge
+  reflection: openrouter/openai/gpt-oss-120b:free
+  
+  # Mining: PR quality evaluation (defaults to reflection model)
+  # mining: openrouter/openai/gpt-oss-120b:free
 
 parameters:
   temperature: 0.3
   max_tokens: 4096
 
-# Provider configurations
-# Set base_url to override defaults (useful for alternative endpoints)
-providers:
-  openrouter:
-    base_url: https://openrouter.ai/api/v1
-    rpm_limit: 20
-  
-  zai:
-    # Zhipu AI official endpoint (default)
-    # base_url: https://api.z.ai/api/paas/v4
-    # For ZAI Coding Plan, uncomment:
-    base_url: https://api.z.ai/api/coding/paas/v4
-  
-  gemini:
-    base_url: https://generativelanguage.googleapis.com/v1beta
-  
-  openai:
-    base_url: https://api.openai.com/v1
-  
-  anthropic:
-    base_url: https://api.anthropic.com/v1
-  
+# Custom endpoints (only for providers NOT natively supported by LiteLLM)
+# LiteLLM natively supports: openrouter, zai, gemini, openai, anthropic
+# 
+# For custom endpoints, set base_url here AND use openai/ prefix in model name
+custom_endpoints:
   opencode:
-    # OpenCode Zen - uses OpenAI-compatible mode
-    # LiteLLM uses: openai/<model> + api_base + api_key
-    # Update this URL to match your OpenCode Zen deployment
     base_url: https://api.opencode.ai/v1
+  
+  zai_coding_plan:
+    base_url: https://api.zukijourney.com/v1
 
-# Example configurations:
-#
-# --- OpenRouter (free tier) ---
-# provider: openrouter
-# models:
-#   task_agent: openrouter/openai/gpt-oss-120b:free
-#   reflection: openrouter/openai/gpt-oss-120b:free
-#
-# --- Z.AI Coding Plan ---
-# provider: zai
-# providers:
-#   zai:
-#     base_url: https://api.zukijourney.com/v1
-# models:
-#   task_agent: zai/glm-4-flash
-#   reflection: zai/glm-4-flash
-#
-# --- OpenCode Zen ---
-# provider: opencode
-# models:
-#   task_agent: glm-5  # No prefix needed (uses openai/ internally)
-#   reflection: glm-5
-#
-# --- Gemini ---
-# provider: gemini
-# models:
-#   task_agent: gemini/gemini-2.0-flash
-#   reflection: gemini/gemini-2.0-flash
-
+# PR mining thresholds
 mining:
   min_quality_score: 7
   require_test_changes: true

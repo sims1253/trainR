@@ -1,17 +1,6 @@
 # Default Evaluation Configuration
 # Used by: make evaluate-batch (default)
-
-# ─────────────────────────────────────────────────────────────
-# Model Selection
-# ─────────────────────────────────────────────────────────────
-model:
-  # Task execution model (agent that writes tests)
-  # glm-4.5: 10 concurrent, good for finding skill signal
-  # glm-4.7: 5 concurrent, stronger reasoning
-  task: glm-4.5
-  
-  # Reflection/judge model (GEPA optimization)
-  reflection: glm-5
+# Model settings come from configs/llm.yaml
 
 # ─────────────────────────────────────────────────────────────
 # Parallelism
@@ -19,7 +8,6 @@ model:
 workers:
   # Number of parallel Docker containers
   # Keep below model concurrency limit
-  # glm-4.5: up to 8-10, glm-4.7: up to 4, glm-5: up to 2
   count: 5
   
   # Auto-detect based on available memory (overrides count if true)

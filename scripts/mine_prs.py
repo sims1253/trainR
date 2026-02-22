@@ -333,7 +333,7 @@ Provide a structured evaluation of this PR as a potential testing task.
         """
         config = get_llm_config()
 
-        self.model = model or config.reflection
+        self.model = model or config.get_mining_model()
         self.api_key = api_key or config.get_api_key()
 
         # Determine provider based on model name
