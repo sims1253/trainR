@@ -155,6 +155,9 @@ next-env.d.ts
 # tasks/train/*.json
 # tasks/dev/*.json
 # tasks/held_out/*.json
+# Canonical v1 migration outputs (generated locally)
+tasks_v1/
+tasks_v1_split/
 
 # Results and checkpoints
 results/
