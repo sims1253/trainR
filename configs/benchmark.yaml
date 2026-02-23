@@ -5,11 +5,10 @@
 # Each entry references a model defined in configs/llm.yaml
 # Comment out models you don't want to run
 models:
-  - glm-5-free
-  - kimi-k2.5-free
-  - minimax-m2.5-free
+  - glm-5
+  - minimax-m2.5
   - gpt-5-nano
-  - gpt-oss-120b-free
+  - gpt-oss-120b
   - step-3.5-flash
   - trinity-large-preview
   - nemotron-3-nano
