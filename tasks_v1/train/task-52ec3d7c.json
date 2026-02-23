@@ -1,0 +1,43 @@
+{
+  "schema_version": "1.0",
+  "task_id": "task-52ec3d7c",
+  "task_type": "test_gen",
+  "difficulty": "easy",
+  "instruction": "Add snapshot tests for `forcats::f` to capture complex output.\n\n\nExisting snapshot tests in this package:\n```r\nexpect_snapshot(error = TRUE, {\n    lvls_expand(f1, c(\"a\", \"c\"))\n  })\n```\n\n\nSnapshot testing is appropriate when the function produces:\n- Formatted text output (messages, errors, warnings)\n- Complex data structures that are hard to test with expect_equal\n- Console output with ANSI formatting\n\nRequirements:\n1. Use expect_snapshot() for capturing printed output\n2. Use expect_snapshot(error = TRUE) for error message snapshots\n3. Use expect_snapshot(transform = ...) if output contains volatile data (timestamps, paths)\n4. Test with representative inputs that exercise different output formats\n",
+  "context": "Package: forcats v1.0.1.9000\nDescription: Tools for Working with Categorical Variables (Factors)\nFunction: f\nParameters: x, y\nTest patterns used: expect_snapshot, with_fixture\nExpectations used: expect_snapshot\n\nFunction Code:\n```r\nf <- function(x, y) .f(x, y, ...)\n```",
+  "hints": [],
+  "source_package": "forcats",
+  "source_file": "R/compat-purrr.R",
+  "tests": {
+    "fail_to_pass": [],
+    "pass_to_pass": [],
+    "test_files": [
+      "R",
+      "lifecycle",
+      "testthat",
+      "withr"
+    ]
+  },
+  "solution": null,
+  "source": null,
+  "files": {
+    "changed": [
+      "R/compat-purrr.R"
+    ],
+    "source_files": [
+      "R/compat-purrr.R"
+    ],
+    "test_changes": null
+  },
+  "quality_score": 0.651,
+  "split": "train",
+  "dependencies": [
+    "R",
+    "lifecycle",
+    "testthat",
+    "withr"
+  ],
+  "constraints": {},
+  "created_at": "2026-02-23T20:26:51.778367+00:00",
+  "updated_at": null
+}

@@ -1,0 +1,55 @@
+{
+  "schema_version": "1.0",
+  "task_id": "r-lib_testthat_2306",
+  "task_type": "swe",
+  "difficulty": "easy",
+  "instruction": "Fix the `snapshot_check_hint()` function in R/reporter-check.R to only emit the snapshot download hint when running in a GitHub Actions job named 'R-CMD-check'. Currently, the hint is emitted in any GitHub Actions environment, but it should only appear when the job name matches 'R-CMD-check' since that's where the testthat artifact is typically uploaded. Also update the documentation for `snapshot_download_gh()` to clarify that `dest_dir` is the 'Package root directory' rather than just 'Directory to download to', and note that the hint is only emitted in R-CMD-check jobs.",
+  "context": "The `snapshot_check_hint()` function in R/reporter-check.R currently checks `if (on_gh())` to determine if it should emit a hint. The fix requires adding an additional condition to check `Sys.getenv(\"GITHUB_JOB\") == \"R-CMD-check\"`. The test in tests/testthat/test-reporter-check.R uses `withr::local_envvar()` to set up GitHub Actions environment variables for testing.",
+  "hints": [],
+  "source_package": "testthat",
+  "source_file": null,
+  "tests": {
+    "fail_to_pass": [
+      "test_that(\"generates informative snapshot hints\", { ... }) - the test should set GITHUB_JOB=\"R-CMD-check\" and verify the hint is generated correctly"
+    ],
+    "pass_to_pass": [
+      "Existing tests for snapshot_check_hint() when not on GitHub Actions should still pass",
+      "Tests where GITHUB_JOB is set to something other than \"R-CMD-check\" should not emit the hint"
+    ],
+    "test_files": []
+  },
+  "solution": {
+    "key_changes": [
+      "Modify the condition in snapshot_check_hint() from `if (on_gh())` to `if (on_gh() && Sys.getenv(\"GITHUB_JOB\") == \"R-CMD-check\")`",
+      "Update the @param dest_dir documentation from 'Directory to download to' to 'Package root directory'",
+      "Add documentation note that the hint is only emitted in R-CMD-check jobs",
+      "Update the test to include GITHUB_JOB = \"R-CMD-check\" in the environment variables"
+    ],
+    "potential_pitfalls": [
+      "Forgetting to update the test to include the new GITHUB_JOB environment variable",
+      "Using incorrect environment variable name or job name comparison",
+      "Not updating the .Rd documentation file (man/snapshot_download_gh.Rd) after changing roxygen comments"
+    ],
+    "reference_diff": "diff --git a/NEWS.md b/NEWS.md\nindex 9effac55e..510e4273b 100644\n--- a/NEWS.md\n+++ b/NEWS.md\n@@ -1,5 +1,6 @@\n # testthat 3.3.1\n \n+* The hint to use `snapshot_download_gh()` is now only emitted when running in a job named \"R-CMD-check\" (#2300).\n * `expect_snapshot_file()` correctly reports file name if duplicated (@MichaelChirico, #2296).\n * Fixed support for `shinytest2::AppDriver$expect_values()` screenshot snapshot failing on CI (#2293, #2288).\n \ndiff --git a/R/reporter-check.R b/R/reporter-check.R\nindex 1d5ac7d51..77c680ecb 100644\n--- a/R/reporter-check.R\n+++ b/R/reporter-check.R\n@@ -123,7 +123,7 @@ summary_line <- function(n_fail, n_warn, n_skip, n_pass) {\n snapshot_check_hint <- function() {\n   intro <- \"To review and process snapshots locally:\"\n \n-  if (on_gh()) {\n+  if (on_gh() && Sys.getenv(\"GITHUB_JOB\") == \"R-CMD-check\") {\n     repository <- Sys.getenv(\"GITHUB_REPOSITORY\")\n     run_id <- Sys.getenv(\"GITHUB_RUN_ID\")\n \ndiff --git a/R/snapshot-github.R b/R/snapshot-github.R\nindex 74e278a11..ae160bffc 100644\n--- a/R/snapshot-github.R\n+++ b/R/snapshot-github.R\n@@ -7,11 +7,13 @@\n #' take the artifacts from.\n #'\n #' Note that you should not generally need to use this function manually;\n-#' instead copy and paste from the hint emitted on GitHub.\n+#' instead copy and paste from the hint emitted on GitHub. This hint is only\n+#' emitted when running in a job named \"R-CMD-check\", since that's where the\n+#' testthat artifact is typically uploaded.\n #'\n #' @param repository Repository owner/name, e.g. `\"r-lib/testthat\"`.\n #' @param run_id Run ID, e.g. `\"47905180716\"`. You can find this in the action url.\n-#' @param dest_dir Directory to download to. Defaults to the current directory.\n+#' @param dest_dir Package root directory. Defaults to the current directory.\n #' @export\n snapshot_download_gh <- function(repository, run_id, dest_dir = \".\") {\n   check_string(repository)\ndiff --git a/man/snapshot_download_gh.Rd b/man/snapshot_download_gh.Rd\nindex 23e5999f1..38b85a7f3 100644\n--- a/man/snapshot_download_gh.Rd\n+++ b/man/snapshot_download_gh.Rd\n@@ -11,7 +11,7 @@ snapshot_download_gh(repository, run_id, dest_dir = \".\")\n \n \\item{run_id}{Run ID, e.g. \\code{\"47905180716\"}. You can find this in the action url.}\n \n-\\item{dest_dir}{Directory to download to. Defaults to the current directory.}\n+\\item{dest_dir}{Package root directory. Defaults to the current directory.}\n }\n \\description{\n If your snapshots fail on GitHub, it can be a pain to figure out exactly\n@@ -20,5 +20,7 @@ easy, only requiring you to interactively select which job you want to\n take the artifacts from.\n \n Note that you should not generally need to use this function manually;\n-instead copy and paste from the hint emitted on GitHub.\n+instead copy and paste from the hint emitted on GitHub. This hint is only\n+emitted when running in a job named \"R-CMD-check\", since that's where the\n+testthat artifact is typically uploaded.\n }"
+  },
+  "source": {
+    "type": "github_pr",
+    "repo": "r-lib/testthat",
+    "pr_number": 2306,
+    "pr_url": "https://github.com/r-lib/testthat/pull/2306",
+    "merged_at": "2026-01-07T02:34:14+00:00",
+    "issue_number": null,
+    "issue_url": "https://github.com/r-lib/testthat/issues/2300"
+  },
+  "files": {
+    "changed": [],
+    "source_files": [],
+    "test_changes": null
+  },
+  "quality_score": 7.0,
+  "split": "mined",
+  "dependencies": [],
+  "constraints": {},
+  "created_at": "2026-02-22T18:51:46.860449+00:00",
+  "updated_at": null
+}

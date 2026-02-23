@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.0",
+  "task_id": "task-89637ef4",
+  "task_type": "test_gen",
+  "difficulty": "hard",
+  "instruction": "Add comprehensive edge case tests for `fct_lump_min`.\n\n\nExisting tests for reference:\n```r\n\n```\n```r\n\n```\n\n\nThe existing tests cover basic functionality. Add tests for:\n1. NULL inputs to each argument\n2. Empty vectors/strings: character(0), \"\", integer(0)\n3. Boundary values: 0, 1, -1, NA, NaN, Inf\n4. Invalid input types (passing numeric where character expected, etc.)\n5. Missing arguments (use expect_error with class matching)\n6. Very long inputs (strings > 1000 chars, vectors > 10000 elements)\n",
+  "context": "Package: forcats v1.0.1.9000\nDescription: Tools for Working with Categorical Variables (Factors)\nFunction: fct_lump_min\nParameters: f, min, w, other_level\nTest patterns used: test_that\nExpectations used: expect_equal\n\nFunction Code:\n```r\nfct_lump_min <- function(f, min, w = NULL, other_level = \"Other\") {\n  f <- check_factor(f)\n  check_number_decimal(min, min = 0)\n  check_string(other_level, allow_na = TRUE)\n\n  level_w <- compute_weights(f, w)\n  lvls_other(f, level_w >= min, other_level)\n}\n```",
+  "hints": [],
+  "source_package": "forcats",
+  "source_file": "R/lump.R",
+  "tests": {
+    "fail_to_pass": [],
+    "pass_to_pass": [],
+    "test_files": [
+      "testthat"
+    ]
+  },
+  "solution": null,
+  "source": null,
+  "files": {
+    "changed": [
+      "R/lump.R"
+    ],
+    "source_files": [
+      "R/lump.R"
+    ],
+    "test_changes": null
+  },
+  "quality_score": 0.56,
+  "split": "train",
+  "dependencies": [
+    "testthat"
+  ],
+  "constraints": {},
+  "created_at": "2026-02-23T20:26:51.767425+00:00",
+  "updated_at": null
+}

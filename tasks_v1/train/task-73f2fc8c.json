@@ -1,0 +1,39 @@
+{
+  "schema_version": "1.0",
+  "task_id": "task-73f2fc8c",
+  "task_type": "test_gen",
+  "difficulty": "medium",
+  "instruction": "Refactor the existing tests for `get_metrics` to follow better testing practices.\n\n\nCurrent test patterns to refactor:\n- test_that at tests/testthat/test-aaa-get_metrics.R:1\n- test_that at tests/testthat/test-aaa-get_metrics.R:12\n- test_that at tests/testthat/test-aaa-get_metrics.R:28\n- test_that at tests/testthat/test-aaa-get_metrics.R:32\n- test_that at tests/testthat/test-aaa-get_metrics.R:36\n\n\nGoals:\n1. Use describe()/it() blocks for better organization where appropriate\n2. Reduce code duplication with helper functions or local fixtures\n3. Improve test descriptions to be specific about what behavior is verified\n4. Extract common setup into withr::local_* fixtures\n5. Each test should have a single responsibility\n",
+  "context": "Package: yardstick v1.3.2.9000\nDescription: Tidy Characterizations of Model Performance\nFunction: get_metrics\nParameters: type\nTest patterns used: expect_snapshot, test_that\nExpectations used: expect_equal, expect_gt, expect_s3_class, expect_snapshot\n\nFunction Code:\n```r\nget_metrics <- function(type) {\n  yardns <- asNamespace(\"yardstick\")\n  fns <- lapply(names(yardns), get, envir = yardns)\n  names(fns) <- names(yardns)\n\n  metric_types <- grep(\"^new_.*_metric$\", names(fns), value = TRUE)\n  metric_types <- gsub(\"(new_|_metric)\", \"\", metric_types)\n  metric_types <- sort(metric_types)\n  rlang::arg_match(type, metric_types, multiple = TRUE)\n\n  type <- paste0(type, \"_metric\")\n  metrics <- fns[vapply(fns, inherits, what = type, FUN.VALUE = logical(1))]\n  metrics <- metrics[sort(names(metrics))]\n\n  metric_set(!!!metrics)\n}\n```",
+  "hints": [],
+  "source_package": "yardstick",
+  "source_file": "R/aaa-get_metrics.R",
+  "tests": {
+    "fail_to_pass": [],
+    "pass_to_pass": [],
+    "test_files": [
+      "R",
+      "testthat"
+    ]
+  },
+  "solution": null,
+  "source": null,
+  "files": {
+    "changed": [
+      "R/aaa-get_metrics.R"
+    ],
+    "source_files": [
+      "R/aaa-get_metrics.R"
+    ],
+    "test_changes": null
+  },
+  "quality_score": 0.516,
+  "split": "train",
+  "dependencies": [
+    "R",
+    "testthat"
+  ],
+  "constraints": {},
+  "created_at": "2026-02-23T20:26:51.760711+00:00",
+  "updated_at": null
+}

@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.0",
+  "task_id": "task-747fd9da",
+  "task_type": "test_gen",
+  "difficulty": "hard",
+  "instruction": "Add comprehensive edge case tests for `cpp_options_to_compile_flags`.\n\n\nExisting tests for reference:\n```r\n\n```\n\n\nThe existing tests cover basic functionality. Add tests for:\n1. NULL inputs to each argument\n2. Empty vectors/strings: character(0), \"\", integer(0)\n3. Boundary values: 0, 1, -1, NA, NaN, Inf\n4. Invalid input types (passing numeric where character expected, etc.)\n5. Missing arguments (use expect_error with class matching)\n6. Very long inputs (strings > 1000 chars, vectors > 10000 elements)\n",
+  "context": "Package: cmdstanr v0.9.0.9000\nDescription: R Interface to 'CmdStan'\nFunction: cpp_options_to_compile_flags\nParameters: cpp_options\nTest patterns used: test_that\nExpectations used: expect_equal\n\nFunction Code:\n```r\ncpp_options_to_compile_flags <- function(cpp_options) {\n  if (length(cpp_options) == 0) {\n    return(NULL)\n  }\n  cpp_built_options <- c()\n  for (i in seq_along(cpp_options)) {\n    option_name <- names(cpp_options)[i]\n    if (is.null(option_name) || !nzchar(option_name)) {\n      cpp_built_options <- c(cpp_built_options, cpp_options[[i]])\n    } else {\n      cpp_built_options <- c(cpp_built_options, paste0(toupper(option_name), \"=\", cpp_options[[i]]))\n    }\n  }\n  cpp_built_options\n}\n```",
+  "hints": [],
+  "source_package": "cmdstanr",
+  "source_file": "R/cpp_opts.R",
+  "tests": {
+    "fail_to_pass": [],
+    "pass_to_pass": [],
+    "test_files": [
+      "testthat"
+    ]
+  },
+  "solution": null,
+  "source": null,
+  "files": {
+    "changed": [
+      "R/cpp_opts.R"
+    ],
+    "source_files": [
+      "R/cpp_opts.R"
+    ],
+    "test_changes": null
+  },
+  "quality_score": 0.56,
+  "split": "train",
+  "dependencies": [
+    "testthat"
+  ],
+  "constraints": {},
+  "created_at": "2026-02-23T20:26:51.757316+00:00",
+  "updated_at": null
+}

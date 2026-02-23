@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.0",
+  "task_id": "task-00201020",
+  "task_type": "test_gen",
+  "difficulty": "medium",
+  "instruction": "Add proper test fixtures to the tests for `st_collection_extract` using the withr package.\n\n\n\nRequirements:\n1. Identify tests that modify global state (options, env vars, working directory)\n2. Wrap state modifications with withr::local_* for automatic cleanup:\n   - withr::local_options() for R options\n   - withr::local_envvar() for environment variables\n   - withr::local_tempdir() for temporary directories\n   - withr::local_file() for temporary files\n3. Ensure tests can run in any order without side effects\n4. Use local_* (not with_*) inside test_that() blocks\n",
+  "context": "Package: sf v1.1-0\nDescription: Simple Features for R\nFunction: st_collection_extract\nParameters: x, type, warn\nTest patterns used: test_that\nExpectations used: expect_error, expect_length, expect_s3_class, expect_true, expect_warning\n\nFunction Code:\n```r\nst_collection_extract = function(x, type = c(\"POLYGON\", \"POINT\", \"LINESTRING\"), warn = FALSE) {\n\tUseMethod(\"st_collection_extract\")\n}\n```",
+  "hints": [],
+  "source_package": "sf",
+  "source_file": "R/collection_extract.R",
+  "tests": {
+    "fail_to_pass": [],
+    "pass_to_pass": [],
+    "test_files": [
+      "testthat"
+    ]
+  },
+  "solution": null,
+  "source": null,
+  "files": {
+    "changed": [
+      "R/collection_extract.R"
+    ],
+    "source_files": [
+      "R/collection_extract.R"
+    ],
+    "test_changes": null
+  },
+  "quality_score": 0.51,
+  "split": "train",
+  "dependencies": [
+    "testthat"
+  ],
+  "constraints": {},
+  "created_at": "2026-02-23T20:26:51.775921+00:00",
+  "updated_at": null
+}

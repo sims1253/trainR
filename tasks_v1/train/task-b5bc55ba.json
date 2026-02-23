@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.0",
+  "task_id": "task-b5bc55ba",
+  "task_type": "test_gen",
+  "difficulty": "medium",
+  "instruction": "Write a complete testthat test file for `stringr::to_words`.\n\nPackage: stringr v1.6.0.9000\nDescription: Simple, Consistent Wrappers for Common String Operations\nFunction: to_words\nParameters: string\nTest patterns used: test_that\nExpectations used: expect_equal\n\nFunction Code:\n```r\nto_words <- function(string) {\n  breakpoints <- paste(\n    # non-word characters\n    \"[^\\\\p{L}\\\\p{N}]+\",\n    # lowercase followed by uppercase\n    \"(?<=\\\\p{Ll})(?=\\\\p{Lu})\",\n    # letter followed by number\n    \"(?<=\\\\p{L})(?=\\\\p{N})\",\n    # number followed by letter\n    \"(?<=\\\\p{N})(?=\\\\p{L})\",\n    # uppercase followed uppercase then lowercase (i.e. end of acronym)\n    \"(?<=\\\\p{Lu})(?=\\\\p{Lu}\\\\p{Ll})\",\n    sep = \"|\"\n  )\n  out <- str_replace_all(string, breakpoints, \" \")\n  out <- str_to_lower(out)\n  str_trim(out)\n}\n```\n\nRequirements:\n1. Use test_that() blocks with descriptive names that reference `to_words`\n2. Test basic functionality using appropriate expectations (expect_equal)\n3. Test edge cases: NULL input, empty strings, missing arguments\n4. Test error conditions with expect_error()\n5. Each test_that() block should test one logical behavior\n",
+  "context": "Package: stringr v1.6.0.9000\nDescription: Simple, Consistent Wrappers for Common String Operations\nFunction: to_words\nParameters: string\nTest patterns used: test_that\nExpectations used: expect_equal\n\nFunction Code:\n```r\nto_words <- function(string) {\n  breakpoints <- paste(\n    # non-word characters\n    \"[^\\\\p{L}\\\\p{N}]+\",\n    # lowercase followed by uppercase\n    \"(?<=\\\\p{Ll})(?=\\\\p{Lu})\",\n    # letter followed by number\n    \"(?<=\\\\p{L})(?=\\\\p{N})\",\n    # number followed by letter\n    \"(?<=\\\\p{N})(?=\\\\p{L})\",\n    # uppercase followed uppercase then lowercase (i.e. end of acronym)\n    \"(?<=\\\\p{Lu})(?=\\\\p{Lu}\\\\p{Ll})\",\n    sep = \"|\"\n  )\n  out <- str_replace_all(string, breakpoints, \" \")\n  out <- str_to_lower(out)\n  str_trim(out)\n}\n```",
+  "hints": [],
+  "source_package": "stringr",
+  "source_file": "R/case.R",
+  "tests": {
+    "fail_to_pass": [],
+    "pass_to_pass": [],
+    "test_files": [
+      "testthat"
+    ]
+  },
+  "solution": null,
+  "source": null,
+  "files": {
+    "changed": [
+      "R/case.R"
+    ],
+    "source_files": [
+      "R/case.R"
+    ],
+    "test_changes": null
+  },
+  "quality_score": 0.585,
+  "split": "train",
+  "dependencies": [
+    "testthat"
+  ],
+  "constraints": {},
+  "created_at": "2026-02-23T20:26:51.769168+00:00",
+  "updated_at": null
+}

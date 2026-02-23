@@ -1,0 +1,39 @@
+{
+  "schema_version": "1.0",
+  "task_id": "task-2188352b",
+  "task_type": "test_gen",
+  "difficulty": "hard",
+  "instruction": "Add comprehensive edge case tests for `find_active_file`.\n\n\nExisting tests for reference:\n```r\n\n```\n```r\nexpect_snapshot(find_active_file(), error = TRUE)\n```\n\n\nThe existing tests cover basic functionality. Add tests for:\n1. NULL inputs to each argument\n2. Empty vectors/strings: character(0), \"\", integer(0)\n3. Boundary values: 0, 1, -1, NA, NaN, Inf\n4. Invalid input types (passing numeric where character expected, etc.)\n5. Missing arguments (use expect_error with class matching)\n6. Very long inputs (strings > 1000 chars, vectors > 10000 elements)\n",
+  "context": "Package: devtools v2.4.6.9000\nDescription: Tools to Make Developing R Packages Easier\nFunction: find_active_file\nParameters: arg, call\nTest patterns used: expect_snapshot, test_that\nExpectations used: expect_snapshot\n\nFunction Code:\n```r\nfind_active_file <- function(arg = \"file\", call = parent.frame()) {\n  if (!is_rstudio_running()) {\n    cli::cli_abort(\"{.arg {arg}} is absent but must be supplied.\", call = call)\n  }\n  normalizePath(rstudioapi::getSourceEditorContext()$path)\n}\n```",
+  "hints": [],
+  "source_package": "devtools",
+  "source_file": "R/active.R",
+  "tests": {
+    "fail_to_pass": [],
+    "pass_to_pass": [],
+    "test_files": [
+      "R",
+      "testthat"
+    ]
+  },
+  "solution": null,
+  "source": null,
+  "files": {
+    "changed": [
+      "R/active.R"
+    ],
+    "source_files": [
+      "R/active.R"
+    ],
+    "test_changes": null
+  },
+  "quality_score": 0.596,
+  "split": "held_out",
+  "dependencies": [
+    "R",
+    "testthat"
+  ],
+  "constraints": {},
+  "created_at": "2026-02-23T20:26:51.811029+00:00",
+  "updated_at": null
+}

@@ -1,0 +1,55 @@
+{
+  "schema_version": "1.0",
+  "task_id": "r-lib_httr2_818",
+  "task_type": "swe",
+  "difficulty": "medium",
+  "instruction": "Fix a bug in `req_perform_connection()` where calling `close()` on an error condition object instead of a response object causes an error. When a curl error occurs during connection retries, the function attempts to close `resp` which is an error condition, not a response object. The fix should ensure `close()` is only called on actual response objects. The function should properly handle curl errors that occur after an initial successful connection but before the request completes.",
+  "context": "The `req_perform_connection()` function handles streaming HTTP connections with retry logic. In the retry loop, it checks if `resp` exists before calling `close(resp)`. However, when `capture_curl_error()` catches an error, it returns an error condition object (class 'httr2_failure', 'httr2_error', etc.) instead of NULL or a response. The `close()` generic has no method for error condition objects.\n\nKey function signatures:\n- `req_perform_connection(req, ...)` - main function with retry loop\n- `capture_curl_error(code, call)` - wraps code to catch curl errors\n- `is_response(resp)` - checks if object is a response (useful for the fix)",
+  "hints": [],
+  "source_package": "httr2",
+  "source_file": null,
+  "tests": {
+    "fail_to_pass": [
+      "test_that(\"correctly reports curl error with retries (#817)\", { local_mocked_bindings(open = function(...) abort(\"Failed to connect\")); req <- request(\"http://127.0.0.1\") |> req_retry(max_tries = 2, retry_on_failure = TRUE, backoff = \\(i) 0); expect_snapshot(req_perform_connection(req), error = TRUE) })"
+    ],
+    "pass_to_pass": [
+      "test_that(\"curl errors become errors\", { ... }) - existing test for basic curl error handling",
+      "test_that(\"mocking works\", { ... }) - existing test for request mocking"
+    ],
+    "test_files": []
+  },
+  "solution": {
+    "key_changes": [
+      "Change the condition check from `if (!is.null(resp))` to `if (is_response(resp))` before calling `close(resp)`",
+      "Modify `capture_curl_error()` to return NULL on success instead of returning the result of evaluating `code`",
+      "Ensure the connection is properly closed when an error occurs in `req_perform_connection1()`"
+    ],
+    "potential_pitfalls": [
+      "Forgetting to close the connection when an error occurs in req_perform_connection1()",
+      "Not understanding that error conditions are objects that can be assigned to variables",
+      "Changing capture_curl_error() incorrectly could break other error handling",
+      "The fix requires changes in two files (req-error.R and req-perform-connection.R)"
+    ],
+    "reference_diff": "diff --git a/NEWS.md b/NEWS.md\nindex 9541d84b..3470d1d1 100644\n--- a/NEWS.md\n+++ b/NEWS.md\n@@ -1,5 +1,6 @@\n # httr2 (development version)\n \n+* `req_perform_connection()` no longer errors with `no applicable method for 'close' applied to an object of class \"c('httr2_failure', 'httr2_error', 'rlang_error', 'error', 'condition')` (#817).\n * Refactor `url_modify()` to better retain exact formatting of URL components \n   that are not modified. (#788, #794)\n \ndiff --git a/R/req-error.R b/R/req-error.R\nindex 9387fd96..9a8e4179 100644\n--- a/R/req-error.R\n+++ b/R/req-error.R\n@@ -112,8 +112,11 @@ error_body <- function(req, resp, call = caller_env()) {\n }\n \n capture_curl_error <- function(code, call = caller_env()) {\n-  resp <- tryCatch(\n-    code,\n+  tryCatch(\n+    {\n+      code\n+      NULL\n+    },\n     error = function(err) curl_cnd(err, call = call)\n   )\n }\ndiff --git a/R/req-perform-connection.R b/R/req-perform-connection.R\nindex 3dbfb664..7b0e3817 100644\n--- a/R/req-perform-connection.R\n+++ b/R/req-perform-connection.R\n@@ -81,7 +81,7 @@ req_perform_connection <- function(\n     retry_check_breaker(req, tries)\n     sys_sleep(delay, \"for retry backoff\")\n \n-    if (!is.null(resp)) {\n+    if (is_response(resp)) {\n       close(resp)\n     }\n     resp <- req_perform_connection1(req, handle, blocking = blocking)\n@@ -143,14 +143,11 @@ req_perform_connection1 <- function(req, handle, blocking = TRUE) {\n   err <- capture_curl_error({\n     conn <- curl::curl(req$url, handle = handle)\n     # Must open the stream in order to initiate the connection\n-    withCallingHandlers(\n-      open(conn, \"rbf\", blocking = blocking),\n-      warning = \\(cnd) tryInvokeRestart(\"muffleWarning\"),\n-      error = \\(cnd) close(conn)\n-    )\n+    suppressWarnings(open(conn, \"rbf\", blocking = blocking))\n     body <- StreamingBody$new(conn)\n   })\n   if (is_error(err)) {\n+    close(conn)\n     return(err)\n   }\n "
+  },
+  "source": {
+    "type": "github_pr",
+    "repo": "r-lib/httr2",
+    "pr_number": 818,
+    "pr_url": "https://github.com/r-lib/httr2/pull/818",
+    "merged_at": "2025-12-04T22:03:15+00:00",
+    "issue_number": null,
+    "issue_url": "https://github.com/r-lib/httr2/issues/817"
+  },
+  "files": {
+    "changed": [],
+    "source_files": [],
+    "test_changes": null
+  },
+  "quality_score": 8.0,
+  "split": "mined",
+  "dependencies": [],
+  "constraints": {},
+  "created_at": "2026-02-22T19:06:09.640582+00:00",
+  "updated_at": null
+}

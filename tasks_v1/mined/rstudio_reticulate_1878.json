@@ -1,0 +1,59 @@
+{
+  "schema_version": "1.0",
+  "task_id": "rstudio_reticulate_1878",
+  "task_type": "swe",
+  "difficulty": "medium",
+  "instruction": "Fix the bug in `py_require()` where adding packages after Python initialization incorrectly errors when packages already exist in requirements without version conflicts. The function should allow `action = 'add'` with packages that are already required (same version), while still erroring on true version conflicts. For example, if 'numpy' is already required, calling `py_require(c('numpy', 'requests'))` should succeed (adding 'requests', ignoring duplicate 'numpy'), but `py_require('numpy>2')` should error with a clear message about the version conflict.",
+  "context": "The bug is in R/py_require.R around lines 262-275. The function `bare_name()` extracts the package name from a version specifier (e.g., 'numpy>2' becomes 'numpy'). The current logic errors if any package name matches existing requirements, but it should only error when there's an actual version conflict. Key function signature: `py_require(packages = NULL, action = 'add', ...)`",
+  "hints": [],
+  "source_package": "reticulate",
+  "source_file": null,
+  "tests": {
+    "fail_to_pass": [
+      "test_that('Adding packages after Python init works; conflicting versions error') - verifies that adding new packages and duplicate packages (same version) works after Python init, while conflicting versions error appropriately",
+      "After Python initialization, py_require(c('numpy', 'requests')) should succeed when 'numpy' is already required",
+      "After Python initialization, py_require('numpy>2') should error with informative message when 'numpy' is already required"
+    ],
+    "pass_to_pass": [
+      "test_that('Error requesting conflicting package versions') - existing test for version conflicts",
+      "test_that('Setting py_require(python_version) after initializing Python') - existing Python version tests",
+      "test_that('Error requesting conflicting Python versions') - existing Python version conflict tests"
+    ],
+    "test_files": []
+  },
+  "solution": {
+    "key_changes": [
+      "Use setdiff() to remove exact package matches from the input before checking for conflicts",
+      "Only check for version conflicts (same bare name but different version specifier) after filtering exact duplicates",
+      "Improve error message to show which packages conflict and what versions are already required",
+      "Ensure packages are still added to the requirements list after filtering"
+    ],
+    "potential_pitfalls": [
+      "Must handle both simple package names ('numpy') and version specifiers ('numpy>2', 'numpy>=1.0,<2.0')",
+      "The bare_name() function uses regex to extract package names from version specifiers",
+      "Need to maintain the unique() call when adding packages to avoid duplicates in the requirements list",
+      "Error message should clearly distinguish between the new conflicting version and the existing requirement"
+    ],
+    "reference_diff": "diff --git a/NEWS.md b/NEWS.md\nindex 873e023d9..30795353a 100644\n--- a/NEWS.md\n+++ b/NEWS.md\n@@ -10,6 +10,9 @@\n - `virtualenv_starter()` now excludes free-threaded CPython builds,\n   which are not supported by reticulate (#1883).\n \n+- Fixed `py_require()` to allow `action = \"add\"` with already-required packages\n+  after Python initialization, while still erroring on true version conflicts (#1878, #1872; @JBGruber).\n+\n - Fix spurious `Error: ignoring SIGPIPE signal` on Unix when embedded Python writes to a closed pipe (#1868).\n \n - Fixed Positron UI interactions, such as restart/create new session with reticulate (#1871, #1869).\n@@ -18,7 +21,7 @@\n \n # reticulate 1.44.1\n \n-- The default Python version in `install_python()` \n+- The default Python version in `install_python()`\n   and `conda_create()` is now 3.12 (#1862).\n \n - Fix error in `virtualenv_create()`/`virtualenv_starter()` (#1861).\ndiff --git a/R/py_require.R b/R/py_require.R\nindex c3dae7e6c..86a7f1a76 100644\n--- a/R/py_require.R\n+++ b/R/py_require.R\n@@ -262,9 +262,17 @@ py_require <- function(packages = NULL,\n             packages <- NULL # no-op, skip activating new env\n           } else {\n             bare_name <- function(x) sub(\"^([^[!=><]+).*\", \"\\\\1\", x)\n-            if (any(bare_name(packages) %in% bare_name(pr$packages))) {\n-              # e.g., if user calls 'numpy<2' after already initialized with 'numpy>2'\n-              signal_and_exit(\"After Python has initialized, only `action = 'add'` with new packages is supported.\")\n+            packages <- setdiff(packages, pr$packages)\n+            # e.g., if user calls 'numpy<2' after already initialized with 'numpy>2'\n+            conflicts <- bare_name(packages) %in% bare_name(pr$packages)\n+            if (any(conflicts)) {\n+              new <- paste0(\"`\", sort(packages[conflicts]), \"`\", collapse = \", \")\n+              old <- sort(pr$packages[bare_name(pr$packages) %in% bare_name(packages)])\n+              old <- paste0(\"`\", old, \"`\", collapse = \", \")\n+              signal_and_exit(paste(\n+                \"After Python has initialized, only `action = 'add'` with new packages is supported.\",\n+                \"You tried to add\", new, \"but requirements contain\", old, \" already.\"\n+              ))\n               packages <- NULL\n             }\n             pr$packages <- unique(c(packages, pr$packages))"
+  },
+  "source": {
+    "type": "github_pr",
+    "repo": "rstudio/reticulate",
+    "pr_number": 1878,
+    "pr_url": "https://github.com/rstudio/reticulate/pull/1878",
+    "merged_at": "2026-02-12T23:47:05+00:00",
+    "issue_number": null,
+    "issue_url": "https://github.com/rstudio/reticulate/issues/1872"
+  },
+  "files": {
+    "changed": [],
+    "source_files": [],
+    "test_changes": null
+  },
+  "quality_score": 8.0,
+  "split": "mined",
+  "dependencies": [],
+  "constraints": {},
+  "created_at": "2026-02-22T18:41:58.650258+00:00",
+  "updated_at": null
+}

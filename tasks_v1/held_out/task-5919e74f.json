@@ -1,0 +1,39 @@
+{
+  "schema_version": "1.0",
+  "task_id": "task-5919e74f",
+  "task_type": "test_gen",
+  "difficulty": "easy",
+  "instruction": "Add snapshot tests for `rsample::bootstraps` to capture complex output.\n\n\nExisting snapshot tests in this package:\n```r\nexpect_snapshot(error = TRUE, {\n    bootstraps(warpbreaks, strata = warpbreaks$tension)\n  })\n```\n```r\nexpect_snapshot(error = TRUE, {\n    bootstraps(warpbreaks, strata = c(\"tension\", \"wool\"))\n  })\n```\n\n\nSnapshot testing is appropriate when the function produces:\n- Formatted text output (messages, errors, warnings)\n- Complex data structures that are hard to test with expect_equal\n- Console output with ANSI formatting\n\nRequirements:\n1. Use expect_snapshot() for capturing printed output\n2. Use expect_snapshot(error = TRUE) for error message snapshots\n3. Use expect_snapshot(transform = ...) if output contains volatile data (timestamps, paths)\n4. Test with representative inputs that exercise different output formats\n",
+  "context": "Package: rsample v1.3.2.9000\nDescription: General Resampling Infrastructure\nFunction: bootstraps\nParameters: data, times, strata, breaks, pool, apparent\nTest patterns used: expect_snapshot\nExpectations used: expect_snapshot\n\nFunction Code:\n```r\nbootstraps <- function(\n  data,\n  times = 25,\n  strata = NULL,\n  breaks = 4,\n  pool = 0.1,\n  apparent = FALSE,\n  ...\n) {\n  check_dots_empty()\n\n  if (!missing(strata)) {\n    strata <- tidyselect::vars_select(names(data), !!enquo(strata))\n    if (length(strata) == 0) strata <- NULL\n  }\n\n  check_strata(strata, data)\n\n  split_objs <-\n    boot_splits(\n      data = data,\n      times = times,\n      strata = strata,\n      breaks = breaks,\n      pool = pool\n    )\n\n  if (apparent) {\n    split_objs <- bind_rows(split_objs, apparent(data))\n  }\n\n  if (!is.null(strata)) {\n    names(strata) <- NULL\n  }\n  boot_att <- list(\n    times = times,\n    apparent = apparent,\n    strata = strata,\n    breaks = breaks,\n    pool = pool\n  )\n\n  new_rset(\n    splits = split_objs$splits,\n    ids = split_objs$id,\n    attrib = boot_att,\n    subclass = c(\"bootstraps\", \"rset\")\n  )\n}\n```",
+  "hints": [],
+  "source_package": "rsample",
+  "source_file": "R/boot.R",
+  "tests": {
+    "fail_to_pass": [],
+    "pass_to_pass": [],
+    "test_files": [
+      "R",
+      "testthat"
+    ]
+  },
+  "solution": null,
+  "source": null,
+  "files": {
+    "changed": [
+      "R/boot.R"
+    ],
+    "source_files": [
+      "R/boot.R"
+    ],
+    "test_changes": null
+  },
+  "quality_score": 0.675,
+  "split": "held_out",
+  "dependencies": [
+    "R",
+    "testthat"
+  ],
+  "constraints": {},
+  "created_at": "2026-02-23T20:26:51.807741+00:00",
+  "updated_at": null
+}

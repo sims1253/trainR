@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.0",
+  "task_id": "task-efe57c32",
+  "task_type": "test_gen",
+  "difficulty": "medium",
+  "instruction": "Write a complete testthat test file for `flextable::as_qmd`.\n\nPackage: flextable v0.9.12.004\nDescription: Functions for Tabular Reporting\nFunction: as_qmd\nParameters: x, display\nTest patterns used: test_that\nExpectations used: expect_equal, expect_true\n\nFunction Code:\n```r\nas_qmd <- function(x, display = x) {\n  x <- as.character(x)\n  display <- as.character(display)\n  if (length(display) != length(x)) {\n    stop(\n      sprintf(\"`display` must be the same length as `x`: %.0f.\", length(x)),\n      call. = FALSE\n    )\n  }\n  chunk_dataframe(\n    txt = display,\n    qmd_data = x\n  )\n}\n```\n\nRequirements:\n1. Use test_that() blocks with descriptive names that reference `as_qmd`\n2. Test basic functionality using appropriate expectations (expect_equal, expect_true)\n3. Test edge cases: NULL input, empty strings, missing arguments\n4. Test error conditions with expect_error()\n5. Each test_that() block should test one logical behavior\n",
+  "context": "Package: flextable v0.9.12.004\nDescription: Functions for Tabular Reporting\nFunction: as_qmd\nParameters: x, display\nTest patterns used: test_that\nExpectations used: expect_equal, expect_true\n\nFunction Code:\n```r\nas_qmd <- function(x, display = x) {\n  x <- as.character(x)\n  display <- as.character(display)\n  if (length(display) != length(x)) {\n    stop(\n      sprintf(\"`display` must be the same length as `x`: %.0f.\", length(x)),\n      call. = FALSE\n    )\n  }\n  chunk_dataframe(\n    txt = display,\n    qmd_data = x\n  )\n}\n```",
+  "hints": [],
+  "source_package": "flextable",
+  "source_file": "R/05_content.R",
+  "tests": {
+    "fail_to_pass": [],
+    "pass_to_pass": [],
+    "test_files": [
+      "testthat"
+    ]
+  },
+  "solution": null,
+  "source": null,
+  "files": {
+    "changed": [
+      "R/05_content.R"
+    ],
+    "source_files": [
+      "R/05_content.R"
+    ],
+    "test_changes": null
+  },
+  "quality_score": 0.585,
+  "split": "train",
+  "dependencies": [
+    "testthat"
+  ],
+  "constraints": {},
+  "created_at": "2026-02-23T20:26:51.762790+00:00",
+  "updated_at": null
+}

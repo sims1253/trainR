@@ -1,0 +1,39 @@
+{
+  "schema_version": "1.0",
+  "task_id": "task-599569ea",
+  "task_type": "test_gen",
+  "difficulty": "medium",
+  "instruction": "Add proper test fixtures to the tests for `chop` using the withr package.\n\n\n\nRequirements:\n1. Identify tests that modify global state (options, env vars, working directory)\n2. Wrap state modifications with withr::local_* for automatic cleanup:\n   - withr::local_options() for R options\n   - withr::local_envvar() for environment variables\n   - withr::local_tempdir() for temporary directories\n   - withr::local_file() for temporary files\n3. Ensure tests can run in any order without side effects\n4. Use local_* (not with_*) inside test_that() blocks\n",
+  "context": "Package: tidyr v1.3.2.9000\nDescription: Tidy Messy Data\nFunction: chop\nParameters: data, cols, error_call\nTest patterns used: expect_snapshot, test_that\nExpectations used: expect_snapshot\n\nFunction Code:\n```r\nchop <- function(data, cols, ..., error_call = current_env()) {\n  check_dots_empty0(...)\n  check_data_frame(data, call = error_call)\n  check_required(cols, call = error_call)\n\n  cols <- tidyselect::eval_select(\n    expr = enquo(cols),\n    data = data,\n    allow_rename = FALSE,\n    error_call = error_call\n  )\n\n  cols <- tidyr_new_list(data[cols])\n  keys <- data[setdiff(names(data), names(cols))]\n\n  info <- vec_group_loc(keys)\n  keys <- info$key\n  indices <- info$loc\n\n  size <- vec_size(keys)\n\n  cols <- map(cols, col_chop, indices = indices)\n  cols <- new_data_frame(cols, n = size)\n\n  out <- vec_cbind(keys, cols, .error_call = error_call)\n\n  reconstruct_tibble(data, out)\n}\n```",
+  "hints": [],
+  "source_package": "tidyr",
+  "source_file": "R/chop.R",
+  "tests": {
+    "fail_to_pass": [],
+    "pass_to_pass": [],
+    "test_files": [
+      "R",
+      "testthat"
+    ]
+  },
+  "solution": null,
+  "source": null,
+  "files": {
+    "changed": [
+      "R/chop.R"
+    ],
+    "source_files": [
+      "R/chop.R"
+    ],
+    "test_changes": null
+  },
+  "quality_score": 0.606,
+  "split": "train",
+  "dependencies": [
+    "R",
+    "testthat"
+  ],
+  "constraints": {},
+  "created_at": "2026-02-23T20:26:51.775452+00:00",
+  "updated_at": null
+}

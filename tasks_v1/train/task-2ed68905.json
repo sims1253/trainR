@@ -1,0 +1,39 @@
+{
+  "schema_version": "1.0",
+  "task_id": "task-2ed68905",
+  "task_type": "test_gen",
+  "difficulty": "easy",
+  "instruction": "Add snapshot tests for `ggplot2::stat` to capture complex output.\n\n\nExisting snapshot tests in this package:\n```r\nexpect_snapshot(\n    make_constructor(StatDensity, geom = \"point\", stat = \"smooth\"),\n    error = TRUE\n  )\n```\n```r\nexpect_snapshot(\n    make_constructor(StatDensity, geom = \"line\", checks = \"A\"),\n    error = TRUE\n  )\n```\n\n\nSnapshot testing is appropriate when the function produces:\n- Formatted text output (messages, errors, warnings)\n- Complex data structures that are hard to test with expect_equal\n- Console output with ANSI formatting\n\nRequirements:\n1. Use expect_snapshot() for capturing printed output\n2. Use expect_snapshot(error = TRUE) for error message snapshots\n3. Use expect_snapshot(transform = ...) if output contains volatile data (timestamps, paths)\n4. Test with representative inputs that exercise different output formats\n",
+  "context": "Package: ggplot2 v4.0.2.9000\nDescription: Create Elegant Data Visualisations Using the Grammar of Graphics\nFunction: stat\nParameters: x\nTest patterns used: expect_snapshot\nExpectations used: expect_snapshot\n\nFunction Code:\n```r\nstat <- function(x) {\n  x\n}\n```",
+  "hints": [],
+  "source_package": "ggplot2",
+  "source_file": "R/aes-delayed-eval.R",
+  "tests": {
+    "fail_to_pass": [],
+    "pass_to_pass": [],
+    "test_files": [
+      "R",
+      "testthat"
+    ]
+  },
+  "solution": null,
+  "source": null,
+  "files": {
+    "changed": [
+      "R/aes-delayed-eval.R"
+    ],
+    "source_files": [
+      "R/aes-delayed-eval.R"
+    ],
+    "test_changes": null
+  },
+  "quality_score": 0.675,
+  "split": "train",
+  "dependencies": [
+    "R",
+    "testthat"
+  ],
+  "constraints": {},
+  "created_at": "2026-02-23T20:26:51.777643+00:00",
+  "updated_at": null
+}

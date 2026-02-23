@@ -1,0 +1,39 @@
+{
+  "schema_version": "1.0",
+  "task_id": "task-d90a0ee8",
+  "task_type": "test_gen",
+  "difficulty": "easy",
+  "instruction": "A test for `check_content_type` is failing. Diagnose and fix the issue.\n\n\nFailing test:\n```r\n\n```\n\n\nSteps:\n1. Read the function source code to understand expected behavior\n2. Compare the test expectations with actual function behavior\n3. Fix the test if expectations are wrong, or fix the function if it has a bug\n4. Ensure the fix maintains backward compatibility\n5. Run the tests to verify the fix\n",
+  "context": "Package: httr2 v1.2.2.9000\nDescription: Perform HTTP Requests and Process the Responses\nFunction: check_content_type\nParameters: content_type, valid_types, valid_suffix, inform_check_type, call\nTest patterns used: expect_snapshot, test_that\nExpectations used: expect_no_error, expect_snapshot\n\nFunction Code:\n```r\ncheck_content_type <- function(\n  content_type,\n  valid_types = NULL,\n  valid_suffix = NULL,\n  inform_check_type = FALSE,\n  call = caller_env()\n) {\n  parsed <- parse_content_type(content_type)\n  base_type <- paste0(parsed$type, \"/\", parsed$subtype)\n\n  if (is.null(valid_types) || base_type %in% valid_types) {\n    return()\n  }\n  if (!is.null(valid_suffix) && parsed$suffix == valid_suffix) {\n    return()\n  }\n\n  msg <- \"Expecting type {.or {.str {valid_types}}}\"\n  if (!is.null(valid_suffix)) {\n    msg <- paste0(msg, \" or suffix {.str {valid_suffix}}.\")\n  }\n\n  cli::cli_abort(\n    c(\"Unexpected content type {.str {content_type}}.\", \"*\" = msg),\n    i = if (inform_check_type) \"Override check with `check_type = FALSE`.\",\n    call = call\n  )\n}\n```",
+  "hints": [],
+  "source_package": "httr2",
+  "source_file": "R/content-type.R",
+  "tests": {
+    "fail_to_pass": [],
+    "pass_to_pass": [],
+    "test_files": [
+      "R",
+      "testthat"
+    ]
+  },
+  "solution": null,
+  "source": null,
+  "files": {
+    "changed": [
+      "R/content-type.R"
+    ],
+    "source_files": [
+      "R/content-type.R"
+    ],
+    "test_changes": null
+  },
+  "quality_score": 0.606,
+  "split": "train",
+  "dependencies": [
+    "R",
+    "testthat"
+  ],
+  "constraints": {},
+  "created_at": "2026-02-23T20:26:51.775204+00:00",
+  "updated_at": null
+}

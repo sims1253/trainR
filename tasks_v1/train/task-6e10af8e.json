@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.0",
+  "task_id": "task-6e10af8e",
+  "task_type": "test_gen",
+  "difficulty": "hard",
+  "instruction": "Add comprehensive edge case tests for `rescale_mid`.\n\n\nExisting tests for reference:\n```r\n\n```\n\n\nThe existing tests cover basic functionality. Add tests for:\n1. NULL inputs to each argument\n2. Empty vectors/strings: character(0), \"\", integer(0)\n3. Boundary values: 0, 1, -1, NA, NaN, Inf\n4. Invalid input types (passing numeric where character expected, etc.)\n5. Missing arguments (use expect_error with class matching)\n6. Very long inputs (strings > 1000 chars, vectors > 10000 elements)\n",
+  "context": "Package: scales v1.4.0.9000\nDescription: Scale Functions for Visualization\nFunction: rescale_mid\nParameters: x, to, from, mid\nTest patterns used: test_that\nExpectations used: expect_equal\n\nFunction Code:\n```r\nrescale_mid <- function(x, to, from, mid, ...) {\n  UseMethod(\"rescale_mid\")\n}\n```",
+  "hints": [],
+  "source_package": "scales",
+  "source_file": "R/bounds.R",
+  "tests": {
+    "fail_to_pass": [],
+    "pass_to_pass": [],
+    "test_files": [
+      "testthat"
+    ]
+  },
+  "solution": null,
+  "source": null,
+  "files": {
+    "changed": [
+      "R/bounds.R"
+    ],
+    "source_files": [
+      "R/bounds.R"
+    ],
+    "test_changes": null
+  },
+  "quality_score": 0.56,
+  "split": "train",
+  "dependencies": [
+    "testthat"
+  ],
+  "constraints": {},
+  "created_at": "2026-02-23T20:26:51.778135+00:00",
+  "updated_at": null
+}

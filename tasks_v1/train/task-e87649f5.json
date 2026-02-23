@@ -1,0 +1,39 @@
+{
+  "schema_version": "1.0",
+  "task_id": "task-e87649f5",
+  "task_type": "test_gen",
+  "difficulty": "medium",
+  "instruction": "Add proper test fixtures to the tests for `find_active_file` using the withr package.\n\n\n\nRequirements:\n1. Identify tests that modify global state (options, env vars, working directory)\n2. Wrap state modifications with withr::local_* for automatic cleanup:\n   - withr::local_options() for R options\n   - withr::local_envvar() for environment variables\n   - withr::local_tempdir() for temporary directories\n   - withr::local_file() for temporary files\n3. Ensure tests can run in any order without side effects\n4. Use local_* (not with_*) inside test_that() blocks\n",
+  "context": "Package: devtools v2.4.6.9000\nDescription: Tools to Make Developing R Packages Easier\nFunction: find_active_file\nParameters: arg, call\nTest patterns used: expect_snapshot, test_that\nExpectations used: expect_snapshot\n\nFunction Code:\n```r\nfind_active_file <- function(arg = \"file\", call = parent.frame()) {\n  if (!is_rstudio_running()) {\n    cli::cli_abort(\"{.arg {arg}} is absent but must be supplied.\", call = call)\n  }\n  normalizePath(rstudioapi::getSourceEditorContext()$path)\n}\n```",
+  "hints": [],
+  "source_package": "devtools",
+  "source_file": "R/active.R",
+  "tests": {
+    "fail_to_pass": [],
+    "pass_to_pass": [],
+    "test_files": [
+      "R",
+      "testthat"
+    ]
+  },
+  "solution": null,
+  "source": null,
+  "files": {
+    "changed": [
+      "R/active.R"
+    ],
+    "source_files": [
+      "R/active.R"
+    ],
+    "test_changes": null
+  },
+  "quality_score": 0.546,
+  "split": "train",
+  "dependencies": [
+    "R",
+    "testthat"
+  ],
+  "constraints": {},
+  "created_at": "2026-02-23T20:26:51.781008+00:00",
+  "updated_at": null
+}

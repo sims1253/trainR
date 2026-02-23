@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.0",
+  "task_id": "task-e2f3b8e7",
+  "task_type": "test_gen",
+  "difficulty": "hard",
+  "instruction": "Add comprehensive edge case tests for `parse_exe_info_string`.\n\n\nExisting tests for reference:\n```r\n\n```\n\n\nThe existing tests cover basic functionality. Add tests for:\n1. NULL inputs to each argument\n2. Empty vectors/strings: character(0), \"\", integer(0)\n3. Boundary values: 0, 1, -1, NA, NaN, Inf\n4. Invalid input types (passing numeric where character expected, etc.)\n5. Missing arguments (use expect_error with class matching)\n6. Very long inputs (strings > 1000 chars, vectors > 10000 elements)\n",
+  "context": "Package: cmdstanr v0.9.0.9000\nDescription: R Interface to 'CmdStan'\nFunction: parse_exe_info_string\nParameters: ret_stdout\nTest patterns used: test_that\nExpectations used: expect_equal_ignore_order\n\nFunction Code:\n```r\nparse_exe_info_string <- function(ret_stdout) {\n  info <- list()\n  info_raw <- strsplit(strsplit(ret_stdout, \"\\n\")[[1]], \"=\")\n  for (key_val in info_raw) {\n    if (length(key_val) > 1) {\n      key_val <- trimws(key_val)\n      val <- key_val[2]\n      if (!is.na(as.logical(val))) {\n        val <- as.logical(val)\n      }\n      info[[tolower(key_val[1])]] <- val\n    }\n  }\n\n  info[[\"stan_version\"]] <- paste0(\n    info[[\"stan_version_major\"]],\n    \".\",\n    info[[\"stan_version_minor\"]],\n    \".\", info[[\"stan_version_patch\"]]\n  )\n  info[[\"stan_version_major\"]] <- NULL\n  info[[\"stan_version_minor\"]] <- NULL\n  info[[\"stan_version_patch\"]] <- NULL\n\n  info\n}\n```",
+  "hints": [],
+  "source_package": "cmdstanr",
+  "source_file": "R/cpp_opts.R",
+  "tests": {
+    "fail_to_pass": [],
+    "pass_to_pass": [],
+    "test_files": [
+      "testthat"
+    ]
+  },
+  "solution": null,
+  "source": null,
+  "files": {
+    "changed": [
+      "R/cpp_opts.R"
+    ],
+    "source_files": [
+      "R/cpp_opts.R"
+    ],
+    "test_changes": null
+  },
+  "quality_score": 0.56,
+  "split": "held_out",
+  "dependencies": [
+    "testthat"
+  ],
+  "constraints": {},
+  "created_at": "2026-02-23T20:26:51.808500+00:00",
+  "updated_at": null
+}

@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.0",
+  "task_id": "task-78f46711",
+  "task_type": "test_gen",
+  "difficulty": "easy",
+  "instruction": "Add snapshot tests for `shiny::icon` to capture complex output.\n\n\nExisting snapshot tests in this package:\n```r\nexpect_snapshot(\n    actionButton(\"foo\", \"Click me\", icon = icon(\"star\"))\n  )\n```\n```r\nexpect_snapshot(actionLink(\"foo\", \"Click me\", icon = icon(\"star\")))\n```\n\n\nSnapshot testing is appropriate when the function produces:\n- Formatted text output (messages, errors, warnings)\n- Complex data structures that are hard to test with expect_equal\n- Console output with ANSI formatting\n\nRequirements:\n1. Use expect_snapshot() for capturing printed output\n2. Use expect_snapshot(error = TRUE) for error message snapshots\n3. Use expect_snapshot(transform = ...) if output contains volatile data (timestamps, paths)\n4. Test with representative inputs that exercise different output formats\n",
+  "context": "Package: shiny v1.12.1.9000\nDescription: Web Application Framework for R\nFunction: icon\nParameters: name, class, lib\nTest patterns used: expect_snapshot\nExpectations used: expect_snapshot\n\nFunction Code:\n```r\nicon <- function(name, class = NULL, lib = \"font-awesome\", ...) {\n\n  # A NULL name allows for a generic <i> not tied to any library\n  if (is.null(name)) {\n    lib <- \"none\"\n  }\n\n  switch(\n    lib %||% \"\",\n    \"none\" = iconTag(name, class = class, ...),\n    \"font-awesome\" = fontawesome::fa_i(name = name, class = class, ...),\n    \"glyphicon\" = iconTag(\n      name, class = \"glyphicon\", class = paste0(\"glyphicon-\", name),\n      class = class, ...\n    ),\n    stop(\"Unknown icon library: \", lib, \". See `?icon` for supported libraries.\")\n  )\n}\n```",
+  "hints": [],
+  "source_package": "shiny",
+  "source_file": "R/bootstrap.R",
+  "tests": {
+    "fail_to_pass": [],
+    "pass_to_pass": [],
+    "test_files": [
+      "testthat"
+    ]
+  },
+  "solution": null,
+  "source": null,
+  "files": {
+    "changed": [
+      "R/bootstrap.R"
+    ],
+    "source_files": [
+      "R/bootstrap.R"
+    ],
+    "test_changes": null
+  },
+  "quality_score": 0.645,
+  "split": "dev",
+  "dependencies": [
+    "testthat"
+  ],
+  "constraints": {},
+  "created_at": "2026-02-23T20:26:51.786466+00:00",
+  "updated_at": null
+}

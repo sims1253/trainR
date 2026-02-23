@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.0",
+  "task_id": "task-004763e7",
+  "task_type": "test_gen",
+  "difficulty": "medium",
+  "instruction": "Write a complete testthat test file for `withr::with_collate`.\n\nPackage: withr v3.0.2.9001\nDescription: Run Code 'With' Temporarily Modified Global State\nFunction: with_collate\nParameters: new, code\nTest patterns used: test_that\nExpectations used: expect_equal\n\nFunction Code:\n```r\nwith_collate <- function(new, code) {\n  with_locale(c(LC_COLLATE = new), code)\n}\n```\n\nRequirements:\n1. Use test_that() blocks with descriptive names that reference `with_collate`\n2. Test basic functionality using appropriate expectations (expect_equal)\n3. Test edge cases: NULL input, empty strings, missing arguments\n4. Test error conditions with expect_error()\n5. Each test_that() block should test one logical behavior\n",
+  "context": "Package: withr v3.0.2.9001\nDescription: Run Code 'With' Temporarily Modified Global State\nFunction: with_collate\nParameters: new, code\nTest patterns used: test_that\nExpectations used: expect_equal\n\nFunction Code:\n```r\nwith_collate <- function(new, code) {\n  with_locale(c(LC_COLLATE = new), code)\n}\n```",
+  "hints": [],
+  "source_package": "withr",
+  "source_file": "R/collate.R",
+  "tests": {
+    "fail_to_pass": [],
+    "pass_to_pass": [],
+    "test_files": [
+      "testthat"
+    ]
+  },
+  "solution": null,
+  "source": null,
+  "files": {
+    "changed": [
+      "R/collate.R"
+    ],
+    "source_files": [
+      "R/collate.R"
+    ],
+    "test_changes": null
+  },
+  "quality_score": 0.585,
+  "split": "held_out",
+  "dependencies": [
+    "testthat"
+  ],
+  "constraints": {},
+  "created_at": "2026-02-23T20:26:51.809956+00:00",
+  "updated_at": null
+}

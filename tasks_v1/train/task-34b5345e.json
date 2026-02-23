@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.0",
+  "task_id": "task-34b5345e",
+  "task_type": "test_gen",
+  "difficulty": "hard",
+  "instruction": "Add comprehensive edge case tests for `local_collate`.\n\n\nExisting tests for reference:\n```r\n\n```\n\n\nThe existing tests cover basic functionality. Add tests for:\n1. NULL inputs to each argument\n2. Empty vectors/strings: character(0), \"\", integer(0)\n3. Boundary values: 0, 1, -1, NA, NaN, Inf\n4. Invalid input types (passing numeric where character expected, etc.)\n5. Missing arguments (use expect_error with class matching)\n6. Very long inputs (strings > 1000 chars, vectors > 10000 elements)\n",
+  "context": "Package: withr v3.0.2.9001\nDescription: Run Code 'With' Temporarily Modified Global State\nFunction: local_collate\nParameters: new, .local_envir\nTest patterns used: test_that\nExpectations used: expect_equal\n\nFunction Code:\n```r\nlocal_collate <- function(new = list(), .local_envir = parent.frame()) {\n  local_locale(c(LC_COLLATE = new), .local_envir = .local_envir)\n}\n```",
+  "hints": [],
+  "source_package": "withr",
+  "source_file": "R/collate.R",
+  "tests": {
+    "fail_to_pass": [],
+    "pass_to_pass": [],
+    "test_files": [
+      "testthat"
+    ]
+  },
+  "solution": null,
+  "source": null,
+  "files": {
+    "changed": [
+      "R/collate.R"
+    ],
+    "source_files": [
+      "R/collate.R"
+    ],
+    "test_changes": null
+  },
+  "quality_score": 0.56,
+  "split": "train",
+  "dependencies": [
+    "testthat"
+  ],
+  "constraints": {},
+  "created_at": "2026-02-23T20:26:51.769652+00:00",
+  "updated_at": null
+}

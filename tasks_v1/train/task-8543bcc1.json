@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.0",
+  "task_id": "task-8543bcc1",
+  "task_type": "test_gen",
+  "difficulty": "hard",
+  "instruction": "Add comprehensive edge case tests for `arg_match`.\n\n\nExisting tests for reference:\n```r\n\n```\n```r\n\n```\n```r\n\n```\n\n\nThe existing tests cover basic functionality. Add tests for:\n1. NULL inputs to each argument\n2. Empty vectors/strings: character(0), \"\", integer(0)\n3. Boundary values: 0, 1, -1, NA, NaN, Inf\n4. Invalid input types (passing numeric where character expected, etc.)\n5. Missing arguments (use expect_error with class matching)\n6. Very long inputs (strings > 1000 chars, vectors > 10000 elements)\n",
+  "context": "Package: rlang v1.1.7.9000\nDescription: Functions for Base Types and Core R and 'Tidyverse' Features\nFunction: arg_match\nParameters: arg, values, multiple, error_arg, error_call\nTest patterns used: test_that\nExpectations used: expect_equal, expect_snapshot\n\nFunction Code:\n```r\narg_match <- function(\n  arg,\n  values = NULL,\n  ...,\n  multiple = FALSE,\n  error_arg = caller_arg(arg),\n  error_call = caller_env()\n) {\n  check_dots_empty0(...)\n\n  arg_expr <- enexpr(arg)\n  error_arg <- as_string(error_arg)\n\n  check_symbol(arg_expr, arg = \"arg\")\n  check_character(arg, arg = error_arg, call = error_call)\n\n  if (is_null(values)) {\n    fn <- caller_fn()\n    values <- formals(fn)[[error_arg]]\n    values <- eval_bare(values, get_env(fn))\n  }\n\n  if (multiple) {\n    return(arg_match_multi(arg, values, error_arg, error_call))\n  }\n\n  if (!length(arg)) {\n    msg <- sprintf(\n      \"%s must be length 1, not length 0\",\n      format_arg(error_arg)\n    )\n    abort(msg, call = error_call, arg = error_arg)\n  }\n  if (length(arg) > 1 && !setequal(arg, values)) {\n    msg <- arg_match_invalid_msg(arg, values, error_arg)\n    abort(msg, call = error_call, arg = error_arg)\n  }\n\n  arg <- arg[[1]]\n  arg_match0(\n    arg,\n    values,\n    error_arg,\n    error_call = error_call\n  )\n}\n```",
+  "hints": [],
+  "source_package": "rlang",
+  "source_file": "R/arg.R",
+  "tests": {
+    "fail_to_pass": [],
+    "pass_to_pass": [],
+    "test_files": [
+      "testthat"
+    ]
+  },
+  "solution": null,
+  "source": null,
+  "files": {
+    "changed": [
+      "R/arg.R"
+    ],
+    "source_files": [
+      "R/arg.R"
+    ],
+    "test_changes": null
+  },
+  "quality_score": 0.56,
+  "split": "train",
+  "dependencies": [
+    "testthat"
+  ],
+  "constraints": {},
+  "created_at": "2026-02-23T20:26:51.779860+00:00",
+  "updated_at": null
+}

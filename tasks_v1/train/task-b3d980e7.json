@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.0",
+  "task_id": "task-b3d980e7",
+  "task_type": "test_gen",
+  "difficulty": "medium",
+  "instruction": "Add proper test fixtures to the tests for `add_row` using the withr package.\n\n\n\nRequirements:\n1. Identify tests that modify global state (options, env vars, working directory)\n2. Wrap state modifications with withr::local_* for automatic cleanup:\n   - withr::local_options() for R options\n   - withr::local_envvar() for environment variables\n   - withr::local_tempdir() for temporary directories\n   - withr::local_file() for temporary files\n3. Ensure tests can run in any order without side effects\n4. Use local_* (not with_*) inside test_that() blocks\n",
+  "context": "Package: tibble v3.3.1.9004\nDescription: Simple Data Frames\nFunction: add_row\nParameters: .data, .before, .after\nTest patterns used: test_that\nExpectations used: expect_equal, expect_identical, expect_tibble_abort\n\nFunction Code:\n```r\nadd_row <- function(.data, ..., .before = NULL, .after = NULL) {\n  if (inherits(.data, \"grouped_df\")) {\n    abort_add_rows_to_grouped_df()\n  }\n\n  if (!is.data.frame(.data)) {\n    deprecate_stop(\"2.1.1\", \"add_row(.data = 'must be a data frame')\")\n  }\n\n  if (dots_n(...) == 0L) {\n    # A single row of missing values is added if no input is supplied\n    df <- new_tibble(list(), nrow = 1L)\n  } else {\n    df <- tibble(...)\n  }\n\n  extra_vars <- setdiff(names(df), names(.data))\n  if (has_length(extra_vars)) {\n    abort_incompatible_new_rows(extra_vars)\n  }\n\n  pos <- pos_from_before_after(.before, .after, nrow(.data))\n  out <- rbind_at(.data, df, pos)\n\n  vectbl_restore(out, .data)\n}\n```",
+  "hints": [],
+  "source_package": "tibble",
+  "source_file": "R/add.R",
+  "tests": {
+    "fail_to_pass": [],
+    "pass_to_pass": [],
+    "test_files": [
+      "testthat"
+    ]
+  },
+  "solution": null,
+  "source": null,
+  "files": {
+    "changed": [
+      "R/add.R"
+    ],
+    "source_files": [
+      "R/add.R"
+    ],
+    "test_changes": null
+  },
+  "quality_score": 0.51,
+  "split": "train",
+  "dependencies": [
+    "testthat"
+  ],
+  "constraints": {},
+  "created_at": "2026-02-23T20:26:51.759276+00:00",
+  "updated_at": null
+}

@@ -1,0 +1,54 @@
+{
+  "schema_version": "1.0",
+  "task_id": "r-lib_httr2_822",
+  "task_type": "swe",
+  "difficulty": "easy",
+  "instruction": "Fix the bug in the TokenBucket class where take_token() sometimes returns negative wait times. The issue occurs when the token bucket is depleted and subsequent calls to take_token() return negative values instead of the correct positive wait times. The fix involves ensuring the bucket is always refilled before calculating wait time and taking a token.",
+  "context": "The TokenBucket class implements a rate-limiting token bucket algorithm. Key methods:\n\n- `refill()`: Adds tokens based on elapsed time since last refill\n- `token_wait_time()`: Returns time to wait before a token is available (0 if tokens >= 1)\n- `take_token()`: Takes a token and returns wait time (can be 0 if token available)\n\nThe bug manifests when:\n1. Bucket has tokens depleted (tokens < 1)\n2. token_wait_time() is called, which refills and calculates wait\n3. take_token() subtracts 1 from tokens, potentially making it negative\n4. Next call sees negative tokens and returns negative wait time",
+  "hints": [],
+  "source_package": "httr2",
+  "source_file": null,
+  "tests": {
+    "fail_to_pass": [
+      "test_that('never returns negative time', { ... }) - Verifies take_token() always returns non-negative wait times even when tokens are depleted"
+    ],
+    "pass_to_pass": [
+      "test_that('token bucket basic works', { ... })",
+      "test_that('token bucket handles fractions correctly', { ... })"
+    ],
+    "test_files": []
+  },
+  "solution": {
+    "key_changes": [
+      "Move the self$refill() call from token_wait_time() to take_token()",
+      "Ensure refill happens before calculating wait time and decrementing tokens",
+      "Remove the refill() call from the else branch in token_wait_time()"
+    ],
+    "potential_pitfalls": [
+      "Refilling at the wrong time can cause token count to go negative",
+      "The order of operations matters: refill first, then calculate wait, then decrement",
+      "Need to understand that token_wait_time() is also called separately, so refill placement affects both paths"
+    ],
+    "reference_diff": "diff --git a/R/req-throttle.R b/R/req-throttle.R\nindex 78b178da..8d958a92 100644\n--- a/R/req-throttle.R\n+++ b/R/req-throttle.R\n@@ -152,7 +152,6 @@ TokenBucket <- R6::R6Class(\n       if (self$tokens >= 1) {\n         0\n       } else {\n-        self$refill()\n         (1 - self$tokens) / self$fill_rate\n       }\n     },\n@@ -161,6 +160,7 @@ TokenBucket <- R6::R6Class(\n     # Might cause tokens to drop below 0 temporarily so if you don't end up\n     # waiting this long, you need to return the token\n     take_token = function() {\n+      self$refill()\n       wait <- self$token_wait_time()\n       self$tokens <- self$tokens - 1\n       wait"
+  },
+  "source": {
+    "type": "github_pr",
+    "repo": "r-lib/httr2",
+    "pr_number": 822,
+    "pr_url": "https://github.com/r-lib/httr2/pull/822",
+    "merged_at": "2025-12-05T16:49:28+00:00",
+    "issue_number": null,
+    "issue_url": "https://github.com/r-lib/httr2/issues/820"
+  },
+  "files": {
+    "changed": [],
+    "source_files": [],
+    "test_changes": null
+  },
+  "quality_score": 9.0,
+  "split": "mined",
+  "dependencies": [],
+  "constraints": {},
+  "created_at": "2026-02-22T19:04:41.880865+00:00",
+  "updated_at": null
+}

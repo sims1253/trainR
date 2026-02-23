@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.0",
+  "task_id": "task-8c0486c1",
+  "task_type": "test_gen",
+  "difficulty": "medium",
+  "instruction": "Add proper test fixtures to the tests for `watcher` using the withr package.\n\n\n\nRequirements:\n1. Identify tests that modify global state (options, env vars, working directory)\n2. Wrap state modifications with withr::local_* for automatic cleanup:\n   - withr::local_options() for R options\n   - withr::local_envvar() for environment variables\n   - withr::local_tempdir() for temporary directories\n   - withr::local_file() for temporary files\n3. Ensure tests can run in any order without side effects\n4. Use local_* (not with_*) inside test_that() blocks\n",
+  "context": "Package: testthat v3.3.2.9000\nDescription: Unit Testing for R\nFunction: watcher\nParameters: added, deleted, modified\nTest patterns used: test_that\nExpectations used: expect_equal\n\nFunction Code:\n```r\nwatcher <- function(added, deleted, modified) {\n    changed <- normalizePath(c(added, modified))\n\n    tests <- changed[starts_with(changed, test_path)]\n    code <- changed[starts_with(changed, code_path)]\n\n    # Remove helper from test and add it to code (if a helper changed,\n    # like for code, reload all and rerun all tests)\n    helper <- tests[starts_with(basename(tests), \"helper-\")]\n    tests <- setdiff(tests, helper)\n    code <- c(code, helper)\n\n    if (length(code) > 0) {\n      # Reload code and rerun all tests\n      cat(\"Changed code: \", paste0(basename(code), collapse = \", \"), \"\\n\")\n      cat(\"Rerunning all tests\\n\")\n      pkgload::load_all(path, quiet = TRUE)\n      test_dir(\n        test_path,\n        package = package,\n        reporter = reporter$clone(deep = TRUE)\n      )\n    } else if (length(tests) > 0) {\n      # If test changes, rerun just that test\n      cat(\"Rerunning tests: \", paste0(basename(tests), collapse = \", \"), \"\\n\")\n      env <- env_clone(asNamespace(package))\n      test_files(\n        test_dir = test_path,\n        test_package = package,\n        test_paths = tests,\n        env = env,\n        reporter = reporter$clone(deep = TRUE)\n      )\n    }\n\n    TRUE\n  }\n```",
+  "hints": [],
+  "source_package": "testthat",
+  "source_file": "R/auto-test.R",
+  "tests": {
+    "fail_to_pass": [],
+    "pass_to_pass": [],
+    "test_files": [
+      "testthat"
+    ]
+  },
+  "solution": null,
+  "source": null,
+  "files": {
+    "changed": [
+      "R/auto-test.R"
+    ],
+    "source_files": [
+      "R/auto-test.R"
+    ],
+    "test_changes": null
+  },
+  "quality_score": 0.51,
+  "split": "train",
+  "dependencies": [
+    "testthat"
+  ],
+  "constraints": {},
+  "created_at": "2026-02-23T20:26:51.766788+00:00",
+  "updated_at": null
+}

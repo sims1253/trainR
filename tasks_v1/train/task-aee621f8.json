@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.0",
+  "task_id": "task-aee621f8",
+  "task_type": "test_gen",
+  "difficulty": "easy",
+  "instruction": "Add snapshot tests for `readr::cols` to capture complex output.\n\n\nExisting snapshot tests in this package:\n```r\nexpect_snapshot(cols())\n```\n\n\nSnapshot testing is appropriate when the function produces:\n- Formatted text output (messages, errors, warnings)\n- Complex data structures that are hard to test with expect_equal\n- Console output with ANSI formatting\n\nRequirements:\n1. Use expect_snapshot() for capturing printed output\n2. Use expect_snapshot(error = TRUE) for error message snapshots\n3. Use expect_snapshot(transform = ...) if output contains volatile data (timestamps, paths)\n4. Test with representative inputs that exercise different output formats\n",
+  "context": "Package: readr v2.2.0.9000\nDescription: Read Rectangular Text Data\nFunction: cols\nParameters: .default\nTest patterns used: expect_snapshot\nExpectations used: expect_snapshot\n\nFunction Code:\n```r\ncols <- function(..., .default = col_guess()) {\n  if (edition_first()) {\n    col_types <- list(...)\n    is_character <- vapply(col_types, is.character, logical(1))\n    col_types[is_character] <- lapply(col_types[is_character], col_concise)\n\n    if (is.character(.default)) {\n      .default <- col_concise(.default)\n    }\n\n    return(col_spec(col_types, .default))\n  }\n  vroom::cols(..., .default = .default)\n}\n```",
+  "hints": [],
+  "source_package": "readr",
+  "source_file": "R/col_types.R",
+  "tests": {
+    "fail_to_pass": [],
+    "pass_to_pass": [],
+    "test_files": [
+      "testthat"
+    ]
+  },
+  "solution": null,
+  "source": null,
+  "files": {
+    "changed": [
+      "R/col_types.R"
+    ],
+    "source_files": [
+      "R/col_types.R"
+    ],
+    "test_changes": null
+  },
+  "quality_score": 0.615,
+  "split": "train",
+  "dependencies": [
+    "testthat"
+  ],
+  "constraints": {},
+  "created_at": "2026-02-23T20:26:51.773256+00:00",
+  "updated_at": null
+}

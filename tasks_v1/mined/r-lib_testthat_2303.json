@@ -1,0 +1,65 @@
+{
+  "schema_version": "1.0",
+  "task_id": "r-lib_testthat_2303",
+  "task_type": "swe",
+  "difficulty": "medium",
+  "instruction": "Enhance the `local_mocked_s3_method()` and `local_mocked_s4_method()` functions in R/mock-oo.R to support three new capabilities: (1) mock methods that don't already exist, (2) temporarily remove a method by setting `definition = NULL`, and (3) fix `local_mocked_s4_method()` to work when the generic is defined in another package. Currently, both functions error when the method doesn't exist. The fix should properly clean up after the mock scope ends - removing methods that were newly created, or restoring methods that were temporarily replaced.",
+  "context": "Key function signatures:\n- `local_mocked_s3_method(generic, signature, definition, frame = caller_env())`\n- `local_mocked_s4_method(generic, signature, definition, frame = caller_env())`\n\nCurrent behavior errors when method doesn't exist. Need to:\n1. Allow `definition = NULL` by changing `check_function(definition)` to `check_function(definition, allow_null = TRUE)`\n2. For S3: Use `utils::getS3method(..., optional = TRUE)` which returns NULL if method doesn't exist, then register new method and set up cleanup to remove it on scope exit\n3. For S4: Use `methods::getGeneric()` first to get the generic definition, then handle method creation/removal\n4. Create helper `remove_s3_method()` to properly unbind methods from S3 methods table",
+  "hints": [],
+  "source_package": "testthat",
+  "source_file": null,
+  "tests": {
+    "fail_to_pass": [
+      "can mock S3 method that doesn't exist yet",
+      "can temporarily remove S3 method with NULL",
+      "can mock S4 method that doesn't exist yet",
+      "can temporarily remove S4 method with NULL"
+    ],
+    "pass_to_pass": [
+      "can mock S3 methods",
+      "can mock S4 methods",
+      "validates its inputs for S3 methods",
+      "validates its inputs for S4 methods"
+    ],
+    "test_files": []
+  },
+  "solution": {
+    "key_changes": [
+      "Change `check_function(definition)` to `check_function(definition, allow_null = TRUE)` in both functions",
+      "For S3: Handle NULL old method by deferring removal instead of restoration",
+      "For S3: Create `remove_s3_method()` helper to properly unbind from `.__S3MethodsTable__.`",
+      "For S3: When definition is NULL, use pass-through stub `function(...) NextMethod()`",
+      "For S4: Use `methods::getGeneric()` to get generic definition first",
+      "For S4: Create internal `set_method()` function to handle both setting and removing methods",
+      "For S4: Use `methods::removeMethod()` when definition is NULL"
+    ],
+    "potential_pitfalls": [
+      "S3 methods table location differs for group generics (Math, Ops, etc.) vs regular generics",
+      "S4 method removal requires the correct environment (topenv(frame))",
+      "Must use `suppressMessages()` around `methods::setMethod()` to avoid verbose output",
+      "Cleanup must properly distinguish between restoring an old method vs removing a newly created one",
+      "For S4, need to pass the generic definition object, not just the name string"
+    ],
+    "reference_diff": "diff --git a/NEWS.md b/NEWS.md\nindex 2901b040a..90d7ca2cf 100644\n--- a/NEWS.md\n+++ b/NEWS.md\n@@ -1,5 +1,6 @@\n # testthat 3.3.1\n \n+* `local_mocked_s3_method()` and `local_mocked_s4_method()` can now mock methods that don't already exist, and can use `definition = NULL` to temporarily remove a method. `local_mocked_s4_method()` now also works when the generic is defined in another package (#2302).\n * `expect_snapshot()` now reports the original error class for base errors, rather than `rlang_error` (#2286).\n * `expect_success()` and `expect_failure()` are more clear about what the expectation actually did (#2297).\n * The hint to use `snapshot_download_gh()` is now only emitted when running in a job named \"R-CMD-check\" (#2300).\ndiff --git a/R/mock-oo.R b/R/mock-oo.R\nindex 95fbd3929..3bfa1cfd7 100644\n--- a/R/mock-oo.R\n+++ b/R/mock-oo.R\n@@ -1,15 +1,16 @@\n #' Mock S3 and S4 methods\n #'\n #' @description\n-#' These functions allow you to temporarily override S3 and S4 methods that\n-#' already exist. It works by using [registerS3method()]/[setMethod()] to\n-#' temporarily replace the original definition.\n+#' These functions temporarily override S3 or S4 methods. They can mock\n+#' methods that don't already exist, or temporarily remove a method by setting\n+#' `definition = NULL`.\n #'\n #' Learn more about mocking in `vignette(\"mocking\")`.\n #'\n #' @param generic A string giving the name of the generic.\n #' @param signature A character vector giving the signature of the method.\n-#' @param definition A function providing the method definition.\n+#' @param definition A function providing the method definition, or `NULL` to\n+#'   temporarily remove the method.\n #' @param frame Calling frame which determines the scope of the mock.\n #'   Only needed when wrapping in another local helper.\n #' @export\n@@ -29,16 +30,41 @@ local_mocked_s3_method <- function(\n ) {\n   check_string(generic)\n   check_string(signature)\n-  check_function(definition)\n+  check_function(definition, allow_null = TRUE)\n \n   old <- utils::getS3method(generic, signature, optional = TRUE)\n+\n+  # Set the new method, or a pass-through stub if removing\n+  definition <- definition %||% function(...) NextMethod()\n+  registerS3method(generic, signature, definition, envir = frame)\n+\n+  # On cleanup, restore old method or remove the one we added\n   if (is.null(old)) {\n-    cli::cli_abort(\n-      \"Can't find existing S3 method {.code {generic}.{signature}()}.\"\n+    withr::defer(remove_s3_method(generic, signature, envir = frame), frame)\n+  } else {\n+    withr::defer(\n+      registerS3method(generic, signature, old, envir = frame),\n+      frame\n     )\n   }\n-  registerS3method(generic, signature, definition, envir = frame)\n-  withr::defer(registerS3method(generic, signature, old, envir = frame), frame)\n+\n+  invisible()\n+}\n+\n+remove_s3_method <- function(generic, class, envir) {\n+  # Extracted from registerS3method()\n+  group_generics <- c(\"Math\", \"Ops\", \"matrixOps\", \"Summary\", \"Complex\")\n+  if (generic %in% group_generics) {\n+    s3_envir <- .BaseNamespaceEnv\n+  } else {\n+    genfun <- get(generic, envir = envir)\n+    s3_envir <- environment(genfun) %||% .BaseNamespaceEnv\n+  }\n+\n+  if (env_has(s3_envir, \".__S3MethodsTable__.\")) {\n+    table <- env_get(s3_envir, \".__S3MethodsTable__.\")\n+    env_unbind(table, paste0(generic, \".\", class))\n+  }\n }\n \n #' @rdname local_mocked_s3_method\n@@ -51,20 +77,28 @@ local_mocked_s4_method <- function(\n ) {\n   check_string(generic)\n   check_character(signature)\n-  check_function(definition)\n+  check_function(definition, allow_null = TRUE)\n \n-  old <- methods::getMethod(generic, signature, optional = TRUE)\n-  if (is.null(old)) {\n-    name <- paste0(generic, \"(\", paste0(signature, collapse = \",\"), \")\")\n-    cli::cli_abort(\n-      \"Can't find existing S4 method {.code {name}}.\"\n-    )\n+  generic_def <- methods::getGeneric(generic)\n+  if (is.null(generic_def)) {\n+    cli::cli_abort(\"Can't find generic {.fn {generic}}.\")\n   }\n-  methods::setMethod(generic, signature, definition, where = topenv(frame))\n-  withr::defer(\n-    methods::setMethod(generic, signature, old, where = topenv(frame)),\n-    frame\n-  )\n+\n+  set_method <- function(generic, signature, def) {\n+    env <- topenv(frame)\n+    old <- methods::getMethod(generic, signature, optional = TRUE)\n+    if (is.null(def)) {\n+      methods::removeMethod(generic, signature, env)\n+    } else {\n+      suppressMessages(methods::setMethod(generic, signature, def, env))\n+    }\n+    old\n+  }\n+\n+  old <- set_method(generic_def, signature, definition)\n+  withr::defer(set_method(generic_def, signature, old), frame)\n+\n+  invisible()\n }\n \n \ndiff --git a/man/local_mocked_s3_method.Rd b/man/local_mocked_s3_method.Rd\nindex c309fa3b4..55143b8a6 100644\n--- a/man/local_mocked_s3_method.Rd\n+++ b/man/local_mocked_s3_method.Rd\n@@ -14,15 +14,16 @@ local_mocked_s4_method(generic, signature, definition, frame = caller_env())\n \n \\item{signature}{A character vector giving the signature of the method.}\n \n-\\item{definition}{A function providing the method definition.}\n+\\item{definition}{A function providing the method definition, or \\code{NULL} to\n+temporarily remove the method.}\n \n \\item{frame}{Calling frame which determines the scope of the mock.\n Only needed when wrapping in another local helper.}\n }\n \\description{\n-These functions allow you to temporarily override S3 and S4 methods that\n-already exist. It works by using \\code{\\link[=registerS3method]{registerS3method()}}/\\code{\\link[=setMethod]{setMethod()}} to\n-temporarily replace the original definition.\n+These functions temporarily override S3 or S4 methods. They can mock\n+methods that don't already exist, or temporarily remove a method by setting\n+\\code{definition = NULL}.\n \n Learn more about mocking in \\code{vignette(\"mocking\")}.\n }"
+  },
+  "source": {
+    "type": "github_pr",
+    "repo": "r-lib/testthat",
+    "pr_number": 2303,
+    "pr_url": "https://github.com/r-lib/testthat/pull/2303",
+    "merged_at": "2026-01-07T19:56:53+00:00",
+    "issue_number": null,
+    "issue_url": "https://github.com/r-lib/testthat/issues/2302"
+  },
+  "files": {
+    "changed": [],
+    "source_files": [],
+    "test_changes": null
+  },
+  "quality_score": 8.0,
+  "split": "mined",
+  "dependencies": [],
+  "constraints": {},
+  "created_at": "2026-02-22T18:52:24.968735+00:00",
+  "updated_at": null
+}

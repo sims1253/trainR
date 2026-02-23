@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.0",
+  "task_id": "task-955bcbe5",
+  "task_type": "test_gen",
+  "difficulty": "hard",
+  "instruction": "Add comprehensive edge case tests for `as_base64`.\n\n\nExisting tests for reference:\n```r\n\n```\n```r\n\n```\n```r\n\n```\n\n\nThe existing tests cover basic functionality. Add tests for:\n1. NULL inputs to each argument\n2. Empty vectors/strings: character(0), \"\", integer(0)\n3. Boundary values: 0, 1, -1, NA, NaN, Inf\n4. Invalid input types (passing numeric where character expected, etc.)\n5. Missing arguments (use expect_error with class matching)\n6. Very long inputs (strings > 1000 chars, vectors > 10000 elements)\n",
+  "context": "Package: officer v0.7.3\nDescription: Manipulation of Microsoft Word and PowerPoint Documents\nFunction: as_base64\nParameters: x\nTest patterns used: test_that\nExpectations used: expect_equal, expect_error, expect_false, expect_length, expect_true\n\nFunction Code:\n```r\nas_base64 <- function(x) {\n  if (!is.character(x)) {\n    stop(\"'x' must be a character vector.\")\n  }\n  z <- vapply(\n    x,\n    function(elem) {\n      if (is.na(elem)) {\n        NA_character_\n      } else {\n        base64_encode(charToRaw(elem))\n      }\n    },\n    NA_character_\n  )\n  unname(z)\n}\n```",
+  "hints": [],
+  "source_package": "officer",
+  "source_file": "R/dev-utils.R",
+  "tests": {
+    "fail_to_pass": [],
+    "pass_to_pass": [],
+    "test_files": [
+      "testthat"
+    ]
+  },
+  "solution": null,
+  "source": null,
+  "files": {
+    "changed": [
+      "R/dev-utils.R"
+    ],
+    "source_files": [
+      "R/dev-utils.R"
+    ],
+    "test_changes": null
+  },
+  "quality_score": 0.56,
+  "split": "train",
+  "dependencies": [
+    "testthat"
+  ],
+  "constraints": {},
+  "created_at": "2026-02-23T20:26:51.777076+00:00",
+  "updated_at": null
+}

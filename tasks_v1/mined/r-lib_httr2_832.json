@@ -1,0 +1,56 @@
+{
+  "schema_version": "1.0",
+  "task_id": "r-lib_httr2_832",
+  "task_type": "swe",
+  "difficulty": "easy",
+  "instruction": "Fix `last_response_()` to work with content types that end with `+`, such as `application/problem+`. Currently, the function errors with 'Last response doesn't have a JSON body' when the content type is `application/problem+`, but `resp_body_()` handles this correctly. The fix should allow any content type with a `+` suffix to be recognized as valid JSON.",
+  "context": "The `last_response_()` function in R/last.R currently checks content type with:\nr\nif (!identical(resp_content_type(resp), \"application/\")) {\n  cli::cli_abort(\"Last response doesn't have a JSON body.\")\n}\n\n\nThe package has a `check_content_type()` function that supports both exact type matching and suffix matching via `valid_types` and `valid_suffix` parameters. This function is used by `resp_body_()` which is why it works correctly.",
+  "hints": [],
+  "source_package": "httr2",
+  "source_file": null,
+  "tests": {
+    "fail_to_pass": [
+      "last_response_() should successfully parse response body when content type is 'application/problem+'",
+      "Error message for non-JSON content types should indicate expected type or suffix"
+    ],
+    "pass_to_pass": [
+      "last_response_() should continue to work with 'application/' content type",
+      "last_response_() should still error appropriately for non-JSON content types like 'application/xml'"
+    ],
+    "test_files": []
+  },
+  "solution": {
+    "key_changes": [
+      "Replace the simple identical() check with check_content_type() function call",
+      "Use valid_types = \"application/\" for exact matching",
+      "Use valid_suffix = \"\" to allow + suffixes like application/problem+",
+      "Set inform_check_type = TRUE for better error messages"
+    ],
+    "potential_pitfalls": [
+      "Not discovering the existing check_content_type() function and reimplementing suffix matching logic",
+      "Breaking existing error messages for non-JSON content types",
+      "Forgetting to handle the case where content type is NULL or missing"
+    ],
+    "reference_diff": "diff --git a/NEWS.md b/NEWS.md\nindex e2e85e4c..db15ae62 100644\n--- a/NEWS.md\n+++ b/NEWS.md\n@@ -1,5 +1,8 @@\n # httr2 (development version)\n \n+* `last_response_json()` now works with content-types that end with `+json`, \n+e.g., `application/problem+json` (@cgiachalis, #782).\n+\n # httr2 1.2.2\n \n * httr2 will now emit OpenTelemetry traces for all requests when tracing is enabled. Requires the `otelsdk` package (@atheriel, #729).\ndiff --git a/R/last.R b/R/last.R\nindex 625d5d01..c57beb14 100644\n--- a/R/last.R\n+++ b/R/last.R\n@@ -61,9 +61,12 @@ last_response_json <- function(pretty = TRUE) {\n   if (is.null(resp)) {\n     cli::cli_abort(\"No request has been made successfully yet.\")\n   }\n-  if (!identical(resp_content_type(resp), \"application/json\")) {\n-    cli::cli_abort(\"Last response doesn't have a JSON body.\")\n-  }\n+  check_content_type(\n+    resp_content_type(resp),\n+    valid_types = \"application/json\",\n+    valid_suffix = \"json\",\n+    inform_check_type = TRUE\n+  )\n   httr2_json(resp_body_string(resp), pretty = pretty)\n }\n "
+  },
+  "source": {
+    "type": "github_pr",
+    "repo": "r-lib/httr2",
+    "pr_number": 832,
+    "pr_url": "https://github.com/r-lib/httr2/pull/832",
+    "merged_at": "2026-01-14T19:10:15+00:00",
+    "issue_number": null,
+    "issue_url": "https://github.com/r-lib/httr2/issues/782"
+  },
+  "files": {
+    "changed": [],
+    "source_files": [],
+    "test_changes": null
+  },
+  "quality_score": 8.0,
+  "split": "mined",
+  "dependencies": [],
+  "constraints": {},
+  "created_at": "2026-02-22T19:04:13.066805+00:00",
+  "updated_at": null
+}

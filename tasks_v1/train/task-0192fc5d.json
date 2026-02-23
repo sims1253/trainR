@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.0",
+  "task_id": "task-0192fc5d",
+  "task_type": "test_gen",
+  "difficulty": "medium",
+  "instruction": "Write a complete testthat test file for `posterior::as_draws`.\n\nPackage: posterior v1.6.1.9000\nDescription: Tools for Working with Posterior Distributions\nFunction: as_draws\nParameters: x\nTest patterns used: test_that\nExpectations used: expect_error\n\nFunction Code:\n```r\nas_draws <- function(x, ...) {\n  UseMethod(\"as_draws\")\n}\n```\n\nRequirements:\n1. Use test_that() blocks with descriptive names that reference `as_draws`\n2. Test basic functionality using appropriate expectations (expect_error)\n3. Test edge cases: NULL input, empty strings, missing arguments\n4. Test error conditions with expect_error()\n5. Each test_that() block should test one logical behavior\n",
+  "context": "Package: posterior v1.6.1.9000\nDescription: Tools for Working with Posterior Distributions\nFunction: as_draws\nParameters: x\nTest patterns used: test_that\nExpectations used: expect_error\n\nFunction Code:\n```r\nas_draws <- function(x, ...) {\n  UseMethod(\"as_draws\")\n}\n```",
+  "hints": [],
+  "source_package": "posterior",
+  "source_file": "R/as_draws.R",
+  "tests": {
+    "fail_to_pass": [],
+    "pass_to_pass": [],
+    "test_files": [
+      "testthat"
+    ]
+  },
+  "solution": null,
+  "source": null,
+  "files": {
+    "changed": [
+      "R/as_draws.R"
+    ],
+    "source_files": [
+      "R/as_draws.R"
+    ],
+    "test_changes": null
+  },
+  "quality_score": 0.585,
+  "split": "train",
+  "dependencies": [
+    "testthat"
+  ],
+  "constraints": {},
+  "created_at": "2026-02-23T20:26:51.762319+00:00",
+  "updated_at": null
+}

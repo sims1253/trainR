@@ -1,0 +1,39 @@
+{
+  "schema_version": "1.0",
+  "task_id": "task-67cf28d7",
+  "task_type": "test_gen",
+  "difficulty": "medium",
+  "instruction": "Refactor the existing tests for `glue_col` to follow better testing practices.\n\n\nCurrent test patterns to refactor:\n- test_that at tests/testthat/test-color.R:1\n- test_that at tests/testthat/test-color.R:7\n- test_that at tests/testthat/test-color.R:14\n- test_that at tests/testthat/test-color.R:25\n- test_that at tests/testthat/test-color.R:34\n\n\nGoals:\n1. Use describe()/it() blocks for better organization where appropriate\n2. Reduce code duplication with helper functions or local fixtures\n3. Improve test descriptions to be specific about what behavior is verified\n4. Extract common setup into withr::local_* fixtures\n5. Each test should have a single responsibility\n",
+  "context": "Package: glue v1.8.0.9000\nDescription: Interpreted String Literals\nFunction: glue_col\nParameters: .envir, .na, .literal\nTest patterns used: expect_snapshot, test_that\nExpectations used: expect_identical, expect_snapshot\n\nFunction Code:\n```r\nglue_col <- function(..., .envir = parent.frame(), .na = \"NA\", .literal = FALSE) {\n  glue(..., .envir = .envir, .na = .na, .literal = .literal, .transformer = color_transformer)\n}\n```",
+  "hints": [],
+  "source_package": "glue",
+  "source_file": "R/color.R",
+  "tests": {
+    "fail_to_pass": [],
+    "pass_to_pass": [],
+    "test_files": [
+      "R",
+      "testthat"
+    ]
+  },
+  "solution": null,
+  "source": null,
+  "files": {
+    "changed": [
+      "R/color.R"
+    ],
+    "source_files": [
+      "R/color.R"
+    ],
+    "test_changes": null
+  },
+  "quality_score": 0.541,
+  "split": "train",
+  "dependencies": [
+    "R",
+    "testthat"
+  ],
+  "constraints": {},
+  "created_at": "2026-02-23T20:26:51.770120+00:00",
+  "updated_at": null
+}

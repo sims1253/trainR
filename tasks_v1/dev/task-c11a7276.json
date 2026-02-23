@@ -1,0 +1,39 @@
+{
+  "schema_version": "1.0",
+  "task_id": "task-c11a7276",
+  "task_type": "test_gen",
+  "difficulty": "hard",
+  "instruction": "Add mocking to isolate `is_windows` from its external dependencies.\n\n\nExisting mocking patterns in this package:\n```r\nlocal_mocked_bindings(\n    num_ansi_colors = function() 256L,\n    isatty = function(...) TRUE,\n    is_windows = function() TRUE\n  )\n```\n```r\nlocal_mocked_bindings(is_windows = function() TRUE)\n```\n\n\nRequirements:\n1. Identify external dependencies in the function (system calls, file I/O, other packages)\n2. Use testthat::local_mocked_bindings() to mock each dependency\n3. Test both success and failure scenarios via mock return values\n4. Verify the function handles mock errors gracefully\n5. Ensure tests are deterministic (no network calls, no file system side effects)\n",
+  "context": "Package: cli v3.6.5.9000\nDescription: Helpers for Developing Command Line Interfaces\nFunction: is_windows\nTest patterns used: local_mocked_bindings\n\nFunction Code:\n```r\nis_windows <- function() {\n  .Platform$OS.type == \"windows\"\n}\n```",
+  "hints": [],
+  "source_package": "cli",
+  "source_file": "R/aaa-utils.R",
+  "tests": {
+    "fail_to_pass": [],
+    "pass_to_pass": [],
+    "test_files": [
+      "R",
+      "testthat"
+    ]
+  },
+  "solution": null,
+  "source": null,
+  "files": {
+    "changed": [
+      "R/aaa-utils.R"
+    ],
+    "source_files": [
+      "R/aaa-utils.R"
+    ],
+    "test_changes": null
+  },
+  "quality_score": 0.59,
+  "split": "dev",
+  "dependencies": [
+    "R",
+    "testthat"
+  ],
+  "constraints": {},
+  "created_at": "2026-02-23T20:26:51.783207+00:00",
+  "updated_at": null
+}

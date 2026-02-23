@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.0",
+  "task_id": "task-426a4ce4",
+  "task_type": "test_gen",
+  "difficulty": "medium",
+  "instruction": "Add proper test fixtures to the tests for `renv_acls_reset` using the withr package.\n\n\n\nRequirements:\n1. Identify tests that modify global state (options, env vars, working directory)\n2. Wrap state modifications with withr::local_* for automatic cleanup:\n   - withr::local_options() for R options\n   - withr::local_envvar() for environment variables\n   - withr::local_tempdir() for temporary directories\n   - withr::local_file() for temporary files\n3. Ensure tests can run in any order without side effects\n4. Use local_* (not with_*) inside test_that() blocks\n",
+  "context": "Package: renv v1.1.7.9000\nDescription: Project Environments\nFunction: renv_acls_reset\nParameters: source, target\nTest patterns used: test_that\nExpectations used: expect_equal\n\nFunction Code:\n```r\nrenv_acls_reset <- function(source, target = dirname(source)) {\n\n  # only run on Linux for now\n  if (!renv_platform_linux())\n    return(FALSE)\n\n  # skip if we don't have 'getfacl', 'setfacl'\n  getfacl <- Sys.which(\"getfacl\"); setfacl <- Sys.which(\"setfacl\")\n  if (!nzchar(getfacl) || !nzchar(setfacl))\n    return(FALSE)\n\n  # build command\n  fmt <- \"getfacl %s 2> /dev/null | setfacl -R --set-file=- %s 2> /dev/null\"\n  cmd <- sprintf(fmt, renv_shell_path(target), renv_shell_path(source))\n\n  # execute it\n  # TODO: Should we report errors? If so, how?\n  catch(\n    renv_system_exec(\n      command = cmd,\n      action = \"resetting ACLs\",\n      quiet = TRUE\n    )\n  )\n\n}\n```",
+  "hints": [],
+  "source_package": "renv",
+  "source_file": "R/acls.R",
+  "tests": {
+    "fail_to_pass": [],
+    "pass_to_pass": [],
+    "test_files": [
+      "testthat"
+    ]
+  },
+  "solution": null,
+  "source": null,
+  "files": {
+    "changed": [
+      "R/acls.R"
+    ],
+    "source_files": [
+      "R/acls.R"
+    ],
+    "test_changes": null
+  },
+  "quality_score": 0.535,
+  "split": "train",
+  "dependencies": [
+    "testthat"
+  ],
+  "constraints": {},
+  "created_at": "2026-02-23T20:26:51.767918+00:00",
+  "updated_at": null
+}

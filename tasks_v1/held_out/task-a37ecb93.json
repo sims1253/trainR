@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.0",
+  "task_id": "task-a37ecb93",
+  "task_type": "test_gen",
+  "difficulty": "easy",
+  "instruction": "A test for `to_words` is failing. Diagnose and fix the issue.\n\n\nFailing test:\n```r\n\n```\n\n\nSteps:\n1. Read the function source code to understand expected behavior\n2. Compare the test expectations with actual function behavior\n3. Fix the test if expectations are wrong, or fix the function if it has a bug\n4. Ensure the fix maintains backward compatibility\n5. Run the tests to verify the fix\n",
+  "context": "Package: stringr v1.6.0.9000\nDescription: Simple, Consistent Wrappers for Common String Operations\nFunction: to_words\nParameters: string\nTest patterns used: test_that\nExpectations used: expect_equal\n\nFunction Code:\n```r\nto_words <- function(string) {\n  breakpoints <- paste(\n    # non-word characters\n    \"[^\\\\p{L}\\\\p{N}]+\",\n    # lowercase followed by uppercase\n    \"(?<=\\\\p{Ll})(?=\\\\p{Lu})\",\n    # letter followed by number\n    \"(?<=\\\\p{L})(?=\\\\p{N})\",\n    # number followed by letter\n    \"(?<=\\\\p{N})(?=\\\\p{L})\",\n    # uppercase followed uppercase then lowercase (i.e. end of acronym)\n    \"(?<=\\\\p{Lu})(?=\\\\p{Lu}\\\\p{Ll})\",\n    sep = \"|\"\n  )\n  out <- str_replace_all(string, breakpoints, \" \")\n  out <- str_to_lower(out)\n  str_trim(out)\n}\n```",
+  "hints": [],
+  "source_package": "stringr",
+  "source_file": "R/case.R",
+  "tests": {
+    "fail_to_pass": [],
+    "pass_to_pass": [],
+    "test_files": [
+      "testthat"
+    ]
+  },
+  "solution": null,
+  "source": null,
+  "files": {
+    "changed": [
+      "R/case.R"
+    ],
+    "source_files": [
+      "R/case.R"
+    ],
+    "test_changes": null
+  },
+  "quality_score": 0.51,
+  "split": "held_out",
+  "dependencies": [
+    "testthat"
+  ],
+  "constraints": {},
+  "created_at": "2026-02-23T20:26:51.809053+00:00",
+  "updated_at": null
+}

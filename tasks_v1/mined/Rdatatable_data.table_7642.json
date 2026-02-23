@@ -1,0 +1,57 @@
+{
+  "schema_version": "1.0",
+  "task_id": "Rdatatable_data.table_7642",
+  "task_type": "swe",
+  "difficulty": "medium",
+  "instruction": "Fix the non-equi join error that occurs when combining an equality condition with two inequality conditions on the same column (e.g., `on = .(id == id, val >= lo, val <= hi)`). The bug is in the `[.data.table` function where `rightcols` gets overwritten by `chmatchdup` when there are duplicate column references. The fix should introduce a separate variable `ansrightcols` for the remapped indices while keeping `rightcols` as the original column indices into `x`.",
+  "context": "The bug occurs in R/data.table.R around line 1075-1085 in the join logic. When `rightcols` has duplicates (same `x` column used in multiple conditions like `val >= lo` and `val <= hi`), `chmatchdup` remaps them into the expanded result namespace `nx`. This overwrites `rightcols`, causing downstream code like `.shallow(x, rightcols)` to reference columns beyond `ncol(x)`. The fix requires: (1) creating `ansrightcols` for remapped indices, (2) keeping `rightcols` as original indices, (3) using `ansrightcols` only for `icolsAns`, and (4) handling the else case where there are no duplicates.",
+  "hints": [],
+  "source_package": "data.table",
+  "source_file": null,
+  "tests": {
+    "fail_to_pass": [
+      "Non-equi join with equi + 2 inequality conditions: `x[i, on = .(id == id, val >= lo, val <= hi)]` should return 2 rows without error",
+      "The join should correctly match rows where val is between lo and hi for matching ids"
+    ],
+    "pass_to_pass": [
+      "Non-equi join with 2 inequality conditions only (no equi part) should continue to work",
+      "Non-equi join with equi + 1 inequality condition should continue to work",
+      "Standard equi joins should continue to work"
+    ],
+    "test_files": []
+  },
+  "solution": {
+    "key_changes": [
+      "Replace `rightcols = chmatchdup(...)` with `ansrightcols = chmatchdup(...)`",
+      "Initialize `ansrightcols = rightcols` in the else branch when there are no duplicates",
+      "Use `ansrightcols` only for `icolsAns` assignment",
+      "Keep `rightcols` unchanged for downstream uses that need original x-relative indices"
+    ],
+    "potential_pitfalls": [
+      "Forgetting to set `ansrightcols = rightcols` in the else branch when there are no duplicate rightcols",
+      "Using `ansrightcols` in places that still need the original column indices",
+      "Not understanding the distinction between result namespace indices vs original x column indices"
+    ],
+    "reference_diff": "diff --git a/DESCRIPTION b/DESCRIPTION\nindex 3860e0c48..5998b3279 100644\n--- a/DESCRIPTION\n+++ b/DESCRIPTION\n@@ -107,5 +107,6 @@ Authors@R: c(\n   person(\"Vinit\", \"Thakur\",        role=\"ctb\"),\n   person(\"Mukul\", \"Kumar\",         role=\"ctb\"),\n   person(\"Ildik\u00f3\", \"Czeller\",      role=\"ctb\"),\n-  person(\"Manmita\", \"Das\",         role=\"ctb\")\n+  person(\"Manmita\", \"Das\",         role=\"ctb\"),\n+  person(\"Tarun\", \"Thammisetty\",   role=\"ctb\")\n   )\ndiff --git a/NEWS.md b/NEWS.md\nindex fd0ee8bf1..7cf63f0b7 100644\n--- a/NEWS.md\n+++ b/NEWS.md\n@@ -38,6 +38,8 @@\n \n 4. `rowwiseDT()` now provides a helpful error message when a complex object that is not a list (e.g., a function) is provided as a cell value, instructing the user to wrap it in `list()`, [#7219](https://github.com/Rdatatable/data.table/issues/7219). Thanks @kylebutts for the report and @venom1204 for the fix.\n \n+5. Non-equi joins combining an equality condition with two inequality conditions on the same column (e.g., `on = .(id == id, val >= lo, val <= hi)`) no longer error, [#7641](https://github.com/Rdatatable/data.table/issues/7641). The internal `chmatchdup` remapping of duplicate `rightcols` was overwriting the original column indices, causing downstream code to reference non-existent columns. Thanks @tarun-t for the report and fix, and @aitap for the diagnosis.\n+\n ### Notes\n \n 1. {data.table} now depends on R 3.5.0 (2018).\ndiff --git a/R/data.table.R b/R/data.table.R\nindex 85d623d39..a989538b1 100644\n--- a/R/data.table.R\n+++ b/R/data.table.R\n@@ -1075,12 +1075,15 @@ replace_dot_alias = function(e) {\n       if (length(tt)) jisvars[tt] = paste0(\"i.\",jisvars[tt])\n       if (length(duprightcols <- rightcols[duplicated(rightcols)])) {\n         nx = c(names_x, names_x[duprightcols])\n-        rightcols = chmatchdup(names_x[rightcols], nx)\n+        ansrightcols = chmatchdup(names_x[rightcols], nx) # indices into result namespace nx, #7641\n         nx = make.unique(nx)\n-      } else nx = names_x\n+      } else {\n+        nx = names_x\n+        ansrightcols = rightcols\n+      }\n       ansvars = make.unique(c(nx, jisvars))\n       icols = c(leftcols, seq_along(i)[-leftcols])\n-      icolsAns = c(rightcols, seq.int(length(nx)+1L, length.out=ncol(i)-length(unique(leftcols))))\n+      icolsAns = c(ansrightcols, seq.int(length(nx)+1L, length.out=ncol(i)-length(unique(leftcols))))\n       xcols = xcolsAns = seq_along(x)[-rightcols]\n     }\n     ansvals = chmatch(ansvars, nx)"
+  },
+  "source": {
+    "type": "github_pr",
+    "repo": "Rdatatable/data.table",
+    "pr_number": 7642,
+    "pr_url": "https://github.com/Rdatatable/data.table/pull/7642",
+    "merged_at": "2026-02-18T16:10:33+00:00",
+    "issue_number": null,
+    "issue_url": "https://github.com/Rdatatable/data.table/issues/7641"
+  },
+  "files": {
+    "changed": [],
+    "source_files": [],
+    "test_changes": null
+  },
+  "quality_score": 8.0,
+  "split": "mined",
+  "dependencies": [],
+  "constraints": {},
+  "created_at": "2026-02-22T18:36:12.564311+00:00",
+  "updated_at": null
+}

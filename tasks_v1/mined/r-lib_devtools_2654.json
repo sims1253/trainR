@@ -1,0 +1,67 @@
+{
+  "schema_version": "1.0",
+  "task_id": "r-lib_devtools_2654",
+  "task_type": "swe",
+  "difficulty": "medium",
+  "instruction": "Add a new `report` argument to `test_coverage()` and `test_coverage_active_file()` functions that controls how coverage reports are displayed. The argument should accept three values: \"html\" (opens interactive browser report), \"zero\" (prints uncovered lines to console), and \"silent\" (returns coverage object without display). The default should be \"html\" in interactive sessions and \"zero\" in non-interactive or LLM contexts. Replace the existing `show_report` boolean argument with this new parameter.",
+  "context": "Functions to modify:\n- test_coverage(pkg = \".\", ...)\n- test_coverage_active_file(file = find_active_file(), filter = TRUE, ...)\n\nKey dependencies:\n- covr package for coverage computation (covr::package_coverage, covr::zero_coverage, covr::report, covr::file_report)\n- cli package for formatted output\n- rlang for arg_match and check_installed\n\nThe show_report function should:\n1. Check if DT is installed for html reports\n2. Use covr::file_report for single files, covr::report for multiple\n3. For \"zero\" mode, iterate over files and print uncovered lines grouped by function\n\nHelper functions needed:\n- report_default(report, call): determine default report type based on interactivity and LLM detection\n- is_llm(): detect if running in LLM context (check AGENT, CLAUDECODE, GEMINI_CLI, CURSOR_AGENT env vars)\n- collapse_lines(x): convert line numbers to compact ranges (e.g., c(1,2,3,5,7,8) -> c(\"1-3\", \"5\", \"7-8\"))",
+  "hints": [],
+  "source_package": "devtools",
+  "source_file": null,
+  "tests": {
+    "fail_to_pass": [
+      "test_coverage_active_file() computes coverage and reports uncovered lines with report = \"zero\"",
+      "test_coverage_active_file() reports 'All lines covered!' when coverage is complete",
+      "report_default() returns \"zero\" when not interactive",
+      "report_default() returns \"html\" when interactive (if not LLM context)",
+      "report_default() returns \"zero\" when LLM environment variables are set",
+      "report_default() validates input and errors on invalid values"
+    ],
+    "pass_to_pass": [
+      "test_coverage() returns coverage object invisibly",
+      "test_coverage_active_file() returns coverage object invisibly",
+      "Existing test functionality remains unchanged"
+    ],
+    "test_files": []
+  },
+  "solution": {
+    "key_changes": [
+      "Replace show_report boolean parameter with report character parameter",
+      "Implement report_default() to determine default based on is_interactive() and is_llm()",
+      "Implement is_llm() to detect LLM agent environments via environment variables",
+      "Implement show_report() to handle html, zero, and silent report modes",
+      "Implement collapse_lines() to format line number ranges compactly",
+      "Update documentation for the new report parameter",
+      "Remove DT dependency check from main functions (move to show_report for html mode only)"
+    ],
+    "potential_pitfalls": [
+      "Forgetting to handle the case when all lines are covered (should print 'All lines covered!')",
+      "Not properly handling the relative path display for uncovered files",
+      "Missing the rlang::arg_match validation for invalid report values",
+      "Not grouping uncovered lines by function when displaying",
+      "Incorrectly collapsing consecutive line numbers into ranges",
+      "Forgetting to check DT installation only when html report is requested"
+    ],
+    "reference_diff": "diff --git a/NEWS.md b/NEWS.md\nindex 86767d119..a8e4f5d73 100644\n--- a/NEWS.md\n+++ b/NEWS.md\n@@ -12,6 +12,7 @@\n * `load_all()` now errors if called recursively, i.e. if you accidentally include a `load_all()` call in one of your R source files (#2617).\n * `release()` is deprecated in favour of `usethis::use_release_issue()`.\n * `show_news()` now looks for NEWS files in the same locations as `utils::news()`: `inst/NEWS.Rd`, `NEWS.md`, `NEWS`, and `inst/NEWS` (@arcresu, #2499).\n+* `test_coverage()` and `test_coverage_active_file()` gain a new `report` argument that can be set to `\"html\"` (the default, for an interactive browser report), `\"zero\"` (prints uncovered lines to the console, used for LLMs and non-interactive contexts), or `\"silent\"`. The `show_report` argument has been removed (#2632).\n * `test_file()` and `test_coverage_file()` are now defunct. These were deprecated in devtools 2.4.0 (2021-04-07) in favour of `test_active_file()` and `test_coverage_active_file()`. Removing `test_file()` eliminates the conflict with `testthat::test_file()`.\n \n # devtools 2.4.6\ndiff --git a/R/utils.R b/R/utils.R\nindex ddc90ffd7..6e68356f4 100644\n--- a/R/utils.R\n+++ b/R/utils.R\n@@ -49,6 +49,14 @@ is_rstudio_running <- function() {\n   !is_testing() && rstudioapi::isAvailable()\n }\n \n+# Copied from testthat:::is_llm()\n+is_llm <- function() {\n+  nzchar(Sys.getenv(\"AGENT\")) ||\n+    nzchar(Sys.getenv(\"CLAUDECODE\")) ||\n+    nzchar(Sys.getenv(\"GEMINI_CLI\")) ||\n+    nzchar(Sys.getenv(\"CURSOR_AGENT\"))\n+}\n+\n # Suppress cli wrapping\n no_wrap <- function(x) {\n   x <- gsub(\"{\", \"{{\", x, fixed = TRUE)"
+  },
+  "source": {
+    "type": "github_pr",
+    "repo": "r-lib/devtools",
+    "pr_number": 2654,
+    "pr_url": "https://github.com/r-lib/devtools/pull/2654",
+    "merged_at": "2026-02-10T23:06:15+00:00",
+    "issue_number": null,
+    "issue_url": "https://github.com/r-lib/devtools/issues/2632"
+  },
+  "files": {
+    "changed": [],
+    "source_files": [],
+    "test_changes": null
+  },
+  "quality_score": 7.0,
+  "split": "mined",
+  "dependencies": [],
+  "constraints": {},
+  "created_at": "2026-02-22T19:10:57.809596+00:00",
+  "updated_at": null
+}

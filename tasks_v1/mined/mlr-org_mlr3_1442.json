@@ -1,0 +1,56 @@
+{
+  "schema_version": "1.0",
+  "task_id": "mlr-org_mlr3_1442",
+  "task_type": "swe",
+  "difficulty": "easy",
+  "instruction": "Implement input validation in the mlr3 package to prevent creation of supervised tasks (classification and regression) when the target column contains NA values. Add checks in both `as_task_classif.data.frame()` and `as_task_regr.data.frame()` functions that detect missing values in the target column and throw an informative error message.",
+  "context": "The functions `as_task_classif.data.frame` and `as_task_regr.data.frame` are located in R/as_task_classif.R and R/as_task_regr.R respectively. The codebase already has similar validation patterns using `anyMissing()` for checking missing values and `error_input()` for throwing formatted error messages. There's also existing validation for Inf values using `warning_input()` that can serve as a pattern.",
+  "hints": [],
+  "source_package": "mlr3",
+  "source_file": null,
+  "tests": {
+    "fail_to_pass": [
+      "test_that(\"TaskClassif rejects NAs in target\", { dt = data.table::data.table(x = 1:10, y = factor(c(NA, letters[1:9]))); expect_error(as_task_classif(dt, target = \"y\"), \"contain missing\") })",
+      "test_that(\"TaskRegr rejects NAs in target\", { dt = data.table::data.table(x = 1:10, y = c(NA_real_, 2:10)); expect_error(as_task_regr(dt, target = \"y\"), \"contain missing\") })"
+    ],
+    "pass_to_pass": [
+      "test_that(\"Target is character/factor\", { ... })",
+      "test_that(\"Target is numeric\", { ... })",
+      "test_that(\"0 feature task\", { ... })"
+    ],
+    "test_files": []
+  },
+  "solution": {
+    "key_changes": [
+      "Add check using `anyMissing(x[[target]])` in both as_task_classif.data.frame and as_task_regr.data.frame",
+      "Use `error_input()` function to throw an error with message format: \"Target column '%s' must not contain missing values\"",
+      "Place the check after the Inf values warning and before the task construction"
+    ],
+    "potential_pitfalls": [
+      "Forgetting to check both classification and regression task creation functions",
+      "Using incorrect error message format that doesn't match the test expectation",
+      "Placing the check in the wrong location in the function body"
+    ],
+    "reference_diff": "diff --git a/R/TaskRegr.R b/R/TaskRegr.R\nindex e50aca6fd..48ab60ea9 100644\n--- a/R/TaskRegr.R\n+++ b/R/TaskRegr.R\n@@ -17,7 +17,7 @@\n #' @template seealso_task\n #' @export\n #' @examples\n-#' task = as_task_regr(palmerpenguins::penguins, target = \"bill_length_mm\")\n+#' task = as_task_regr(mtcars, target = \"mpg\")\n #' task$task_type\n #' task$formula()\n #' task$truth()\ndiff --git a/R/as_task_classif.R b/R/as_task_classif.R\nindex cc3dff347..c39fa56e5 100644\n--- a/R/as_task_classif.R\n+++ b/R/as_task_classif.R\n@@ -46,6 +46,10 @@ as_task_classif.data.frame = function(x, target, id = deparse1(substitute(x)), p\n     warning_input(\"Detected columns with unsupported Inf values in data: %s\", str_collapse(names(ii)))\n   }\n \n+  if (anyMissing(x[[target]])) {\n+    error_input(\"Target column '%s' must not contain missing values\", target)\n+  }\n+\n   y = x[[target]]\n   if (!is.factor(y)) {\n     x[[target]] = as.factor(y)\ndiff --git a/R/as_task_regr.R b/R/as_task_regr.R\nindex b348bbc14..7f71d81c4 100644\n--- a/R/as_task_regr.R\n+++ b/R/as_task_regr.R\n@@ -44,6 +44,10 @@ as_task_regr.data.frame = function(x, target, id = deparse1(substitute(x)), labe\n     warning_input(\"Detected columns with unsupported Inf values in data: %s\", str_collapse(names(ii)))\n   }\n \n+  if (anyMissing(x[[target]])) {\n+    error_input(\"Target column '%s' must not contain missing values\", target)\n+  }\n+\n   TaskRegr$new(id = id, backend = x, target = target, label = label)\n }\n \ndiff --git a/man/Measure.Rd b/man/Measure.Rd\nindex 9fe60fdf4..87b6a2a86 100644\n--- a/man/Measure.Rd\n+++ b/man/Measure.Rd\n@@ -125,19 +125,6 @@ Other Measure:\n \\code{\\link{mlr_measures_selected_features}}\n }\n \\concept{Measure}\n-\\section{Public fields}{\n-\\if{html}{\\out{<div class=\"r6-fields\">}}\n-\\describe{\n-\\item{\\code{trafo}}{(\\code{list()} | \\code{NULL})\n-\\code{NULL} or a list with two elements:\n-\\itemize{\n-\\item \\code{trafo}: the transformation function applied after aggregating\n-observation-wise losses (e.g. \\code{sqrt} for RMSE)\n-\\item \\code{deriv}: The derivative of the \\code{trafo}.\n-}}\n-}\n-\\if{html}{\\out{</div>}}\n-}\n \\section{Active bindings}{\n \\if{html}{\\out{<div class=\"r6-active-bindings\">}}\n \\describe{\n@@ -244,6 +231,14 @@ These packages are loaded, but not attached.}\n \\item{\\code{man}}{(\\code{character(1)})\\cr\n String in the format \\verb{[pkg]::[topic]} pointing to a manual page for this object.\n Defaults to \\code{NA}, but can be set by child classes.}\n+\n+\\item{\\code{trafo}}{(\\code{list()} | \\code{NULL})\\cr\n+\\code{NULL} or a list with two elements:\n+\\itemize{\n+\\item \\code{fn}: the transformation function applied after aggregating\n+observation-wise losses (e.g. \\code{sqrt} for RMSE)\n+\\item \\code{deriv}: The derivative of the \\code{fn}.\n+}}\n }\n \\if{html}{\\out{</div>}}\n }\ndiff --git a/man/Task.Rd b/man/Task.Rd\nindex 46189fe61..396708ea9 100644\n--- a/man/Task.Rd\n+++ b/man/Task.Rd\n@@ -230,32 +230,6 @@ Other Task:\n \\code{\\link{mlr_tasks_zoo}}\n }\n \\concept{Task}\n-\\section{Public fields}{\n-\\if{html}{\\out{<div class=\"r6-fields\">}}\n-\\describe{\n-\\item{\\code{backend}}{(\\link{DataBackend})\\cr\n-Abstract interface to the data of the task.}\n-\n-\\item{\\code{col_info}}{(\\code{\\link[data.table:data.table]{data.table::data.table()}})\\cr\n-Table with with 4 columns, mainly for internal purposes:\n-\\itemize{\n-\\item \\code{\"id\"} (\\code{character()}) stores the name of the column.\n-\\item \\code{\"type\"} (\\code{character()}) holds the storage type of the variable, e.g. \\code{integer}, \\code{numeric} or \\code{character}.\n-See \\link[=mlr_reflections]{mlr_reflections$task_feature_types} for a complete list of allowed types.\n-\\item \\code{\"levels\"} (\\code{list()}) stores a vector of distinct values (levels) for ordered and unordered factor variables.\n-\\item \\code{\"label\"} (\\code{character()}) stores a vector of prettier, formated column names.\n-\\item \\code{\"fix_factor_levels\"} (\\code{logical()}) stores flags which determine if the levels of the respective variable\n-need to be reordered after querying the data from the \\link{DataBackend}.\n-}\n-\n-Note that all columns of the \\link{DataBackend}, also columns which are not selected or have any role, are listed\n-in this table.}\n-\n-\\item{\\code{mlr3_version}}{(\\code{package_version})\\cr\n-Package version of \\code{mlr3} used to create the task.}\n-}\n-\\if{html}{\\out{</div>}}\n-}\n \\section{Active bindings}{\n \\if{html}{\\out{<div class=\"r6-active-bindings\">}}\n \\describe{\n@@ -474,6 +448,27 @@ Defaults to \\code{NA}, but can be set by child classes.}\n \\item{\\code{extra_args}}{(named \\code{list()})\\cr\n Additional arguments set during construction.\n Required for \\code{\\link[=convert_task]{convert_task()}}.}\n+\n+\\item{\\code{backend}}{(\\link{DataBackend})\\cr\n+Abstract interface to the data of the task.}\n+\n+\\item{\\code{col_info}}{(\\code{\\link[data.table:data.table]{data.table::data.table()}})\\cr\n+Table with with 4 columns, mainly for internal purposes:\n+\\itemize{\n+\\item \\code{\"id\"} (\\code{character()}) stores the name of the column.\n+\\item \\code{\"type\"} (\\code{character()}) holds the storage type of the variable, e.g. \\code{integer}, \\code{numeric} or \\code{character}.\n+See \\link[=mlr_reflections]{mlr_reflections$task_feature_types} for a complete list of allowed types.\n+\\item \\code{\"levels\"} (\\code{list()}) stores a vector of distinct values (levels) for ordered and unordered factor variables.\n+\\item \\code{\"label\"} (\\code{character()}) stores a vector of prettier, formated column names.\n+\\item \\code{\"fix_factor_levels\"} (\\code{logical()}) stores flags which determine if the levels of the respective variable\n+need to be reordered after querying the data from the \\link{DataBackend}.\n+}\n+\n+Note that all columns of the \\link{DataBackend}, also columns which are not selected or have any role, are listed\n+in this table.}\n+\n+\\item{\\code{mlr3_version}}{(\\code{package_version})\\cr\n+Package version of \\code{mlr3} used to create the task.}\n }\n \\if{html}{\\out{</div>}}\n }\ndiff --git a/man/TaskRegr.Rd b/man/TaskRegr.Rd\nindex 8c38eb6ef..e3c084a56 100644\n--- a/man/TaskRegr.Rd\n+++ b/man/TaskRegr.Rd\n@@ -12,7 +12,7 @@ It is recommended to use \\code{\\link[=as_task_regr]{as_task_regr()}} for constru\n Predefined tasks are stored in the \\link[mlr3misc:Dictionary]{dictionary} \\link{mlr_tasks}.\n }\n \\examples{\n-task = as_task_regr(palmerpenguins::penguins, target = \"bill_length_mm\")\n+task = as_task_regr(mtcars, target = \"mpg\")\n task$task_type\n task$formula()\n task$truth()"
+  },
+  "source": {
+    "type": "github_pr",
+    "repo": "mlr-org/mlr3",
+    "pr_number": 1442,
+    "pr_url": "https://github.com/mlr-org/mlr3/pull/1442",
+    "merged_at": "2026-02-08T09:23:19+00:00",
+    "issue_number": null,
+    "issue_url": "https://github.com/mlr-org/mlr3/issues/1357"
+  },
+  "files": {
+    "changed": [],
+    "source_files": [],
+    "test_changes": null
+  },
+  "quality_score": 8.0,
+  "split": "mined",
+  "dependencies": [],
+  "constraints": {},
+  "created_at": "2026-02-22T18:57:16.243603+00:00",
+  "updated_at": null
+}

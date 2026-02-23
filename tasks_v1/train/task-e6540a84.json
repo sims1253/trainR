@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.0",
+  "task_id": "task-e6540a84",
+  "task_type": "test_gen",
+  "difficulty": "medium",
+  "instruction": "Write a complete testthat test file for `rlang::arg_match0`.\n\nPackage: rlang v1.1.7.9000\nDescription: Functions for Base Types and Core R and 'Tidyverse' Features\nFunction: arg_match0\nParameters: arg, values, arg_nm, error_call\nTest patterns used: test_that\nExpectations used: expect_snapshot\n\nFunction Code:\n```r\narg_match0 <- function(\n  arg,\n  values,\n  arg_nm = caller_arg(arg),\n  error_call = caller_env()\n) {\n  .External(ffi_arg_match0, arg, values, environment())\n}\n```\n\nRequirements:\n1. Use test_that() blocks with descriptive names that reference `arg_match0`\n2. Test basic functionality using appropriate expectations (expect_snapshot)\n3. Test edge cases: NULL input, empty strings, missing arguments\n4. Test error conditions with expect_error()\n5. Each test_that() block should test one logical behavior\n",
+  "context": "Package: rlang v1.1.7.9000\nDescription: Functions for Base Types and Core R and 'Tidyverse' Features\nFunction: arg_match0\nParameters: arg, values, arg_nm, error_call\nTest patterns used: test_that\nExpectations used: expect_snapshot\n\nFunction Code:\n```r\narg_match0 <- function(\n  arg,\n  values,\n  arg_nm = caller_arg(arg),\n  error_call = caller_env()\n) {\n  .External(ffi_arg_match0, arg, values, environment())\n}\n```",
+  "hints": [],
+  "source_package": "rlang",
+  "source_file": "R/arg.R",
+  "tests": {
+    "fail_to_pass": [],
+    "pass_to_pass": [],
+    "test_files": [
+      "testthat"
+    ]
+  },
+  "solution": null,
+  "source": null,
+  "files": {
+    "changed": [
+      "R/arg.R"
+    ],
+    "source_files": [
+      "R/arg.R"
+    ],
+    "test_changes": null
+  },
+  "quality_score": 0.585,
+  "split": "train",
+  "dependencies": [
+    "testthat"
+  ],
+  "constraints": {},
+  "created_at": "2026-02-23T20:26:51.760965+00:00",
+  "updated_at": null
+}

@@ -1,0 +1,57 @@
+{
+  "schema_version": "1.0",
+  "task_id": "rstudio_reticulate_1870",
+  "task_type": "swe",
+  "difficulty": "medium",
+  "instruction": "Fix the SIGPIPE signal handling issue in reticulate's Python initialization. When reticulate initializes Python with `Py_InitializeEx(0)`, CPython does not install its default signal dispositions (including ignoring SIGPIPE). This causes R's 'Error: ignoring SIGPIPE signal' when embedded Python code writes to a closed pipe. The fix should: (1) Ignore SIGPIPE on Unix immediately after Python initialization to mirror CPython's default behavior, and (2) Restore the previous SIGPIPE handler on `py_finalize()`.",
+  "context": "The relevant code is in src/python.cpp. Key functions are `py_initialize()` and `py_finalize()`. Python provides `PyOS_setsig()` for signal handling. The fix should use `#ifndef _WIN32` guards since SIGPIPE is Unix-specific. Pattern to follow: similar to how `orig_interrupt_handler` is saved and restored for SIGINT.",
+  "hints": [],
+  "source_package": "reticulate",
+  "source_file": null,
+  "tests": {
+    "fail_to_pass": [
+      "test_that('SIGPIPE does not interrupt embedded Python', { ... }) - Test creates a pipe, closes the read end, and writes to the write end. Should raise BrokenPipeError, not 'ignoring SIGPIPE signal' error."
+    ],
+    "pass_to_pass": [
+      "Existing reticulate tests should continue to pass",
+      "Python initialization and finalization should work correctly",
+      "Signal handling for SIGINT should remain unaffected"
+    ],
+    "test_files": []
+  },
+  "solution": {
+    "key_changes": [
+      "Add static variables to track SIGPIPE handler state: `s_restore_sigpipe_handler` (bool) and `s_orig_sigpipe_handler` (PyOS_sighandler_t)",
+      "In py_initialize(), after Py_InitializeEx(0), call `PyOS_setsig(SIGPIPE, SIG_IGN)` and save the original handler",
+      "In py_finalize(), restore the original SIGPIPE handler using `PyOS_setsig(SIGPIPE, s_orig_sigpipe_handler)`",
+      "Wrap all SIGPIPE code in `#ifndef _WIN32` preprocessor guards"
+    ],
+    "potential_pitfalls": [
+      "Forgetting to wrap code in `#ifndef _WIN32` guards (SIGPIPE doesn't exist on Windows)",
+      "Not saving the original handler before setting SIG_IGN",
+      "Not restoring the handler on finalization (could affect R's signal handling after Python is shut down)",
+      "Setting the handler before Py_InitializeEx(0) instead of after"
+    ],
+    "reference_diff": "diff --git a/NEWS.md b/NEWS.md\nindex 40a826173..8e2eec7fb 100644\n--- a/NEWS.md\n+++ b/NEWS.md\n@@ -1,5 +1,7 @@\n # reticulate (development version)\n \n+- Fix spurious `Error: ignoring SIGPIPE signal` on Unix when embedded Python writes to a closed pipe (#1868).\n+\n # reticulate 1.44.1\n \n - The default Python version in `install_python()` \ndiff --git a/src/python.cpp b/src/python.cpp\nindex c0b4fb53d..83abcf641 100644\n--- a/src/python.cpp\n+++ b/src/python.cpp\n@@ -2853,6 +2853,11 @@ static void interrupt_handler(int signum) {\n \n PyOS_sighandler_t orig_interrupt_handler = NULL;\n \n+#ifndef _WIN32\n+static bool s_restore_sigpipe_handler = false;\n+static PyOS_sighandler_t s_orig_sigpipe_handler = SIG_DFL;\n+#endif\n+\n PyOS_sighandler_t install_interrupt_handlers_() {\n   // Installs a C handler and a Python handler\n   // Exported as an R symbol in case the user did some action that cleared the\n@@ -3171,6 +3176,16 @@ void py_initialize(const std::string& python,\n       // initialize python\n       Py_InitializeEx(0); // 0 means \"do not install signal handlers\"\n       s_was_python_initialized_by_reticulate = true;\n+\n+#ifndef _WIN32\n+      // Python ignores SIGPIPE by default to avoid the process being\n+      // interrupted during normal pipe / IPC usage (EPIPE is handled as an\n+      // exception instead). Because reticulate uses Py_InitializeEx(0), we\n+      // must explicitly mirror that behavior.\n+      s_orig_sigpipe_handler = PyOS_setsig(SIGPIPE, SIG_IGN);\n+      s_restore_sigpipe_handler = true;\n+#endif\n+\n       const wchar_t *argv[1] = {s_python_v3.c_str()};\n       PySys_SetArgv_v3(1, const_cast<wchar_t**>(argv));\n \n@@ -3262,6 +3277,14 @@ void py_finalize() {\n     Py_MakePendingCalls();\n     if (orig_interrupt_handler)\n       reticulate_setsig(SIGINT, orig_interrupt_handler);\n+\n+#ifndef _WIN32\n+    if (s_restore_sigpipe_handler) {\n+      PyOS_setsig(SIGPIPE, s_orig_sigpipe_handler);\n+      s_restore_sigpipe_handler = false;\n+    }\n+#endif\n+\n     is_py_finalized = true;\n     Py_Finalize();\n   }"
+  },
+  "source": {
+    "type": "github_pr",
+    "repo": "rstudio/reticulate",
+    "pr_number": 1870,
+    "pr_url": "https://github.com/rstudio/reticulate/pull/1870",
+    "merged_at": "2025-12-19T13:31:35+00:00",
+    "issue_number": null,
+    "issue_url": "https://github.com/rstudio/reticulate/issues/1868"
+  },
+  "files": {
+    "changed": [],
+    "source_files": [],
+    "test_changes": null
+  },
+  "quality_score": 8.0,
+  "split": "mined",
+  "dependencies": [],
+  "constraints": {},
+  "created_at": "2026-02-22T19:03:31.894610+00:00",
+  "updated_at": null
+}

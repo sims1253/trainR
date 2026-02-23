@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.0",
+  "task_id": "task-12c414bb",
+  "task_type": "test_gen",
+  "difficulty": "hard",
+  "instruction": "Add comprehensive edge case tests for `fct_explicit_na`.\n\n\nExisting tests for reference:\n```r\n\n```\n\n\nThe existing tests cover basic functionality. Add tests for:\n1. NULL inputs to each argument\n2. Empty vectors/strings: character(0), \"\", integer(0)\n3. Boundary values: 0, 1, -1, NA, NaN, Inf\n4. Invalid input types (passing numeric where character expected, etc.)\n5. Missing arguments (use expect_error with class matching)\n6. Very long inputs (strings > 1000 chars, vectors > 10000 elements)\n",
+  "context": "Package: forcats v1.0.1.9000\nDescription: Tools for Working with Categorical Variables (Factors)\nFunction: fct_explicit_na\nParameters: f, na_level\nTest patterns used: test_that\nExpectations used: expect_snapshot\n\nFunction Code:\n```r\nfct_explicit_na <- function(f, na_level = \"(Missing)\") {\n  lifecycle::deprecate_warn(\n    when = \"1.0.0\",\n    what = \"fct_explicit_na()\",\n    with = \"fct_na_value_to_level()\"\n  )\n\n  f <- check_factor(f)\n\n  is_missing <- is.na(f)\n  is_missing_level <- is.na(levels(f))\n\n  if (any(is_missing)) {\n    f <- fct_expand(f, na_level)\n    f[is_missing] <- na_level\n\n    f\n  } else if (any(is_missing_level)) {\n    levs <- levels(f)\n    levs[is.na(levs)] <- na_level\n\n    lvls_revalue(f, levs)\n  } else {\n    f\n  }\n}\n```",
+  "hints": [],
+  "source_package": "forcats",
+  "source_file": "R/explicit_na.R",
+  "tests": {
+    "fail_to_pass": [],
+    "pass_to_pass": [],
+    "test_files": [
+      "testthat"
+    ]
+  },
+  "solution": null,
+  "source": null,
+  "files": {
+    "changed": [
+      "R/explicit_na.R"
+    ],
+    "source_files": [
+      "R/explicit_na.R"
+    ],
+    "test_changes": null
+  },
+  "quality_score": 0.56,
+  "split": "train",
+  "dependencies": [
+    "testthat"
+  ],
+  "constraints": {},
+  "created_at": "2026-02-23T20:26:51.754546+00:00",
+  "updated_at": null
+}

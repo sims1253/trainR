@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.0",
+  "task_id": "task-d0938732",
+  "task_type": "test_gen",
+  "difficulty": "medium",
+  "instruction": "Write a complete testthat test file for `officer::plot_in_png`.\n\nPackage: officer v0.7.3\nDescription: Manipulation of Microsoft Word and PowerPoint Documents\nFunction: plot_in_png\nParameters: ggobj, code, width, height, res, units, pointsize, scaling, path\nTest patterns used: test_that\nExpectations used: expect_equal, expect_match, expect_true\n\nFunction Code:\n```r\nplot_in_png <- function(\n  ggobj = NULL,\n  code = NULL,\n  width,\n  height,\n  res = 200,\n  units = \"in\",\n  pointsize = 11,\n  scaling = 1,\n  path = NULL\n) {\n  if (is.null(path)) {\n    path <- tempfile(fileext = \".png\")\n  }\n\n  if (!is.null(ggobj)) {\n    code <- str2lang(\"print(ggobj)\")\n  }\n\n  agg_png(\n    filename = path,\n    width = width,\n    height = height,\n    units = units,\n    background = \"transparent\",\n    res = res,\n    pointsize = pointsize,\n    scaling = scaling\n  )\n  tryCatch(\n    {\n      eval(code)\n    },\n    finally = dev.off()\n  )\n  path\n}\n```\n\nRequirements:\n1. Use test_that() blocks with descriptive names that reference `plot_in_png`\n2. Test basic functionality using appropriate expectations (expect_equal, expect_match, expect_true)\n3. Test edge cases: NULL input, empty strings, missing arguments\n4. Test error conditions with expect_error()\n5. Each test_that() block should test one logical behavior\n",
+  "context": "Package: officer v0.7.3\nDescription: Manipulation of Microsoft Word and PowerPoint Documents\nFunction: plot_in_png\nParameters: ggobj, code, width, height, res, units, pointsize, scaling, path\nTest patterns used: test_that\nExpectations used: expect_equal, expect_match, expect_true\n\nFunction Code:\n```r\nplot_in_png <- function(\n  ggobj = NULL,\n  code = NULL,\n  width,\n  height,\n  res = 200,\n  units = \"in\",\n  pointsize = 11,\n  scaling = 1,\n  path = NULL\n) {\n  if (is.null(path)) {\n    path <- tempfile(fileext = \".png\")\n  }\n\n  if (!is.null(ggobj)) {\n    code <- str2lang(\"print(ggobj)\")\n  }\n\n  agg_png(\n    filename = path,\n    width = width,\n    height = height,\n    units = units,\n    background = \"transparent\",\n    res = res,\n    pointsize = pointsize,\n    scaling = scaling\n  )\n  tryCatch(\n    {\n      eval(code)\n    },\n    finally = dev.off()\n  )\n  path\n}\n```",
+  "hints": [],
+  "source_package": "officer",
+  "source_file": "R/dev-utils.R",
+  "tests": {
+    "fail_to_pass": [],
+    "pass_to_pass": [],
+    "test_files": [
+      "testthat"
+    ]
+  },
+  "solution": null,
+  "source": null,
+  "files": {
+    "changed": [
+      "R/dev-utils.R"
+    ],
+    "source_files": [
+      "R/dev-utils.R"
+    ],
+    "test_changes": null
+  },
+  "quality_score": 0.585,
+  "split": "train",
+  "dependencies": [
+    "testthat"
+  ],
+  "constraints": {},
+  "created_at": "2026-02-23T20:26:51.758582+00:00",
+  "updated_at": null
+}

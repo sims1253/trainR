@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.0",
+  "task_id": "task-3db177a3",
+  "task_type": "test_gen",
+  "difficulty": "medium",
+  "instruction": "Add proper test fixtures to the tests for `parse_file_link_params` using the withr package.\n\n\n\nRequirements:\n1. Identify tests that modify global state (options, env vars, working directory)\n2. Wrap state modifications with withr::local_* for automatic cleanup:\n   - withr::local_options() for R options\n   - withr::local_envvar() for environment variables\n   - withr::local_tempdir() for temporary directories\n   - withr::local_file() for temporary files\n3. Ensure tests can run in any order without side effects\n4. Use local_* (not with_*) inside test_that() blocks\n",
+  "context": "Package: cli v3.6.5.9000\nDescription: Helpers for Developing Command Line Interfaces\nFunction: parse_file_link_params\nParameters: txt\nTest patterns used: test_that\nExpectations used: expect_equal\n\nFunction Code:\n```r\nparse_file_link_params <- function(txt) {\n  pattern <- \"^(?<path>.*?)(?::(?<line>\\\\d*))?(?::(?<column>\\\\d*))?$\"\n  matches <- re_match(txt, pattern)\n  ret <- as.list(matches)\n  ret[!nzchar(ret)] <- list(NULL)\n  if (is.null(ret[[\"path\"]])) ret[[\"path\"]] <- \"\"\n  ret\n}\n```",
+  "hints": [],
+  "source_package": "cli",
+  "source_file": "R/ansi-hyperlink.R",
+  "tests": {
+    "fail_to_pass": [],
+    "pass_to_pass": [],
+    "test_files": [
+      "testthat"
+    ]
+  },
+  "solution": null,
+  "source": null,
+  "files": {
+    "changed": [
+      "R/ansi-hyperlink.R"
+    ],
+    "source_files": [
+      "R/ansi-hyperlink.R"
+    ],
+    "test_changes": null
+  },
+  "quality_score": 0.51,
+  "split": "held_out",
+  "dependencies": [
+    "testthat"
+  ],
+  "constraints": {},
+  "created_at": "2026-02-23T20:26:51.806535+00:00",
+  "updated_at": null
+}

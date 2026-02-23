@@ -1,0 +1,52 @@
+{
+  "schema_version": "1.0",
+  "task_id": "tidyverse_ggplot2_6759",
+  "task_type": "swe",
+  "difficulty": "easy",
+  "instruction": "Fix the bug in `compute_data_size()` function in R/utilities.R where the default `width` is miscalculated when some panels are empty. The issue occurs when using `geom_col()` in a `facet_grid()` where some panels have no data - the plot renders blank instead of showing the data. The bug was introduced by incorrectly using `drop = FALSE` in the `split()` call when calculating resolution across panels. The fix should ensure that empty factor levels are properly handled.",
+  "context": "The `compute_data_size()` function calculates data dimensions (width/height) for geoms. When `panels = \"across\"`, it splits data by PANEL factor and calculates resolution. The relevant code section:\n\nr\nif (panels == \"across\") {\n    res <- split(data[[var]], data$PANEL, drop = FALSE)  # BUG: should be drop = TRUE\n    res <- vapply(res, resolution, FUN.VALUE = numeric(1), ...)\n    res <- min(res, na.rm = TRUE)\n}\n\n\nWhen a PANEL factor has levels with no corresponding data (e.g., levels c(\"A\", \"B\") but only \"B\" has data), using `drop = FALSE` creates an empty vector for the missing level, which causes `resolution()` to return unexpected values.",
+  "hints": [],
+  "source_package": "ggplot2",
+  "source_file": null,
+  "tests": {
+    "fail_to_pass": [
+      "test_that(\"compute_data_size handles gnarly cases\", { df <- data_frame0(x = seq(0, 20, by = 2), PANEL = factor(rep(\"B\", 11), levels = c(\"A\", \"B\"))); new <- compute_data_size(df, size = NULL, target = \"width\", default = 1); expect_all_equal(new$width, 2) })"
+    ],
+    "pass_to_pass": [
+      "Existing tests for compute_data_size with normal panel data",
+      "Existing tests for resolution calculation"
+    ],
+    "test_files": []
+  },
+  "solution": {
+    "key_changes": [
+      "Change `drop = FALSE` to `drop = TRUE` in the `split()` call within `compute_data_size()` function",
+      "This ensures empty factor levels are dropped before calculating resolution"
+    ],
+    "potential_pitfalls": [
+      "Using `drop = FALSE` preserves empty factor levels, which causes `resolution()` to return Inf or incorrect values for empty vectors",
+      "The fix must maintain backward compatibility with panels that have all levels populated"
+    ],
+    "reference_diff": "diff --git a/DESCRIPTION b/DESCRIPTION\nindex 01f91fcb9a..da78c46c3d 100644\n--- a/DESCRIPTION\n+++ b/DESCRIPTION\n@@ -70,7 +70,7 @@ Suggests:\n     rpart,\n     sf (>= 0.7-3),\n     svglite (>= 2.1.2),\n-    testthat (>= 3.1.5),\n+    testthat (>= 3.3.0),\n     tibble,\n     vdiffr (>= 1.0.6),\n     xml2\ndiff --git a/NEWS.md b/NEWS.md\nindex a252538302..714784d06f 100644\n--- a/NEWS.md\n+++ b/NEWS.md\n@@ -4,6 +4,8 @@\n   (@lgaborini, #6724)\n * Added new argument `geom_curve(shape)` that will be passed down to \n   `grid::curveGrob()` (@fmarotta, #5998).\n+* Fixed a regression where default `width` was miscalculated when some panels\n+  are empty (@teunbrand, #6758)\n \n # ggplot2 4.0.1\n \ndiff --git a/R/utilities.R b/R/utilities.R\nindex 598b9a8fc3..2aa6ab5b42 100644\n--- a/R/utilities.R\n+++ b/R/utilities.R\n@@ -927,7 +927,7 @@ compute_data_size <- function(data, size, default = 0.9,\n   panels <- arg_match0(panels, c(\"across\", \"by\", \"ignore\"))\n \n   if (panels == \"across\") {\n-    res <- split(data[[var]], data$PANEL, drop = FALSE)\n+    res <- split(data[[var]], data$PANEL, drop = TRUE)\n     res <- vapply(res, resolution, FUN.VALUE = numeric(1), ...)\n     res <- min(res, na.rm = TRUE)\n   } else if (panels == \"by\") {"
+  },
+  "source": {
+    "type": "github_pr",
+    "repo": "tidyverse/ggplot2",
+    "pr_number": 6759,
+    "pr_url": "https://github.com/tidyverse/ggplot2/pull/6759",
+    "merged_at": "2025-12-03T15:12:11+00:00",
+    "issue_number": null,
+    "issue_url": "https://github.com/tidyverse/ggplot2/issues/6758"
+  },
+  "files": {
+    "changed": [],
+    "source_files": [],
+    "test_changes": null
+  },
+  "quality_score": 8.0,
+  "split": "mined",
+  "dependencies": [],
+  "constraints": {},
+  "created_at": "2026-02-22T18:49:00.598983+00:00",
+  "updated_at": null
+}

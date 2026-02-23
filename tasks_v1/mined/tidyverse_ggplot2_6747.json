@@ -1,0 +1,60 @@
+{
+  "schema_version": "1.0",
+  "task_id": "tidyverse_ggplot2_6747",
+  "task_type": "swe",
+  "difficulty": "medium",
+  "instruction": "Implement support for namespace prefixes in `find_scale()` and `validate_guide()` functions. When a scale or guide is specified with a `pkgname::` prefix (e.g., `\"legendry::colring\"` or `\"pillar::num\"`), the lookup should search in the specified namespace rather than searching all loaded namespaces. This allows scales and guides from non-attached packages to be found.\n\nSpecifically:\n1. Modify `validate_guide()` to parse `::` prefixes and look for guides in the specified namespace\n2. Modify `find_scale()` to parse `::` prefixes when processing scale types returned by `scale_type()` methods\n3. Refactor `find_global()` to accept a list of environments to search\n4. Add an `as_namespace()` helper that can be mocked in tests",
+  "context": "Key function signatures and existing code:\n\nr\n# R/scale-type.R\nfind_scale <- function(aes, x, env = parent.frame()) {\n  type <- scale_type(x)\n  # ... needs to handle type like \"foo::bar\"\n}\n\nfind_global <- function(name, env, mode = \"any\") {\n  # Currently searches env, then ggplot2 namespace\n  # Needs to accept list of environments\n}\n\n# R/guides-.R\nvalidate_guide <- function(guide) {\n  if (is.character(guide)) {\n    # Needs to parse \"pkgname::guidename\" format\n  }\n}\n\n\nThe `scale_type()` S3 method can return a character vector like `c(\"num\", \"pillar::num\", \"continuous\")` to declare multiple scale candidates.",
+  "hints": [],
+  "source_package": "ggplot2",
+  "source_file": null,
+  "tests": {
+    "fail_to_pass": [
+      "validate_guide finds guides with namespace prefixes - should find guide when prefixed with namespace",
+      "find_scale finds scales with namespace prefixes - should find scale when scale_type returns prefixed name"
+    ],
+    "pass_to_pass": [
+      "guide specifications are properly checked",
+      "find_scale gives sensible calls to scales",
+      "existing scale lookup continues to work without prefixes"
+    ],
+    "test_files": []
+  },
+  "solution": {
+    "key_changes": [
+      "Parse `::` in guide/scale names using `strsplit(name, \"::\", fixed = TRUE)`",
+      "Use `as_namespace(prefix)` to get the namespace environment to search",
+      "Refactor `find_global()` to accept a list of environments instead of single environment",
+      "Add `as_namespace()` function with `on_load()` pattern for testability",
+      "Search environments in order: provided env(s), then ggplot2 namespace"
+    ],
+    "potential_pitfalls": [
+      "Need to handle both prefixed and non-prefixed names in the same code path",
+      "The `find_global()` refactoring must maintain backward compatibility",
+      "String parsing should use `fixed = TRUE` in `strsplit()` for performance",
+      "Need to use `get0()` instead of `exists()`/`get()` pattern for cleaner NULL handling",
+      "The `as_namespace()` function needs to be mockable for testing without loading external packages"
+    ],
+    "reference_diff": "diff --git a/NEWS.md b/NEWS.md\nindex a252538302..aab8bce821 100644\n--- a/NEWS.md\n+++ b/NEWS.md\n@@ -1,5 +1,8 @@\n # ggplot2 (development version)\n \n+* Scales and guides specified by a string can now use package name prefixes to\n+  indicate a namespace wherein to look for the scale/guide. For example, one can\n+  use `scale_x_continuous(guide = \"legendry::axis_base\")` (@teunbrand, #4705).\n * `get_layer_data()` and `get_layer_grob()` now accept layer names as index \n   (@lgaborini, #6724)\n * Added new argument `geom_curve(shape)` that will be passed down to \ndiff --git a/R/guides-.R b/R/guides-.R\nindex 8213ff6723..584aefbbfe 100644\n--- a/R/guides-.R\n+++ b/R/guides-.R\n@@ -915,8 +915,19 @@ include_layer_in_guide <- function(layer, matched) {\n validate_guide <- function(guide) {\n   # if guide is specified by character, then find the corresponding guide\n   if (is.character(guide)) {\n-    fun <- find_global(paste0(\"guide_\", guide), env = global_env(),\n-                       mode = \"function\")\n+    check_string(guide, allow_empty = FALSE)\n+    search_env <- list(global_env())\n+    if (isTRUE(grepl(\"::\", guide))) {\n+      guide <- strsplit(guide, \"::\", fixed = TRUE)[[1]]\n+      # Append prefix as namespaces to search environments\n+      search_env <- c(search_env, list(as_namespace(guide[[1]])))\n+      # Remove prefix from guide name\n+      guide <- guide[[2]]\n+    }\n+    fun <- find_global(\n+      paste0(\"guide_\", guide),\n+      env = search_env, mode = \"function\"\n+    )\n     if (is.function(fun)) {\n       guide <- fun()\n     }\ndiff --git a/R/scale-type.R b/R/scale-type.R\nindex e9f3b8cc9b..a217603cd0 100644\n--- a/R/scale-type.R\n+++ b/R/scale-type.R\n@@ -7,10 +7,18 @@ find_scale <- function(aes, x, env = parent.frame()) {\n   }\n \n   type <- scale_type(x)\n-  candidates <- paste(\"scale\", aes, type, sep = \"_\")\n \n-  for (scale in candidates) {\n-    scale_f <- find_global(scale, env, mode = \"function\")\n+  for (scale in type) {\n+    search_env <- list(env)\n+    if (isTRUE(grepl(\"::\", scale))) {\n+      scale <- strsplit(scale, \"::\", fixed = TRUE)[[1]]\n+      # Append prefix as namepaces to search environments\n+      search_env <- c(search_env, list(as_namespace(scale[[1]])))\n+      # Remove prefix from scale name\n+      scale <- scale[[2]]\n+    }\n+    scale <- paste(\"scale\", aes, scale, sep = \"_\")\n+    scale_f <- find_global(scale, search_env, mode = \"function\")\n     if (!is.null(scale_f)) {\n       sc <- scale_f()\n       sc$call <- parse_expr(paste0(scale, \"()\"))\n@@ -29,18 +37,29 @@ find_scale <- function(aes, x, env = parent.frame()) {\n # ggplot2 namespace environment.  This makes it possible to override default\n # scales by setting them in the parent environment.\n find_global <- function(name, env, mode = \"any\") {\n-  if (exists(name, envir = env, mode = mode)) {\n-    return(get(name, envir = env, mode = mode))\n+\n+  if (!is.list(env)) {\n+    env <- list(env)\n   }\n+  env <- c(env, list(as_namespace(\"ggplot2\")))\n \n-  nsenv <- asNamespace(\"ggplot2\")\n-  if (exists(name, envir = nsenv, mode = mode)) {\n-    return(get(name, envir = nsenv, mode = mode))\n+  for (e in env) {\n+    found <- get0(name, envir = e, mode = mode)\n+    if (!is.null(found)) {\n+      return(found)\n+    }\n   }\n \n   NULL\n }\n \n+# This exists for testing purposes (mocking) only\n+as_namespace <- function(...) NULL\n+on_load({\n+  as_namespace <- base::asNamespace\n+})\n+\n+\n #' Determine default scale type\n #'\n #' You will need to define a method for this method if you want to extend"
+  },
+  "source": {
+    "type": "github_pr",
+    "repo": "tidyverse/ggplot2",
+    "pr_number": 6747,
+    "pr_url": "https://github.com/tidyverse/ggplot2/pull/6747",
+    "merged_at": "2025-12-03T15:24:05+00:00",
+    "issue_number": null,
+    "issue_url": "https://github.com/tidyverse/ggplot2/issues/4705"
+  },
+  "files": {
+    "changed": [],
+    "source_files": [],
+    "test_changes": null
+  },
+  "quality_score": 8.0,
+  "split": "mined",
+  "dependencies": [],
+  "constraints": {},
+  "created_at": "2026-02-22T18:49:35.516566+00:00",
+  "updated_at": null
+}

@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.0",
+  "task_id": "task-dd8cd3e2",
+  "task_type": "test_gen",
+  "difficulty": "easy",
+  "instruction": "A test for `plot_in_png` is failing. Diagnose and fix the issue.\n\n\nFailing test:\n```r\n\n```\n\n\nSteps:\n1. Read the function source code to understand expected behavior\n2. Compare the test expectations with actual function behavior\n3. Fix the test if expectations are wrong, or fix the function if it has a bug\n4. Ensure the fix maintains backward compatibility\n5. Run the tests to verify the fix\n",
+  "context": "Package: officer v0.7.3\nDescription: Manipulation of Microsoft Word and PowerPoint Documents\nFunction: plot_in_png\nParameters: ggobj, code, width, height, res, units, pointsize, scaling, path\nTest patterns used: test_that\nExpectations used: expect_equal, expect_match, expect_true\n\nFunction Code:\n```r\nplot_in_png <- function(\n  ggobj = NULL,\n  code = NULL,\n  width,\n  height,\n  res = 200,\n  units = \"in\",\n  pointsize = 11,\n  scaling = 1,\n  path = NULL\n) {\n  if (is.null(path)) {\n    path <- tempfile(fileext = \".png\")\n  }\n\n  if (!is.null(ggobj)) {\n    code <- str2lang(\"print(ggobj)\")\n  }\n\n  agg_png(\n    filename = path,\n    width = width,\n    height = height,\n    units = units,\n    background = \"transparent\",\n    res = res,\n    pointsize = pointsize,\n    scaling = scaling\n  )\n  tryCatch(\n    {\n      eval(code)\n    },\n    finally = dev.off()\n  )\n  path\n}\n```",
+  "hints": [],
+  "source_package": "officer",
+  "source_file": "R/dev-utils.R",
+  "tests": {
+    "fail_to_pass": [],
+    "pass_to_pass": [],
+    "test_files": [
+      "testthat"
+    ]
+  },
+  "solution": null,
+  "source": null,
+  "files": {
+    "changed": [
+      "R/dev-utils.R"
+    ],
+    "source_files": [
+      "R/dev-utils.R"
+    ],
+    "test_changes": null
+  },
+  "quality_score": 0.51,
+  "split": "dev",
+  "dependencies": [
+    "testthat"
+  ],
+  "constraints": {},
+  "created_at": "2026-02-23T20:26:51.787599+00:00",
+  "updated_at": null
+}

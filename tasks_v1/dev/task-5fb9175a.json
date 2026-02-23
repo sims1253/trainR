@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.0",
+  "task_id": "task-5fb9175a",
+  "task_type": "test_gen",
+  "difficulty": "hard",
+  "instruction": "Add comprehensive edge case tests for `col_spec_standardise`.\n\n\nExisting tests for reference:\n```r\n\n```\n\n\nThe existing tests cover basic functionality. Add tests for:\n1. NULL inputs to each argument\n2. Empty vectors/strings: character(0), \"\", integer(0)\n3. Boundary values: 0, 1, -1, NA, NaN, Inf\n4. Invalid input types (passing numeric where character expected, etc.)\n5. Missing arguments (use expect_error with class matching)\n6. Very long inputs (strings > 1000 chars, vectors > 10000 elements)\n",
+  "context": "Package: readr v2.2.0.9000\nDescription: Read Rectangular Text Data\nFunction: col_spec_standardise\nParameters: file, col_names, col_types, guessed_types, comment, skip, skip_empty_rows, skip_quote, guess_max, tokenizer, locale, drop_skipped_names\nTest patterns used: test_that\nExpectations used: expect_s3_class\n\nFunction Code:\n```r\ncol_spec_standardise <- function(\n  file,\n  col_names = TRUE,\n  col_types = NULL,\n  guessed_types = NULL,\n  comment = \"\",\n  skip = 0,\n  skip_empty_rows = TRUE,\n  skip_quote = TRUE,\n  guess_max = 1000,\n  tokenizer = tokenizer_csv(),\n  locale = default_locale(),\n  drop_skipped_names = FALSE\n) {\n  # Figure out the column names -----------------------------------------------\n  if (is.logical(col_names) && length(col_names) == 1) {\n    ds_header <- datasource(\n      file,\n      skip = skip,\n      skip_empty_rows = skip_empty_rows,\n      skip_quote = skip_quote,\n      comment = comment\n    )\n    if (col_names) {\n      res <- guess_header(ds_header, tokenizer, locale)\n      col_names <- res$header\n      skip <- res$skip\n    } else {\n      n <- length(guess_header(ds_header, tokenizer, locale)$header)\n      col_names <- paste0(\"X\", seq_len(n))\n    }\n    guessed_names <- TRUE\n  } else if (is.character(col_names)) {\n    guessed_names <- FALSE\n  } else {\n    stop(\"`col_names` must be TRUE, FALSE or a character vector\", call. = FALSE)\n  }\n\n  missing_names <- is.na(col_names)\n  if (any(missing_names)) {\n    new_names <- paste0(\"X\", seq_along(col_names)[missing_names])\n    col_names[missing_names] <- new_names\n    warning(\n      \"Missing column names filled in: \",\n      paste0(\n        encodeString(new_names, quote = \"'\"),\n        \" [\",\n        which(missing_names),\n        \"]\",\n        collapse = \", \"\n      ),\n      call. = FALSE\n    )\n  }\n\n  if (anyDuplicated(col_names)) {\n    dups <- duplicated(col_names)\n\n    old_names <- col_names\n    col_names <- make.unique(col_names, sep = \"_\")\n\n    warning(\n      \"Duplicated column names deduplicated: \",\n      paste0(\n        encodeString(old_names[dups], quote = \"'\"),\n        \" => \",\n        encodeString(col_names[dups], quote = \"'\"),\n        \" [\",\n        which(dups),\n        \"]\",\n        collapse = \", \"\n      ),\n      call. = FALSE\n    )\n  }\n\n  # Figure out column types ----------------------------------------------------\n\n  spec <- as.col_spec(col_types)\n  type_names <- names(spec$cols)\n\n  spec$skip <- skip\n\n  if (length(spec$cols) == 0) {\n    # no types specified so use defaults\n\n    spec$cols <- rep(list(spec$default), length(col_names))\n    names(spec$cols) <- col_names\n  } else if (is.null(type_names) && guessed_names) {\n    # unnamed types & names guessed from header: match exactly\n\n    if (length(spec$cols) != length(col_names)) {\n      warning(\n        \"Unnamed `col_types` should have the same length as `col_names`. \",\n        \"Using smaller of the two.\",\n        call. = FALSE\n      )\n      n <- min(length(col_names), length(spec$cols))\n      spec$cols <- spec$cols[seq_len(n)]\n      col_names <- col_names[seq_len(n)]\n    }\n\n    names(spec$cols) <- col_names\n  } else if (is.null(type_names) && !guessed_names) {\n    # unnamed types & names supplied: match non-skipped columns\n    skipped <- vapply(\n      spec$cols,\n      inherits,\n      \"collector_skip\",\n      FUN.VALUE = logical(1)\n    )\n\n    # Needed for read_fwf() because width generator functions have name for\n    # every column, even those that are skipped. Not need for read_delim()\n    if (drop_skipped_names) {\n      col_names <- col_names[!skipped]\n    }\n\n    n_read <- sum(!skipped)\n    n_names <- length(col_names)\n\n    n_new <- abs(n_names - n_read)\n    if (n_read < n_names) {\n      warning(\n        \"Insufficient `col_types`. Guessing \",\n        n_new,\n        \" columns.\",\n        call. = FALSE\n      )\n      spec$cols <- c(spec$cols, list(rep(col_guess(), n_new)))\n    } else if (n_read > n_names) {\n      warning(\n        \"Insufficient `col_names`. Adding \",\n        n_new,\n        \" names.\",\n        call. = FALSE\n      )\n\n      col_names2 <- rep(\"\", length(spec$cols))\n      col_names2[!skipped] <- c(\n        col_names,\n        paste0(\"X\", seq_len(n_new) + n_names)\n      )\n      col_names <- col_names2\n    } else {\n      col_names2 <- rep(\"\", length(spec$cols))\n      col_names2[!skipped] <- col_names\n      col_names <- col_names2\n    }\n    names(spec$cols) <- col_names\n  } else {\n    # names types\n\n    bad_types <- !(type_names %in% col_names)\n    if (any(bad_types)) {\n      warning(\n        \"The following named parsers don't match the column names: \",\n        paste0(type_names[bad_types], collapse = \", \"),\n        call. = FALSE\n      )\n      spec$cols <- spec$cols[!bad_types]\n      type_names <- type_names[!bad_types]\n    }\n\n    default_types <- !(col_names %in% type_names)\n    if (any(default_types)) {\n      defaults <- rep(list(spec$default), sum(default_types))\n      names(defaults) <- col_names[default_types]\n      spec$cols[names(defaults)] <- defaults\n    }\n\n    spec$cols <- spec$cols[col_names]\n  }\n\n  # Guess any types that need to be guessed ------------------------------------\n\n  is_guess <- vapply(\n    spec$cols,\n    function(x) inherits(x, \"collector_guess\"),\n    logical(1)\n  )\n  if (any(is_guess)) {\n    if (is.null(guessed_types)) {\n      ds <- datasource(\n        file,\n        skip = spec$skip,\n        skip_empty_rows = skip_empty_rows,\n        skip_quote = skip_quote,\n        comment = comment\n      )\n      guessed_types <- guess_types(ds, tokenizer, locale, guess_max = guess_max)\n    }\n\n    # Need to be careful here: there might be more guesses than types/names\n    guesses <- guessed_types[seq_along(spec$cols)][is_guess]\n    spec$cols[is_guess] <- lapply(guesses, collector_find)\n  }\n\n  spec\n}\n```",
+  "hints": [],
+  "source_package": "readr",
+  "source_file": "R/col_types.R",
+  "tests": {
+    "fail_to_pass": [],
+    "pass_to_pass": [],
+    "test_files": [
+      "testthat"
+    ]
+  },
+  "solution": null,
+  "source": null,
+  "files": {
+    "changed": [
+      "R/col_types.R"
+    ],
+    "source_files": [
+      "R/col_types.R"
+    ],
+    "test_changes": null
+  },
+  "quality_score": 0.56,
+  "split": "dev",
+  "dependencies": [
+    "testthat"
+  ],
+  "constraints": {},
+  "created_at": "2026-02-23T20:26:51.785680+00:00",
+  "updated_at": null
+}

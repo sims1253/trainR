@@ -1,0 +1,63 @@
+{
+  "schema_version": "1.0",
+  "task_id": "tidyverse_dplyr_7795",
+  "task_type": "swe",
+  "difficulty": "medium",
+  "instruction": "Fix the bug in `case_when_size_common()` where using `NULL` in formula elements (e.g., `case_when(x == \"a\" ~ NULL)`) throws an internal error 'vec_size_common() should have errored' instead of a meaningful user-facing error message. The function should properly handle the edge case where all conditions or values are NULL, allowing proper error messages to be generated downstream.",
+  "context": "The `case_when_size_common()` function in `R/case-when.R` uses `vec_size_common()` to compute sizes of conditions and values. When all elements are NULL, `vec_size_common()` needs the `.absent` parameter to return a sentinel value (-1L) instead of erroring. The fix involves:\n\n1. Adding `.absent = -1L` to both `vec_size_common()` calls\n2. Handling the edge case where size_conditions or size_values equals -1L\n3. Returning appropriate sizes so that `vec_case_when()` can generate proper error messages\n\nFunction signature context:\nr\ncase_when_size_common <- function(\n  conditions,\n  values,\n  size,\n  error_call = caller_env()\n)\n",
+  "hints": [],
+  "source_package": "dplyr",
+  "source_file": null,
+  "tests": {
+    "fail_to_pass": [
+      "case_when(NULL ~ NULL) should error with: '`..1 (left)` must be a logical vector, not `NULL`.'",
+      "case_when(TRUE ~ NULL) should error with: '`..1 (right)` must be a vector, not `NULL`.'",
+      "case_when(NULL ~ TRUE) should error with: '`..1 (left)` must be a logical vector, not `NULL`.'",
+      "case_when(c(TRUE, TRUE) ~ NULL) should error with: '`..1 (right)` must be a vector, not `NULL`.'",
+      "case_when(NULL ~ c(TRUE, TRUE)) should error with: '`..1 (left)` must be a logical vector, not `NULL`.'",
+      "case_when(TRUE ~ NULL, c(TRUE, TRUE) ~ NULL) should error with: '`..1 (right)` must be a vector, not `NULL`.'",
+      "case_when(c(TRUE, TRUE) ~ NULL, c(TRUE, TRUE, TRUE) ~ NULL) should error with: 'Can\\'t recycle `..1 (left)` (size 2) to match `..2 (left)` (size 3).'"
+    ],
+    "pass_to_pass": [
+      "case_when(TRUE ~ 1, FALSE ~ 2) returns expected values",
+      "case_when(c(TRUE, FALSE) ~ 1, c(FALSE, TRUE) ~ 2) returns expected values",
+      "case_when() with valid inputs continues to work correctly"
+    ],
+    "test_files": []
+  },
+  "solution": {
+    "key_changes": [
+      "Add `.absent = -1L` parameter to both `vec_size_common()` calls in `case_when_size_common()`",
+      "Add conditional logic to handle when size_conditions == -1L or size_values == -1L",
+      "Return appropriate size value to allow downstream error handling to generate proper messages",
+      "Handle three cases: all values NULL, all conditions NULL, or both all NULL"
+    ],
+    "potential_pitfalls": [
+      "Forgetting to handle all three edge cases (conditions NULL, values NULL, both NULL)",
+      "Returning wrong size value that causes different error messages",
+      "Not understanding that -1L is a sentinel value indicating all inputs were NULL",
+      "Breaking existing behavior for valid inputs"
+    ],
+    "reference_diff": "diff --git a/R/case-when.R b/R/case-when.R\nindex 58cf5815e0..1f6efe4ac2 100644\n--- a/R/case-when.R\n+++ b/R/case-when.R\n@@ -395,14 +395,32 @@ case_when_size_common <- function(\n   size_conditions <- vec_size_common(\n     !!!conditions,\n     .size = size,\n+    .absent = -1L,\n     .call = error_call\n   )\n   size_values <- vec_size_common(\n     !!!values,\n     .size = size,\n+    .absent = -1L,\n     .call = error_call\n   )\n \n+  # Annoying handling of the edge case of all `NULL` elements in the formulas.\n+  # `vec_case_when()` will error on these and require vector inputs, but we have\n+  # to get to it first (#7794).\n+  if (size_conditions == -1L || size_values == -1L) {\n+    if (size_conditions != -1L) {\n+      # All `values` are `NULL`, but at least 1 `conditions` is non-`NULL`\n+      return(size_conditions)\n+    } else if (size_values != -1L) {\n+      # All `conditions` are `NULL`, but at least 1 `values` is non-`NULL`\n+      return(size_values)\n+    } else {\n+      # All `conditions` and `values` are `NULL`\n+      return(0L)\n+    }\n+  }\n+\n   if (size_conditions == 1L && size_values == 1L) {\n     return(1L)\n   }"
+  },
+  "source": {
+    "type": "github_pr",
+    "repo": "tidyverse/dplyr",
+    "pr_number": 7795,
+    "pr_url": "https://github.com/tidyverse/dplyr/pull/7795",
+    "merged_at": "2026-01-25T02:15:58+00:00",
+    "issue_number": null,
+    "issue_url": "https://github.com/tidyverse/dplyr/issues/7794"
+  },
+  "files": {
+    "changed": [],
+    "source_files": [],
+    "test_changes": null
+  },
+  "quality_score": 8.0,
+  "split": "mined",
+  "dependencies": [],
+  "constraints": {},
+  "created_at": "2026-02-22T18:48:23.940141+00:00",
+  "updated_at": null
+}

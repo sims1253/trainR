@@ -1,0 +1,55 @@
+{
+  "schema_version": "1.0",
+  "task_id": "tidymodels_parsnip_1317",
+  "task_type": "swe",
+  "difficulty": "medium",
+  "instruction": "Fix the bug in the `xgb_by_tree()` function where requesting predictions with `trees` parameter equal to the number of trees in the model causes an 'Out of range for tree layers' error in xgboost. The function should properly bound the `iterationrange` parameter to avoid requesting more iterations than the model contains. This affects the `multi_predict` functionality when users request predictions for a specific number of trees that matches or exceeds what was trained.",
+  "context": "The `xgb_by_tree()` function in R/boost_tree.R handles per-tree predictions for xgboost models. The function uses `iterationrange` parameter which is 1-indexed with exclusive upper bound. The bug occurs when `tree + 1` exceeds the actual number of trees in the model. For xgboost >= 2.0.0.0, the number of iterations can be obtained via `nrow(attr(object$fit, \"evaluation_log\"))`. For older versions, use `object$fit$niter`. The fix requires using `min()` to bound the range_end appropriately.",
+  "hints": [],
+  "source_package": "parsnip",
+  "source_file": null,
+  "tests": {
+    "fail_to_pass": [
+      "test_that(\"submodel prediction doesn't error if trees match number of trees (#1316)\", { ... }) - verifies that multi_predict with trees=20 works on a model trained with 20 trees"
+    ],
+    "pass_to_pass": [
+      "Existing submodel prediction tests should continue to pass",
+      "Tests for predictions with trees < model's tree count should work"
+    ],
+    "test_files": []
+  },
+  "solution": {
+    "key_changes": [
+      "Add bounds checking using min() to prevent iterationrange from exceeding model's actual tree count",
+      "Handle both xgboost >= 2.0.0.0 (use evaluation_log) and older versions (use niter)",
+      "The iterationrange upper bound should be min(actual_iterations, tree + 1)"
+    ],
+    "potential_pitfalls": [
+      "Off-by-one errors: iterationrange is 1-indexed with exclusive upper bound (c(1, n+1) gives n iterations)",
+      "Not handling both xgboost version cases (>= 2.0.0.0 and older)",
+      "Using wrong attribute to determine number of iterations",
+      "Forgetting that trees parameter from user is 0-indexed conceptually but iterationrange needs adjustment"
+    ],
+    "reference_diff": "diff --git a/.github/workflows/R-CMD-check.yaml b/.github/workflows/R-CMD-check.yaml\nindex 135e8834f..94a0bedc1 100644\n--- a/.github/workflows/R-CMD-check.yaml\n+++ b/.github/workflows/R-CMD-check.yaml\n@@ -56,7 +56,7 @@ jobs:\n \n       - uses: r-lib/actions/setup-r-dependencies@v2\n         with:\n-          extra-packages: any::rcmdcheck\n+          extra-packages: any::rcmdcheck, xgboost=?ignore-before-r=4.3.0\n           needs: check\n \n       - name: Install dev reticulate\ndiff --git a/NEWS.md b/NEWS.md\nindex 0282b2f30..7966795a2 100644\n--- a/NEWS.md\n+++ b/NEWS.md\n@@ -1,5 +1,7 @@\n # parsnip (development version)\n \n+* Fixed bug where xgboost mdoels would fail to predict when `trees` matched number of trees in model. (#1316)\n+\n # parsnip 1.4.0\n \n * Fixes issue with running predictions for Decision Trees in Spark (#1309)\ndiff --git a/R/boost_tree.R b/R/boost_tree.R\nindex beb11b46f..b15c6f6af 100644\n--- a/R/boost_tree.R\n+++ b/R/boost_tree.R\n@@ -653,16 +653,19 @@ multi_predict._xgb.Booster <-\n xgb_by_tree <- function(tree, object, new_data, type, ...) {\n   rlang::check_installed(\"xgboost\")\n   if (utils::packageVersion(\"xgboost\") >= \"2.0.0.0\") {\n+    # avoid out of range\n+    range_end <- min(nrow(attr(object$fit, \"evaluation_log\")), tree + 1)\n+\n     pred <- xgb_predict(\n       object$fit,\n       new_data = new_data,\n-      iterationrange = c(1, tree + 1)\n+      iterationrange = c(1, range_end)\n     )\n   } else {\n     pred <- xgb_predict(\n       object$fit,\n       new_data = new_data,\n-      iterationrange = c(1, tree + 1),\n+      iterationrange = c(1, min(object$fit$niter, tree + 1)),\n       ntreelimit = NULL\n     )\n   }"
+  },
+  "source": {
+    "type": "github_pr",
+    "repo": "tidymodels/parsnip",
+    "pr_number": 1317,
+    "pr_url": "https://github.com/tidymodels/parsnip/pull/1317",
+    "merged_at": "2026-01-06T16:04:21+00:00",
+    "issue_number": null,
+    "issue_url": "https://github.com/tidymodels/parsnip/issues/1316"
+  },
+  "files": {
+    "changed": [],
+    "source_files": [],
+    "test_changes": null
+  },
+  "quality_score": 8.0,
+  "split": "mined",
+  "dependencies": [],
+  "constraints": {},
+  "created_at": "2026-02-22T18:58:36.275427+00:00",
+  "updated_at": null
+}

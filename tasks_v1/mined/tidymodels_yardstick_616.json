@@ -1,0 +1,68 @@
+{
+  "schema_version": "1.0",
+  "task_id": "tidymodels_yardstick_616",
+  "task_type": "swe",
+  "difficulty": "medium",
+  "instruction": "Add a `thresholds` argument to the `roc_curve()` function in the yardstick package. This argument should allow users to pre-specify probability thresholds for calculating ROC curves instead of using all unique values from the estimate. The thresholds must be a numeric vector with values between 0 and 1. Duplicate values should be silently removed. When thresholds is NULL (default), the function should use all unique values of estimate as before. The feature should work for both binary and multiclass cases.",
+  "context": "The roc_curve() function calculates ROC curves by computing sensitivity and specificity at various probability thresholds. Currently, it uses all unique values from the estimate column. The new `thresholds` parameter should:\n\n1. Accept a numeric vector of threshold values (0 to 1)\n2. Validate that thresholds is numeric and within [0, 1] range\n3. Work with both binary and multiclass ROC curves\n4. Handle the core algorithm in binary_threshold_curve() where thresholds are mapped to data points using findInterval()\n\nKey function signatures to modify:\n- roc_curve.data.frame(..., thresholds = NULL)\n- roc_curve_vec(truth, estimate, ..., thresholds = NULL)\n- binary_threshold_curve(..., thresholds = NULL)\n- one_vs_all_impl(..., thresholds = NULL)",
+  "hints": [],
+  "source_package": "yardstick",
+  "source_file": null,
+  "tests": {
+    "fail_to_pass": [
+      "roc_curve(two_class_example, truth, Class1, thresholds = seq(0, 0.9, by = 0.1)) returns a tibble with 12 rows (including -Inf and Inf boundaries)",
+      "roc_curve with thresholds argument produces correct specificity and sensitivity values at specified thresholds",
+      "roc_curve with reverse-ordered thresholds produces same result as sorted thresholds",
+      "roc_curve with duplicated thresholds produces same result as unique thresholds",
+      "roc_curve(two_class_example, truth, Class1, thresholds = TRUE) throws error: 'thresholds' must be a numeric vector",
+      "roc_curve(two_class_example, truth, Class1, thresholds = -4) throws error: 'thresholds' must only take values between 0 and 1",
+      "roc_curve(two_class_example, truth, Class1, thresholds = seq(-1, 2, by = 0.2)) throws error about indices outside range"
+    ],
+    "pass_to_pass": [
+      "roc_curve(two_class_example, truth, Class1) without thresholds argument works as before",
+      "roc_curve works with grouped data frames",
+      "roc_curve works with multiclass data",
+      "roc_curve handles case_weights correctly"
+    ],
+    "test_files": []
+  },
+  "solution": {
+    "key_changes": [
+      "Add thresholds parameter to roc_curve.data.frame, roc_curve_vec, and helper functions",
+      "Add validation in roc_curve_vec: check is.numeric(thresholds) and all values in [0, 1]",
+      "Modify binary_threshold_curve: when thresholds is provided, use findInterval() to map thresholds to data instead of using unique estimate values",
+      "Thread thresholds parameter through one_vs_all_impl for multiclass support",
+      "Sort thresholds in decreasing order and remove duplicates before processing",
+      "Update documentation for the new thresholds argument"
+    ],
+    "potential_pitfalls": [
+      "Forgetting to handle NULL case (default behavior should remain unchanged)",
+      "Not properly sorting thresholds in decreasing order before using findInterval()",
+      "Using wrong sign in findInterval(-thresholds, -estimate) - need negative to match decreasing sort",
+      "Not threading thresholds through the one_vs_all_impl helper for multiclass support",
+      "Missing validation for edge cases like empty thresholds vector",
+      "Not updating the one_vs_all_impl to check if thresholds is in formals of the passed function"
+    ],
+    "reference_diff": "diff --git a/NEWS.md b/NEWS.md\nindex cfd88a63..ced2c5ef 100644\n--- a/NEWS.md\n+++ b/NEWS.md\n@@ -14,6 +14,8 @@\n \n * `metric_set()` now provides a more informative error message when `estimate` is not explicitly named for class/prob or survival metric sets. (#504)\n \n+* Added `thresholds` argument to `roc_curve()` to allow for custom thresholds to calculate curves for. (#488)\n+\n * All metrics now have documented ranges of possible values in addition to what direction is the best. (#572)\n \n * The ranked probability score for ordinal classification data was added with `ranked_prob_score()`. (#524)\ndiff --git a/R/prob-binary-thresholds.R b/R/prob-binary-thresholds.R\nindex 6eb138e3..e28b9307 100644\n--- a/R/prob-binary-thresholds.R\n+++ b/R/prob-binary-thresholds.R\n@@ -8,7 +8,8 @@ binary_threshold_curve <- function(\n   estimate,\n   ...,\n   event_level = yardstick_event_level(),\n-  case_weights = NULL\n+  case_weights = NULL,\n+  thresholds = NULL\n ) {\n   check_dots_empty()\n \n@@ -91,11 +92,17 @@ binary_threshold_curve <- function(\n   estimate <- estimate[order]\n   case_weights <- case_weights[order]\n \n-  # Skip repeated probabilities.\n-  # We want the last duplicate to ensure that we capture all the events from the\n-  # `cumsum()`, so we use `fromLast`.\n-  loc_unique <- which(!duplicated(estimate, fromLast = TRUE))\n-  thresholds <- estimate[loc_unique]\n+  if (is.null(thresholds)) {\n+    # Skip repeated probabilities.\n+    # We want the last duplicate to ensure that we capture all the events from the\n+    # `cumsum()`, so we use `fromLast`.\n+    loc_unique <- which(!duplicated(estimate, fromLast = TRUE))\n+    thresholds <- estimate[loc_unique]\n+  } else {\n+    thresholds <- unique(thresholds)\n+    thresholds <- sort(thresholds, decreasing = TRUE)\n+    loc_unique <- findInterval(-thresholds, -estimate)\n+  }\n \n   case_weights_events <- truth * case_weights\n   case_weights_non_events <- (1 - truth) * case_weights\ndiff --git a/R/prob-helpers.R b/R/prob-helpers.R\nindex 21885d20..0a4dce55 100644\n--- a/R/prob-helpers.R\n+++ b/R/prob-helpers.R\n@@ -36,7 +36,15 @@ auc <- function(x, y, na_rm = TRUE) {\n \n # One vs all helper ------------------------------------------------------------\n \n-one_vs_all_impl <- function(fn, truth, estimate, case_weights, call, ...) {\n+one_vs_all_impl <- function(\n+  fn,\n+  truth,\n+  estimate,\n+  case_weights,\n+  thresholds = NULL,\n+  call,\n+  ...\n+) {\n   lvls <- levels(truth)\n   other <- \"..other\"\n \n@@ -59,13 +67,24 @@ one_vs_all_impl <- function(fn, truth, estimate, case_weights, call, ...) {\n \n     # `one_vs_all_impl()` always ignores the event level ordering when\n     # computing each individual binary metric\n-    metric_lst[[i]] <- fn(\n-      truth_temp,\n-      estimate_temp,\n-      case_weights = case_weights,\n-      event_level = \"first\",\n-      ...\n-    )\n+    if (\"thresholds\" %in% names(formals(fn))) {\n+      metric_lst[[i]] <- fn(\n+        truth_temp,\n+        estimate_temp,\n+        case_weights = case_weights,\n+        event_level = \"first\",\n+        thresholds = thresholds,\n+        ...\n+      )\n+    } else {\n+      metric_lst[[i]] <- fn(\n+        truth_temp,\n+        estimate_temp,\n+        case_weights = case_weights,\n+        event_level = \"first\",\n+        ...\n+      )\n+    }\n   }\n \n   metric_lst\n@@ -76,6 +95,7 @@ one_vs_all_with_level <- function(\n   truth,\n   estimate,\n   case_weights,\n+  thresholds = NULL,\n   call,\n   ...\n ) {\n@@ -84,6 +104,7 @@ one_vs_all_with_level <- function(\n     truth = truth,\n     estimate = estimate,\n     case_weights = case_weights,\n+    thresholds = thresholds,\n     call = call,\n     ...\n   )\ndiff --git a/R/probcurve-roc_curve.R b/R/probcurve-roc_curve.R\nindex 6237fe15..858942ec 100644\n--- a/R/probcurve-roc_curve.R\n+++ b/R/probcurve-roc_curve.R\n@@ -19,6 +19,9 @@\n #' @template event_first\n #'\n #' @inheritParams roc_auc\n+#' @param thresholds A numeric vector to denote what values of `estimate` we\n+#'   calculate the curve for. Defaults to `NULL` which denotes that all unique\n+#'   values of `estimate` are used. Duplicate values are silently removed.\n #'\n #' @return\n #' A tibble with class `roc_df` or `roc_grouped_df` having\n@@ -76,7 +79,8 @@ roc_curve.data.frame <- function(\n   na_rm = TRUE,\n   event_level = yardstick_event_level(),\n   case_weights = NULL,\n-  options = list()\n+  options = list(),\n+  thresholds = NULL\n ) {\n   check_roc_options_deprecated(\"roc_curve\", options)\n \n@@ -88,7 +92,8 @@ roc_curve.data.frame <- function(\n     ...,\n     na_rm = na_rm,\n     event_level = event_level,\n-    case_weights = !!enquo(case_weights)\n+    case_weights = !!enquo(case_weights),\n+    fn_options = list(thresholds = thresholds)\n   )\n \n   curve_finalize(result, data, \"roc_df\", \"grouped_roc_df\")\n@@ -100,11 +105,29 @@ roc_curve_vec <- function(\n   na_rm = TRUE,\n   event_level = yardstick_event_level(),\n   case_weights = NULL,\n+  thresholds = NULL,\n   ...\n ) {\n   check_bool(na_rm)\n   abort_if_class_pred(truth)\n \n+  if (!is.null(thresholds)) {\n+    if (!is.numeric(thresholds)) {\n+      cli::cli_abort(\n+        \"{.arg thresholds} must be a numeric vector,\n+        not {.obj_type_friendly {thresholds}}.\"\n+      )\n+    }\n+    if (any(thresholds < 0) || any(thresholds > 1)) {\n+      offenders <- which(thresholds < 0 | thresholds > 1)\n+      cli::cli_abort(c(\n+        \"{.arg thresholds} must only take values between 0 and 1.\",\n+        \"The following {length(offenders)} {?index/indices} {?falls/fall} \n+        outside the range: {offenders}.\"\n+      ))\n+    }\n+  }\n+\n   estimator <- finalize_estimator(truth, metric_class = \"roc_curve\")\n \n   check_prob_metric(truth, estimate, case_weights, estimator)\n@@ -130,7 +153,8 @@ roc_curve_vec <- function(\n     estimate = estimate,\n     estimator = estimator,\n     event_level = event_level,\n-    case_weights = case_weights\n+    case_weights = case_weights,\n+    thresholds = thresholds\n   )\n }\n \n@@ -140,16 +164,31 @@ roc_curve_estimator_impl <- function(\n   estimator,\n   event_level,\n   case_weights,\n+  thresholds,\n   call = caller_env()\n ) {\n   if (is_binary(estimator)) {\n-    roc_curve_binary(truth, estimate, event_level, case_weights, call)\n+    roc_curve_binary(\n+      truth,\n+      estimate,\n+      event_level,\n+      case_weights,\n+      thresholds,\n+      call\n+    )\n   } else {\n-    roc_curve_multiclass(truth, estimate, case_weights, call)\n+    roc_curve_multiclass(truth, estimate, case_weights, thresholds, call)\n   }\n }\n \n-roc_curve_binary <- function(truth, estimate, event_level, case_weights, call) {\n+roc_curve_binary <- function(\n+  truth,\n+  estimate,\n+  event_level,\n+  case_weights,\n+  thresholds,\n+  call\n+) {\n   lvls <- levels(truth)\n \n   if (!is_event_first(event_level)) {\n@@ -170,7 +209,8 @@ roc_curve_binary <- function(truth, estimate, event_level, case_weights, call) {\n     truth = truth,\n     estimate = estimate,\n     event_level = event_level,\n-    case_weights = case_weights\n+    case_weights = case_weights,\n+    thresholds = thresholds\n   )\n \n   threshold <- curve$threshold\n@@ -202,12 +242,19 @@ roc_curve_binary <- function(truth, estimate, event_level, case_weights, call) {\n }\n \n # One-VS-All approach\n-roc_curve_multiclass <- function(truth, estimate, case_weights, call) {\n+roc_curve_multiclass <- function(\n+  truth,\n+  estimate,\n+  case_weights,\n+  thresholds,\n+  call\n+) {\n   one_vs_all_with_level(\n     fn = roc_curve_binary,\n     truth = truth,\n     estimate = estimate,\n-    case_weights = case_weights\n+    case_weights = case_weights,\n+    thresholds = thresholds\n   )\n }\n \ndiff --git a/man/roc_curve.Rd b/man/roc_curve.Rd\nindex 2a31b738..2109fc9e 100644\n--- a/man/roc_curve.Rd\n+++ b/man/roc_curve.Rd\n@@ -14,7 +14,8 @@ roc_curve(data, ...)\n   na_rm = TRUE,\n   event_level = yardstick_event_level(),\n   case_weights = NULL,\n-  options = list()\n+  options = list(),\n+  thresholds = NULL\n )\n }\n \\arguments{\n@@ -54,6 +55,10 @@ will be ignored with a warning.\n \n Previously, these were options passed on to \\code{pROC::roc()}. If you need\n support for this, use the pROC package directly.}\n+\n+\\item{thresholds}{A numeric vector to denote what values of \\code{estimate} we\n+calculate the curve for. Defaults to \\code{NULL} which denotes that all unique\n+values of \\code{estimate} are used. Duplicate values are silently removed.}\n }\n \\value{\n A tibble with class \\code{roc_df} or \\code{roc_grouped_df} having"
+  },
+  "source": {
+    "type": "github_pr",
+    "repo": "tidymodels/yardstick",
+    "pr_number": 616,
+    "pr_url": "https://github.com/tidymodels/yardstick/pull/616",
+    "merged_at": "2026-01-28T20:12:42+00:00",
+    "issue_number": null,
+    "issue_url": "https://github.com/tidymodels/yardstick/issues/488"
+  },
+  "files": {
+    "changed": [],
+    "source_files": [],
+    "test_changes": null
+  },
+  "quality_score": 8.0,
+  "split": "mined",
+  "dependencies": [],
+  "constraints": {},
+  "created_at": "2026-02-22T19:01:54.955950+00:00",
+  "updated_at": null
+}

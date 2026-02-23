@@ -1,0 +1,66 @@
+{
+  "schema_version": "1.0",
+  "task_id": "rstudio_plumber_1018",
+  "task_type": "swe",
+  "difficulty": "medium",
+  "instruction": "Fix the swagger redirect functionality in the `swagger_redirects()` function in R/ui.R. When `apiPath` is configured (e.g., `/api/v1`), the redirect from `/__swagger__/` to `/__docs__/` was using absolute paths which broke documentation access when APIs are mounted at subpaths. The fix should: (1) Include the apiPath prefix in the redirect keys (e.g., `/api/v1/__swagger__/`), and (2) Use relative path targets (`../__docs__/`) instead of absolute paths so redirects work correctly regardless of apiPath configuration.",
+  "context": "The `swagger_redirects()` function generates redirect routes for legacy swagger documentation paths. It should return a named list where names are the redirect source paths and values contain the target route and handler function. The function uses `get_option_or_env(\"plumber.apiPath\", \"\")` to get the API path prefix. The redirects should return 301 status codes with the Location header set to the redirect target.",
+  "hints": [],
+  "source_package": "plumber",
+  "source_file": null,
+  "tests": {
+    "fail_to_pass": [
+      "swagger_redirects returns correct redirect structure with default apiPath",
+      "swagger_redirects respects custom apiPath",
+      "swagger redirect handler returns 301 response with relative path",
+      "swagger redirect handler works with apiPath",
+      "swagger redirects work on mounted router with apiPath",
+      "swagger redirects work with nested apiPath (e.g., /api/v1/myapp)",
+      "swagger redirects respect environment variable for apiPath",
+      "swagger redirects handle empty apiPath correctly",
+      "multiple swagger redirects on same router work independently"
+    ],
+    "pass_to_pass": [
+      "swagger_redirects returns empty list when plumber.legacyRedirects = FALSE",
+      "swagger redirects are mounted on plumber router",
+      "swagger redirects can be unmounted",
+      "swagger redirect overwrite warning appears when route exists"
+    ],
+    "test_files": []
+  },
+  "solution": {
+    "key_changes": [
+      "Change redirect targets from absolute paths (e.g., `/api/v1/__docs__/`) to relative paths (e.g., `../__docs__/`)",
+      "Include apiPath prefix in redirect keys: `paste0(path, \"/__swagger__/\")` instead of just `/__swagger__/`",
+      "The swagger_base variable should be constructed as `paste0(path, \"/__swagger__/\")`",
+      "Both redirect entries (`swagger_base` and `swagger_base + \"index.html\"`) should use `../__docs__/` relative targets"
+    ],
+    "potential_pitfalls": [
+      "Using absolute paths instead of relative paths will break when apiPath is set",
+      "Forgetting to include apiPath in the redirect keys will cause routes to not match",
+      "Not handling the case when apiPath is empty string vs NULL",
+      "The relative path `../__docs__/` works because `__swagger__` and `__docs__` are siblings at the same level under apiPath"
+    ],
+    "reference_diff": "diff --git a/R/ui.R b/R/ui.R\nindex 6fbc2bcd..1b1490d0 100644\n--- a/R/ui.R\n+++ b/R/ui.R\n@@ -3,7 +3,6 @@\n # Mount OpenAPI and Docs\n #' @noRd\n mount_docs <- function(pr, host, port, docs_info, callback, quiet = FALSE) {\n-\n   # return early if not enabled\n   if (!isTRUE(docs_info$enabled)) {\n     return()\n@@ -14,9 +13,9 @@ mount_docs <- function(pr, host, port, docs_info, callback, quiet = FALSE) {\n     \"plumber.apiURL\",\n     urlHost(\n       scheme = get_option_or_env(\"plumber.apiScheme\", \"http\"),\n-      host   = get_option_or_env(\"plumber.apiHost\", host),\n-      port   = get_option_or_env(\"plumber.apiPort\", port),\n-      path   = get_option_or_env(\"plumber.apiPath\", \"\"),\n+      host = get_option_or_env(\"plumber.apiHost\", host),\n+      port = get_option_or_env(\"plumber.apiPort\", port),\n+      path = get_option_or_env(\"plumber.apiPath\", \"\"),\n       changeHostLocation = TRUE\n     )\n   )\n@@ -27,7 +26,9 @@ mount_docs <- function(pr, host, port, docs_info, callback, quiet = FALSE) {\n   # Mount Docs\n   if (length(registered_docs()) == 0) {\n     if (!isTRUE(quiet)) {\n-      message(\"No visual documentation options registered. See help(register_docs).\")\n+      message(\n+        \"No visual documentation options registered. See help(register_docs).\"\n+      )\n     }\n     return()\n   }\n@@ -48,7 +49,6 @@ mount_docs <- function(pr, host, port, docs_info, callback, quiet = FALSE) {\n   }\n \n   invisible()\n-\n }\n \n # Check is Docs is available\n@@ -57,7 +57,7 @@ is_docs_available <- function(docs) {\n   if (isTRUE(docs %in% registered_docs())) {\n     return(TRUE)\n   } else {\n-    message(\"Unknown docs \\\"\", docs,\"\\\". Maybe try library(\", docs,\").\")\n+    message(\"Unknown docs \\\"\", docs, \"\\\". Maybe try library(\", docs, \").\")\n     return(FALSE)\n   }\n }\n@@ -65,7 +65,6 @@ is_docs_available <- function(docs) {\n # Unmount OpenAPI and Docs\n #' @noRd\n unmount_docs <- function(pr, docs_info) {\n-\n   # return early if not enabled\n   if (!isTRUE(docs_info$enabled)) {\n     return()\n@@ -84,20 +83,20 @@ unmount_docs <- function(pr, docs_info) {\n #' Mount OpenAPI Specification to a plumber router\n #' @noRd\n mount_openapi <- function(pr, api_url) {\n-\n   spec <- pr$getApiSpec()\n \n   # Create a function that's hardcoded to return the OpenAPI specification -- regardless of env.\n   openapi_fun <- function(req) {\n     # use the HTTP_REFERER so RSC can find the Docs location to ask\n     ## (can't directly ask for 127.0.0.1)\n-    if (is.null(get_option_or_env(\"plumber.apiURL\")) &&\n-        is.null(get_option_or_env(\"plumber.apiHost\"))) {\n+    if (\n+      is.null(get_option_or_env(\"plumber.apiURL\")) &&\n+        is.null(get_option_or_env(\"plumber.apiHost\"))\n+    ) {\n       if (is.null(req$HTTP_REFERER)) {\n         # Prevent leaking host and port if option is not set\n         api_url <- character(1)\n-      }\n-      else {\n+      } else {\n         # Use HTTP_REFERER as fallback\n         api_url <- req$HTTP_REFERER\n         api_url <- sub(\"(\\\\?.*)?$\", \"\", api_url)\n@@ -107,18 +106,28 @@ mount_openapi <- function(pr, api_url) {\n     }\n \n     utils::modifyList(list(servers = list(list(url = api_url))), spec)\n-\n   }\n   # http://spec.openapis.org/oas/v3.0.3#document-structure\n   # \"It is RECOMMENDED that the root OpenAPI document be named: openapi.json\"\n-  openapi_json_path <- paste0(get_option_or_env(\"plumber.apiPath\", \"\"), \"/openapi.json\")\n+  # `plumber.apiPath` option is for the UI of the docs, not internal routing. Do not use it.\n+  openapi_json_path <- paste0(\n+    get_option_or_env(\"plumber.apiPath\", \"\"),\n+    \"/openapi.json\"\n+  )\n   for (ep in pr$endpoints[[\"__no-preempt__\"]]) {\n     if (ep$path == openapi_json_path) {\n-      message(\"Overwritting existing `/openapi.json` route. Use `$setApiSpec()` to define your OpenAPI Spec\")\n+      message(\n+        \"Overwritting existing `/openapi.json` route. Use `$setApiSpec()` to define your OpenAPI Spec\"\n+      )\n       break\n     }\n   }\n-  pr$handle(\"GET\", openapi_json_path, openapi_fun, serializer = serializer_unboxed_json())\n+  pr$handle(\n+    \"GET\",\n+    openapi_json_path,\n+    openapi_fun,\n+    serializer = serializer_unboxed_json()\n+  )\n \n   invisible()\n }\n@@ -179,11 +188,12 @@ unmount_openapi <- function(pr) {\n #' }\n #' @rdname register_docs\n register_docs <- function(name, index, static = NULL) {\n-\n   stopifnot(is.character(name) && length(name) == 1L)\n   stopifnot(grepl(\"^[a-zA-Z0-9_]+$\", name))\n   stopifnot(is.function(index))\n-  if (!is.null(static)) stopifnot(is.function(static))\n+  if (!is.null(static)) {\n+    stopifnot(is.function(static))\n+  }\n \n   docs_root <- \"/__docs__/\"\n   docs_paths <- c(\"/index.html\", \"/\")\n@@ -201,7 +211,12 @@ register_docs <- function(name, index, static = NULL) {\n \n     docs_router <- Plumber$new()\n     for (path in docs_paths) {\n-      docs_router$handle(\"GET\", path, docs_index, serializer = serializer_html())\n+      docs_router$handle(\n+        \"GET\",\n+        path,\n+        docs_index,\n+        serializer = serializer_html()\n+      )\n     }\n     if (!is.null(static)) {\n       docs_router$mount(\"/\", PlumberStatic$new(static(...)))\n@@ -221,7 +236,11 @@ register_docs <- function(name, index, static = NULL) {\n     redirect_info <- swagger_redirects()\n     for (path in names(redirect_info)) {\n       if (router_has_route(pr, path, \"GET\")) {\n-        message(\"Overwriting existing GET endpoint: \", path, \". Disable by setting `options_plumber(legacyRedirects = FALSE)`\")\n+        message(\n+          \"Overwriting existing GET endpoint: \",\n+          path,\n+          \". Disable by setting `options_plumber(legacyRedirects = FALSE)`\"\n+        )\n       }\n       pr_get(pr, path, redirect_info[[path]]$handler)\n     }\n@@ -274,18 +293,28 @@ swagger_redirects <- function() {\n   }\n \n   path <- get_option_or_env(\"plumber.apiPath\", \"\")\n-  list(\n-    \"/__swagger__/\" = to_route(paste0(path, \"/__docs__/\")),\n-    \"/__swagger__/index.html\"  = to_route(paste0(path, \"/__docs__/index.html\"))\n-  )\n+  # The swagger UI should exist at the `<API_PATH>/__swagger__/` path\n+  # which should redirect to a sibling `__docs__/` path\n+  swagger_base <- paste0(path, \"/__swagger__/\")\n+\n+  ret <- list()\n+  ret[[swagger_base]] <-\n+    to_route(\"../__docs__/\")\n+  ret[[paste0(swagger_base, \"index.html\")]] <-\n+    to_route(\"../__docs__/index.html\")\n+\n+  ret\n }\n \n \n register_swagger_docs_onLoad <- function() {\n-  tryCatch({\n-    do.call(register_docs, swagger::plumber_docs())\n-  }, error = function(e) {\n-    message(\"Could not register `swagger` docs. \", e)\n-    NULL\n-  })\n+  tryCatch(\n+    {\n+      do.call(register_docs, swagger::plumber_docs())\n+    },\n+    error = function(e) {\n+      message(\"Could not register `swagger` docs. \", e)\n+      NULL\n+    }\n+  )\n }"
+  },
+  "source": {
+    "type": "github_pr",
+    "repo": "rstudio/plumber",
+    "pr_number": 1018,
+    "pr_url": "https://github.com/rstudio/plumber/pull/1018",
+    "merged_at": "2026-01-27T21:09:13+00:00",
+    "issue_number": null,
+    "issue_url": "https://github.com/rstudio/plumber/issues/1016"
+  },
+  "files": {
+    "changed": [],
+    "source_files": [],
+    "test_changes": null
+  },
+  "quality_score": 8.0,
+  "split": "mined",
+  "dependencies": [],
+  "constraints": {},
+  "created_at": "2026-02-22T18:44:28.337672+00:00",
+  "updated_at": null
+}

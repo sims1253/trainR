@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.0",
+  "task_id": "task-6b50e4bf",
+  "task_type": "test_gen",
+  "difficulty": "easy",
+  "instruction": "Add snapshot tests for `parsnip::combine_words` to capture complex output.\n\n\nExisting snapshot tests in this package:\n```r\nexpect_snapshot(combine_words(1))\n```\n```r\nexpect_snapshot(combine_words(1:2))\n```\n\n\nSnapshot testing is appropriate when the function produces:\n- Formatted text output (messages, errors, warnings)\n- Complex data structures that are hard to test with expect_equal\n- Console output with ANSI formatting\n\nRequirements:\n1. Use expect_snapshot() for capturing printed output\n2. Use expect_snapshot(error = TRUE) for error message snapshots\n3. Use expect_snapshot(transform = ...) if output contains volatile data (timestamps, paths)\n4. Test with representative inputs that exercise different output formats\n",
+  "context": "Package: parsnip v1.4.1.9002\nDescription: A Common API to Modeling and Analysis Functions\nFunction: combine_words\nParameters: x\nTest patterns used: expect_snapshot, test_that\nExpectations used: expect_snapshot\n\nFunction Code:\n```r\ncombine_words <- function(x) {\n  if (isTRUE(length(x) > 2)) {\n    last <- \", and \"\n  } else {\n    last <- \" and \"\n  }\n\n  glue::glue_collapse(x, \", \", last = last)\n}\n```",
+  "hints": [],
+  "source_package": "parsnip",
+  "source_file": "R/aaa.R",
+  "tests": {
+    "fail_to_pass": [],
+    "pass_to_pass": [],
+    "test_files": [
+      "testthat"
+    ]
+  },
+  "solution": null,
+  "source": null,
+  "files": {
+    "changed": [
+      "R/aaa.R"
+    ],
+    "source_files": [
+      "R/aaa.R"
+    ],
+    "test_changes": null
+  },
+  "quality_score": 0.651,
+  "split": "dev",
+  "dependencies": [
+    "testthat"
+  ],
+  "constraints": {},
+  "created_at": "2026-02-23T20:26:51.786921+00:00",
+  "updated_at": null
+}

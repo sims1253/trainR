@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.0",
+  "task_id": "task-9a3c7b7b",
+  "task_type": "test_gen",
+  "difficulty": "hard",
+  "instruction": "Add comprehensive edge case tests for `otel_srcref_attributes`.\n\n\nExisting tests for reference:\n```r\n\n```\n```r\n\n```\n```r\n\n```\n\n\nThe existing tests cover basic functionality. Add tests for:\n1. NULL inputs to each argument\n2. Empty vectors/strings: character(0), \"\", integer(0)\n3. Boundary values: 0, 1, -1, NA, NaN, Inf\n4. Invalid input types (passing numeric where character expected, etc.)\n5. Missing arguments (use expect_error with class matching)\n6. Very long inputs (strings > 1000 chars, vectors > 10000 elements)\n",
+  "context": "Package: shiny v1.12.1.9000\nDescription: Web Application Framework for R\nFunction: otel_srcref_attributes\nParameters: srcref, fn_name\nTest patterns used: test_that\nExpectations used: expect_equal, expect_error, expect_false, expect_identical, expect_null\n\nFunction Code:\n```r\notel_srcref_attributes <- function(srcref, fn_name = NULL) {\n  if (is.function(srcref)) {\n    srcref <- getSrcRefs(srcref)[[1]][[1]]\n  }\n\n  if (is.null(srcref)) {\n    return(NULL)\n  }\n\n  stopifnot(inherits(srcref, \"srcref\"))\n\n  # Semantic conventions for code: https://opentelemetry.io/docs/specs/semconv/registry/attributes/code/\n  #\n  # Inspiration from https://github.com/r-lib/testthat/pull/2087/files#diff-92de3306849d93d6f7e76c5aaa1b0c037e2d716f72848f8a1c70536e0c8a1564R123-R124\n  srcfile <- attr(srcref, \"srcfile\")\n  # Prefer the original filename (as user typed it) over the normalized path\n  filename <- getSrcfileFilename(srcfile)\n  dropNulls(list(\n    \"code.function.name\" = fn_name,\n    # Location attrs\n    \"code.file.path\" = filename,\n    \"code.line.number\" = srcref[1],\n    \"code.column.number\" = srcref[2],\n    # Remove these deprecated location names once Logfire supports the preferred names\n    # https://github.com/pydantic/logfire/issues/1559\n    \"code.filepath\" = filename,\n    \"code.lineno\" = srcref[1],\n    \"code.column\" = srcref[2]\n  ))\n}\n```",
+  "hints": [],
+  "source_package": "shiny",
+  "source_file": "R/otel-attr-srcref.R",
+  "tests": {
+    "fail_to_pass": [],
+    "pass_to_pass": [],
+    "test_files": [
+      "testthat"
+    ]
+  },
+  "solution": null,
+  "source": null,
+  "files": {
+    "changed": [
+      "R/otel-attr-srcref.R"
+    ],
+    "source_files": [
+      "R/otel-attr-srcref.R"
+    ],
+    "test_changes": null
+  },
+  "quality_score": 0.56,
+  "split": "train",
+  "dependencies": [
+    "testthat"
+  ],
+  "constraints": {},
+  "created_at": "2026-02-23T20:26:51.761533+00:00",
+  "updated_at": null
+}

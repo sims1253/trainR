@@ -1,0 +1,59 @@
+{
+  "schema_version": "1.0",
+  "task_id": "Rdatatable_data.table_7634",
+  "task_type": "swe",
+  "difficulty": "medium",
+  "instruction": "Modify the `dcast()` and `melt()` functions in data.table to accept data.frame inputs directly, without requiring users to manually coerce them to data.table first. This should match the behavior of other data.table functions like `rbindlist()` and `fread()` that accept data.frame inputs seamlessly. The implementation should manually dispatch to the data.table methods to avoid potential conflicts with reshape2's data.frame methods.",
+  "context": "The dcast() function is defined in R/fcast.R and melt() is in R/fmelt.R. Both currently use UseMethod() for S3 dispatch. The internal dcast.data.table and melt.data.table functions previously had checks that threw errors when passed non-data.table inputs. The solution involves intercepting data.frame inputs before UseMethod() dispatch and redirecting them to the .data.table methods using match.call() and eval().",
+  "hints": [],
+  "source_package": "data.table",
+  "source_file": null,
+  "tests": {
+    "fail_to_pass": [
+      "melt(data.frame(a = 1:2, b = 3:4), id.vars=1:2) should return the same result as melt(data.table(a = 1:2, b = 3:4), id.vars=1:2)",
+      "dcast(data.frame(a = c('x', 'y'), b = 1:2, v = 3:4), a ~ b, value.var = 'v') should return the same result as dcast(data.table(...), ...)"
+    ],
+    "pass_to_pass": [
+      "Existing tests for melt() with data.table input should continue to pass",
+      "Existing tests for dcast() with data.table input should continue to pass",
+      "Tests for error handling of invalid inputs should still work"
+    ],
+    "test_files": []
+  },
+  "solution": {
+    "key_changes": [
+      "Add check in dcast() and melt() functions: if (!is.data.table(data) && is.data.frame(data))",
+      "Use match.call() to capture the original function call",
+      "Modify the function name in the call object to dcast.data.table or melt.data.table",
+      "Use eval() in parent.frame() to execute the redirected call",
+      "Remove the error checks in dcast.data.table and melt.data.table that rejected data.frame inputs"
+    ],
+    "potential_pitfalls": [
+      "Using standard S3 method dispatch could conflict with reshape2's data.frame methods for melt/dcast",
+      "Incorrect use of eval() environment could cause scoping issues with arguments",
+      "Forgetting to handle the parent.frame() correctly when evaluating the modified call",
+      "Not removing the old error checks in the .data.table methods would cause failures"
+    ],
+    "reference_diff": "diff --git a/NEWS.md b/NEWS.md\nindex 24a078836..fd0ee8bf1 100644\n--- a/NEWS.md\n+++ b/NEWS.md\n@@ -26,6 +26,8 @@\n       - Type conversion support in GForce expressions (e.g., `sum(as.numeric(x))` will use GForce, saving the need to coerce `x` in a setup step) [#2934](https://github.com/Rdatatable/data.table/issues/2934)\n       - Arithmetic operation support in GForce (e.g., `max(x) - min(x)` will use GForce on both `max(x)` and `min(x)`, saving the need to do the subtraction in a follow-up step) [#3815](https://github.com/Rdatatable/data.table/issues/3815)\n \n+4. `dcast()` and `melt()` \"just work\" when passed a data.frame, not just data.tables, with no need for coercion, [#7614](https://github.com/Rdatatable/data.table/issues/7614). Thanks @MichaelChirico for the suggestion and @manmita for the PR. Note that to avoid potential conflicts with {reshape2}'s data.frame methods, we do the dispatch to the data.table method manually.\n+\n ### BUG FIXES\n \n 1. `fread()` with `skip=0` and `(header=TRUE|FALSE)` no longer skips the first row when it has fewer fields than subsequent rows, [#7463](https://github.com/Rdatatable/data.table/issues/7463). Thanks @emayerhofer for the report and @ben-schwen for the fix.\ndiff --git a/R/fcast.R b/R/fcast.R\nindex c11eb76d5..3de3fcb8f 100644\n--- a/R/fcast.R\n+++ b/R/fcast.R\n@@ -12,6 +12,11 @@ dcast = function(\n   data, formula, fun.aggregate = NULL, ..., margins = NULL,\n   subset = NULL, fill = NULL, value.var = guess(data)\n ) {\n+  if (!is.data.table(data) && is.data.frame(data)){\n+    mc <- match.call()\n+    mc[[1L]] <- as.name(\"dcast.data.table\")\n+    return(eval(mc, parent.frame()))\n+  }\n   UseMethod(\"dcast\", data)\n }\n \n@@ -119,7 +124,6 @@ aggregate_funs = function(funs, vals, sep=\"_\", ...) {\n }\n \n dcast.data.table = function(data, formula, fun.aggregate = NULL, sep = \"_\", ..., margins = NULL, subset = NULL, fill = NULL, drop = TRUE, value.var = guess(data), verbose = getOption(\"datatable.verbose\"), value.var.in.dots = FALSE, value.var.in.LHSdots = value.var.in.dots, value.var.in.RHSdots = value.var.in.dots) {\n-  if (!is.data.table(data)) stopf(\"'%s' must be a data.table\", \"data\")\n   drop = as.logical(rep_len(drop, 2L))\n   if (anyNA(drop)) stopf(\"'drop' must be logical vector with no missing entries\")\n   if (!isTRUEorFALSE(value.var.in.dots))\ndiff --git a/R/fmelt.R b/R/fmelt.R\nindex 85a8a641e..6d26d6b10 100644\n--- a/R/fmelt.R\n+++ b/R/fmelt.R\n@@ -4,6 +4,11 @@\n #   redirection as well\n \n melt = function(data, ..., na.rm = FALSE, value.name = \"value\") {\n+  if (!is.data.table(data) && is.data.frame(data)){\n+    mc <- match.call()\n+    mc[[1L]] <- as.name(\"melt.data.table\")\n+    return(eval(mc, parent.frame()))\n+  }\n   UseMethod(\"melt\", data)\n }\n \n@@ -176,7 +181,6 @@ measurev = function(fun.list, sep=\"_\", pattern, cols, multiple.keyword=\"value.na\n melt.data.table = function(data, id.vars, measure.vars, variable.name = \"variable\",\n        value.name = \"value\", ..., na.rm = FALSE, variable.factor = TRUE, value.factor = FALSE,\n        verbose = getOption(\"datatable.verbose\")) {\n-  if (!is.data.table(data)) stopf(\"'%s' must be a data.table\", \"data\")\n   for(type.vars in c(\"id.vars\",\"measure.vars\")){\n     sub.lang <- substitute({\n       if (missing(VAR)) VAR=NULL"
+  },
+  "source": {
+    "type": "github_pr",
+    "repo": "Rdatatable/data.table",
+    "pr_number": 7634,
+    "pr_url": "https://github.com/Rdatatable/data.table/pull/7634",
+    "merged_at": "2026-01-29T20:36:52+00:00",
+    "issue_number": null,
+    "issue_url": "https://github.com/Rdatatable/data.table/issues/7614"
+  },
+  "files": {
+    "changed": [],
+    "source_files": [],
+    "test_changes": null
+  },
+  "quality_score": 8.0,
+  "split": "mined",
+  "dependencies": [],
+  "constraints": {},
+  "created_at": "2026-02-22T18:36:40.440906+00:00",
+  "updated_at": null
+}

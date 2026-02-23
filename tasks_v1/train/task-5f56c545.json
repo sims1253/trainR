@@ -1,0 +1,39 @@
+{
+  "schema_version": "1.0",
+  "task_id": "task-5f56c545",
+  "task_type": "test_gen",
+  "difficulty": "easy",
+  "instruction": "A test for `glue_col` is failing. Diagnose and fix the issue.\n\n\nFailing test:\n```r\n\n```\n\n\nSteps:\n1. Read the function source code to understand expected behavior\n2. Compare the test expectations with actual function behavior\n3. Fix the test if expectations are wrong, or fix the function if it has a bug\n4. Ensure the fix maintains backward compatibility\n5. Run the tests to verify the fix\n",
+  "context": "Package: glue v1.8.0.9000\nDescription: Interpreted String Literals\nFunction: glue_col\nParameters: .envir, .na, .literal\nTest patterns used: expect_snapshot, test_that\nExpectations used: expect_identical, expect_snapshot\n\nFunction Code:\n```r\nglue_col <- function(..., .envir = parent.frame(), .na = \"NA\", .literal = FALSE) {\n  glue(..., .envir = .envir, .na = .na, .literal = .literal, .transformer = color_transformer)\n}\n```",
+  "hints": [],
+  "source_package": "glue",
+  "source_file": "R/color.R",
+  "tests": {
+    "fail_to_pass": [],
+    "pass_to_pass": [],
+    "test_files": [
+      "R",
+      "testthat"
+    ]
+  },
+  "solution": null,
+  "source": null,
+  "files": {
+    "changed": [
+      "R/color.R"
+    ],
+    "source_files": [
+      "R/color.R"
+    ],
+    "test_changes": null
+  },
+  "quality_score": 0.541,
+  "split": "train",
+  "dependencies": [
+    "R",
+    "testthat"
+  ],
+  "constraints": {},
+  "created_at": "2026-02-23T20:26:51.756025+00:00",
+  "updated_at": null
+}

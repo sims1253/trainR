@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.0",
+  "task_id": "task-a3b639e7",
+  "task_type": "test_gen",
+  "difficulty": "hard",
+  "instruction": "Add comprehensive edge case tests for `autoload`.\n\n\nExisting tests for reference:\n```r\n\n```\n\n\nThe existing tests cover basic functionality. Add tests for:\n1. NULL inputs to each argument\n2. Empty vectors/strings: character(0), \"\", integer(0)\n3. Boundary values: 0, 1, -1, NA, NaN, Inf\n4. Invalid input types (passing numeric where character expected, etc.)\n5. Missing arguments (use expect_error with class matching)\n6. Very long inputs (strings > 1000 chars, vectors > 10000 elements)\n",
+  "context": "Package: renv v1.1.7.9000\nDescription: Project Environments\nFunction: autoload\nTest patterns used: test_that\nExpectations used: expect_equal\n\nFunction Code:\n```r\nautoload <- function() {\n  invisible(renv_autoload_impl())\n}\n```",
+  "hints": [],
+  "source_package": "renv",
+  "source_file": "R/autoload.R",
+  "tests": {
+    "fail_to_pass": [],
+    "pass_to_pass": [],
+    "test_files": [
+      "testthat"
+    ]
+  },
+  "solution": null,
+  "source": null,
+  "files": {
+    "changed": [
+      "R/autoload.R"
+    ],
+    "source_files": [
+      "R/autoload.R"
+    ],
+    "test_changes": null
+  },
+  "quality_score": 0.56,
+  "split": "dev",
+  "dependencies": [
+    "testthat"
+  ],
+  "constraints": {},
+  "created_at": "2026-02-23T20:26:51.787146+00:00",
+  "updated_at": null
+}

@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.0",
+  "task_id": "task-0653a8f5",
+  "task_type": "test_gen",
+  "difficulty": "easy",
+  "instruction": "A test for `st_cast` is failing. Diagnose and fix the issue.\n\n\nFailing test:\n```r\n\n```\n\n\nSteps:\n1. Read the function source code to understand expected behavior\n2. Compare the test expectations with actual function behavior\n3. Fix the test if expectations are wrong, or fix the function if it has a bug\n4. Ensure the fix maintains backward compatibility\n5. Run the tests to verify the fix\n",
+  "context": "Package: sf v1.1-0\nDescription: Simple Features for R\nFunction: st_cast\nParameters: x, to\nTest patterns used: test_that\nExpectations used: expect_equal, expect_error, expect_identical, expect_s3_class, expect_silent\n\nFunction Code:\n```r\nst_cast <- function(x, to, ...) UseMethod(\"st_cast\")\n```",
+  "hints": [],
+  "source_package": "sf",
+  "source_file": "R/cast_sfc.R",
+  "tests": {
+    "fail_to_pass": [],
+    "pass_to_pass": [],
+    "test_files": [
+      "testthat"
+    ]
+  },
+  "solution": null,
+  "source": null,
+  "files": {
+    "changed": [
+      "R/cast_sfc.R"
+    ],
+    "source_files": [
+      "R/cast_sfc.R"
+    ],
+    "test_changes": null
+  },
+  "quality_score": 0.51,
+  "split": "held_out",
+  "dependencies": [
+    "testthat"
+  ],
+  "constraints": {},
+  "created_at": "2026-02-23T20:26:51.809518+00:00",
+  "updated_at": null
+}

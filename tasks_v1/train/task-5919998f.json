@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.0",
+  "task_id": "task-5919998f",
+  "task_type": "test_gen",
+  "difficulty": "hard",
+  "instruction": "Add comprehensive edge case tests for `add_image`.\n\n\nExisting tests for reference:\n```r\n\n```\n\n\nThe existing tests cover basic functionality. Add tests for:\n1. NULL inputs to each argument\n2. Empty vectors/strings: character(0), \"\", integer(0)\n3. Boundary values: 0, 1, -1, NA, NaN, Inf\n4. Invalid input types (passing numeric where character expected, etc.)\n5. Missing arguments (use expect_error with class matching)\n6. Very long inputs (strings > 1000 chars, vectors > 10000 elements)\n",
+  "context": "Package: plotly v4.12.0.9000\nDescription: Create Interactive Web Graphics via 'plotly.js'\nFunction: add_image\nParameters: p, z, colormodel, data, inherit\nTest patterns used: test_that\nExpectations used: expect_doppelganger\n\nFunction Code:\n```r\nadd_image <- function(p, z = NULL, colormodel = NULL, ..., data = NULL, inherit = TRUE) {\n  \n  if (inherit) {\n    z <- z %||% p$x$attrs[[1]][[\"z\"]]\n    colormodel <- colormodel %||% p$x$attrs[[1]][[\"colormodel\"]]\n  }\n  \n  if (inherits(z, \"raster\")) {\n    cols <- col2rgb(z, alpha = TRUE)\n    dims <- c(dim(z), 4)\n    z <- array(numeric(prod(dims)), dims)\n    matrix_ <- function(x) {\n      matrix(x, byrow = TRUE, nrow = dims[1], ncol = dims[2])\n    }\n    z[,,1] <- matrix_(cols[\"red\",])\n    z[,,2] <- matrix_(cols[\"green\",])\n    z[,,3] <- matrix_(cols[\"blue\",])\n    z[,,4] <- matrix_(cols[\"alpha\",])\n    \n    # Throw if we detect another colormodel\n    if (!identical(colormodel %||% \"rgba\", \"rgba\")) {\n      warning(\"Passing a raster object to z requires rgba colormodel\")\n    }\n    colormodel <- \"rgba\"\n  }\n  \n  add_trace(\n    p, z = z, colormodel = colormodel, ..., \n    data = data, type = \"image\"\n  )\n}\n```",
+  "hints": [],
+  "source_package": "plotly",
+  "source_file": "R/add.R",
+  "tests": {
+    "fail_to_pass": [],
+    "pass_to_pass": [],
+    "test_files": [
+      "testthat"
+    ]
+  },
+  "solution": null,
+  "source": null,
+  "files": {
+    "changed": [
+      "R/add.R"
+    ],
+    "source_files": [
+      "R/add.R"
+    ],
+    "test_changes": null
+  },
+  "quality_score": 0.56,
+  "split": "train",
+  "dependencies": [
+    "testthat"
+  ],
+  "constraints": {},
+  "created_at": "2026-02-23T20:26:51.771074+00:00",
+  "updated_at": null
+}

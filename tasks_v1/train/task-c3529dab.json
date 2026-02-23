@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.0",
+  "task_id": "task-c3529dab",
+  "task_type": "test_gen",
+  "difficulty": "medium",
+  "instruction": "Write a complete testthat test file for `reticulate::py_has_method`.\n\nPackage: reticulate v1.45.0.9000\nDescription: Interface to 'Python'\nFunction: py_has_method\nParameters: object, name\nTest patterns used: test_that\nExpectations used: expect_false, expect_true\n\nFunction Code:\n```r\npy_has_method <- function(object, name) {\n    .Call(`_reticulate_py_has_method`, object, name)\n}\n```\n\nRequirements:\n1. Use test_that() blocks with descriptive names that reference `py_has_method`\n2. Test basic functionality using appropriate expectations (expect_false, expect_true)\n3. Test edge cases: NULL input, empty strings, missing arguments\n4. Test error conditions with expect_error()\n5. Each test_that() block should test one logical behavior\n",
+  "context": "Package: reticulate v1.45.0.9000\nDescription: Interface to 'Python'\nFunction: py_has_method\nParameters: object, name\nTest patterns used: test_that\nExpectations used: expect_false, expect_true\n\nFunction Code:\n```r\npy_has_method <- function(object, name) {\n    .Call(`_reticulate_py_has_method`, object, name)\n}\n```",
+  "hints": [],
+  "source_package": "reticulate",
+  "source_file": "R/RcppExports.R",
+  "tests": {
+    "fail_to_pass": [],
+    "pass_to_pass": [],
+    "test_files": [
+      "testthat"
+    ]
+  },
+  "solution": null,
+  "source": null,
+  "files": {
+    "changed": [
+      "R/RcppExports.R"
+    ],
+    "source_files": [
+      "R/RcppExports.R"
+    ],
+    "test_changes": null
+  },
+  "quality_score": 0.585,
+  "split": "train",
+  "dependencies": [
+    "testthat"
+  ],
+  "constraints": {},
+  "created_at": "2026-02-23T20:26:51.772499+00:00",
+  "updated_at": null
+}

@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.0",
+  "task_id": "task-b496e5a6",
+  "task_type": "test_gen",
+  "difficulty": "medium",
+  "instruction": "Refactor the existing tests for `unchop` to follow better testing practices.\n\n\nCurrent test patterns to refactor:\n- test_that at tests/testthat/test-chop.R:153\n- test_that at tests/testthat/test-chop.R:285\n- test_that at tests/testthat/test-chop.R:291\n- test_that at tests/testthat/test-chop.R:296\n- test_that at tests/testthat/test-chop.R:336\n\n\nGoals:\n1. Use describe()/it() blocks for better organization where appropriate\n2. Reduce code duplication with helper functions or local fixtures\n3. Improve test descriptions to be specific about what behavior is verified\n4. Extract common setup into withr::local_* fixtures\n5. Each test should have a single responsibility\n",
+  "context": "Package: tidyr v1.3.2.9000\nDescription: Tidy Messy Data\nFunction: unchop\nParameters: data, cols, keep_empty, ptype, error_call\nTest patterns used: test_that\nExpectations used: expect_identical, expect_snapshot\n\nFunction Code:\n```r\nunchop <- function(\n  data,\n  cols,\n  ...,\n  keep_empty = FALSE,\n  ptype = NULL,\n  error_call = current_env()\n) {\n  check_dots_empty0(...)\n  check_data_frame(data, call = error_call)\n  check_required(cols, call = error_call)\n  check_bool(keep_empty, call = error_call)\n\n  sel <- tidyselect::eval_select(\n    expr = enquo(cols),\n    data = data,\n    allow_rename = FALSE,\n    error_call = error_call\n  )\n\n  size <- vec_size(data)\n  names <- names(data)\n\n  # Start from first principles to avoid issues in any subclass methods\n  out <- new_data_frame(data, n = size)\n  cols <- out[sel]\n\n  # Remove unchopped columns to avoid slicing them needlessly later\n  out[sel] <- NULL\n\n  result <- df_unchop(\n    x = cols,\n    ptype = ptype,\n    keep_empty = keep_empty,\n    error_call = error_call\n  )\n  cols <- result$val\n  loc <- result$loc\n\n  out <- vec_slice(out, loc)\n\n  # Add unchopped columns back on then preserve original ordering\n  out <- tidyr_col_modify(out, cols)\n  out <- out[names]\n\n  reconstruct_tibble(data, out)\n}\n```",
+  "hints": [],
+  "source_package": "tidyr",
+  "source_file": "R/chop.R",
+  "tests": {
+    "fail_to_pass": [],
+    "pass_to_pass": [],
+    "test_files": [
+      "testthat"
+    ]
+  },
+  "solution": null,
+  "source": null,
+  "files": {
+    "changed": [
+      "R/chop.R"
+    ],
+    "source_files": [
+      "R/chop.R"
+    ],
+    "test_changes": null
+  },
+  "quality_score": 0.51,
+  "split": "train",
+  "dependencies": [
+    "testthat"
+  ],
+  "constraints": {},
+  "created_at": "2026-02-23T20:26:51.779135+00:00",
+  "updated_at": null
+}

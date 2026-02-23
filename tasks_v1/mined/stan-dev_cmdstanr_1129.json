@@ -1,0 +1,57 @@
+{
+  "schema_version": "1.0",
+  "task_id": "stan-dev_cmdstanr_1129",
+  "task_type": "swe",
+  "difficulty": "easy",
+  "instruction": "Fix the cryptic error message when NULL values are passed in the data list. Currently, passing NULL as a data variable causes an unhelpful error: 'Error in round(x) : non-numeric argument to mathematical function'. Add explicit NULL checks in the `write_stan_()` and `process_data()` functions in R/data.R to provide a clear error message like \"Variable 'N' is NULL.\" when a NULL value is encountered in the data.",
+  "context": "The `write_stan_()` function iterates over data variables and validates their types. The `process_data()` function also iterates over data variables for processing. Both functions should check for NULL values before attempting operations on them. The NULL check should be added early in the iteration loop, before any operations that would fail on NULL values (like `is.numeric()`, `is.factor()`, or `length()` checks).",
+  "hints": [],
+  "source_package": "cmdstanr",
+  "source_file": null,
+  "tests": {
+    "fail_to_pass": [
+      "test_that('write_stan_ errors if NULL variables', { expect_error(write_stan_(list(N = NULL), tempfile()), \"Variable 'N' is NULL\") })",
+      "test_that('process_data errors on NULL data variables', { expect_error(process_data(list(N = NULL), model_variables = mod$variables()), \"Variable 'N' is NULL\") })"
+    ],
+    "pass_to_pass": [
+      "Existing tests for write_stan_ with valid numeric data",
+      "Existing tests for process_data with valid inputs",
+      "Tests for other error conditions (NA values, invalid types, non-list data)"
+    ],
+    "test_files": []
+  },
+  "solution": {
+    "key_changes": [
+      "Add `if (is.null(var)) { stop(\"Variable '\", var_name, \"' is NULL.\", call. = FALSE) }` check in write_stan_() after extracting the variable",
+      "Add similar NULL check in process_data() at the start of the loop over data_variables",
+      "Use `call. = FALSE` in the stop() call for cleaner error output"
+    ],
+    "potential_pitfalls": [
+      "The NULL check must be placed before other type checks that would fail on NULL",
+      "In process_data(), the check should use `data[[var_name]]` not `var` since the variable hasn't been extracted yet",
+      "The error message format should match the existing style in the codebase (single quotes around variable name)",
+      "Minor whitespace cleanup (space after 'for' in for loop) was included but is not essential"
+    ],
+    "reference_diff": "diff --git a/R/data.R b/R/data.R\nindex f483ba4c2..31b647e2f 100644\n--- a/R/data.R\n+++ b/R/data.R\n@@ -77,6 +77,9 @@ write_stan_json <- function(data, file, always_decimal = FALSE) {\n \n   for (var_name in data_names) {\n     var <- data[[var_name]]\n+    if (is.null(var)) {\n+      stop(\"Variable '\", var_name, \"' is NULL.\", call. = FALSE)\n+    }\n     if (!(is.numeric(var) || is.factor(var) || is.logical(var) ||\n           is.data.frame(var) || is.list(var))) {\n       stop(\"Variable '\", var_name, \"' is of invalid type.\", call. = FALSE)\n@@ -176,7 +179,10 @@ process_data <- function(data, model_variables = NULL) {\n           call. = FALSE\n         )\n       }\n-      for(var_name in names(data_variables)) {\n+      for (var_name in names(data_variables)) {\n+        if (is.null(data[[var_name]])) {\n+          stop(\"Variable '\", var_name, \"' is NULL.\", call. = FALSE)\n+        }\n         # distinguish between scalars and arrays/vectors of length 1\n         if (length(data[[var_name]]) == 1\n             && data_variables[[var_name]]$dimensions == 1) {"
+  },
+  "source": {
+    "type": "github_pr",
+    "repo": "stan-dev/cmdstanr",
+    "pr_number": 1129,
+    "pr_url": "https://github.com/stan-dev/cmdstanr/pull/1129",
+    "merged_at": "2025-12-31T17:45:55+00:00",
+    "issue_number": null,
+    "issue_url": "https://github.com/stan-dev/cmdstanr/issues/1126"
+  },
+  "files": {
+    "changed": [],
+    "source_files": [],
+    "test_changes": null
+  },
+  "quality_score": 9.0,
+  "split": "mined",
+  "dependencies": [],
+  "constraints": {},
+  "created_at": "2026-02-22T18:56:10.204718+00:00",
+  "updated_at": null
+}

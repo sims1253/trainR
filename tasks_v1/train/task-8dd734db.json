@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.0",
+  "task_id": "task-8dd734db",
+  "task_type": "test_gen",
+  "difficulty": "easy",
+  "instruction": "A test for `with_collate` is failing. Diagnose and fix the issue.\n\n\nFailing test:\n```r\n\n```\n\n\nSteps:\n1. Read the function source code to understand expected behavior\n2. Compare the test expectations with actual function behavior\n3. Fix the test if expectations are wrong, or fix the function if it has a bug\n4. Ensure the fix maintains backward compatibility\n5. Run the tests to verify the fix\n",
+  "context": "Package: withr v3.0.2.9001\nDescription: Run Code 'With' Temporarily Modified Global State\nFunction: with_collate\nParameters: new, code\nTest patterns used: test_that\nExpectations used: expect_equal\n\nFunction Code:\n```r\nwith_collate <- function(new, code) {\n  with_locale(c(LC_COLLATE = new), code)\n}\n```",
+  "hints": [],
+  "source_package": "withr",
+  "source_file": "R/collate.R",
+  "tests": {
+    "fail_to_pass": [],
+    "pass_to_pass": [],
+    "test_files": [
+      "testthat"
+    ]
+  },
+  "solution": null,
+  "source": null,
+  "files": {
+    "changed": [
+      "R/collate.R"
+    ],
+    "source_files": [
+      "R/collate.R"
+    ],
+    "test_changes": null
+  },
+  "quality_score": 0.51,
+  "split": "train",
+  "dependencies": [
+    "testthat"
+  ],
+  "constraints": {},
+  "created_at": "2026-02-23T20:26:51.755733+00:00",
+  "updated_at": null
+}

@@ -1,0 +1,63 @@
+{
+  "schema_version": "1.0",
+  "task_id": "stan-dev_cmdstanr_1125",
+  "task_type": "swe",
+  "difficulty": "medium",
+  "instruction": "Add a `format` parameter to the `save_object()` method in the CmdStanFit R6 class to support saving model objects in the 'qs2' format in addition to the default 'rds' format. The qs2 format provides faster serialization for large model objects. The method should accept a `format` argument (defaulting to 'rds'), validate it using `match.arg()`, and use `qs2::qs_save()` when format is 'qs2'. Include proper error handling when the qs2 package is not installed.",
+  "context": "The save_object method is part of a CmdStanFit R6 class. Current signature: save_object(file, ...). The method ensures all CmdStan output is loaded into memory before saving. Key code structure:\n\nr\nsave_object <- function(file, ...) {\n  self$draws()\n  try(self$sampler_diagnostics(), silent = TRUE)\n  try(self$init(), silent = TRUE)\n  try(self$profiles(), silent = TRUE)\n  saveRDS(self, file = file, ...)\n  invisible(self)\n}\n\n\nThe qs2 package provides `qs_save()` and `qs_read()` functions for fast serialization.",
+  "hints": [],
+  "source_package": "cmdstanr",
+  "source_file": null,
+  "tests": {
+    "fail_to_pass": [
+      "save_object() method works with qs2 format - saves object and can be read back with qs2::qs_read()",
+      "saved qs2 object has identical summary() output to original",
+      "saved qs2 object has identical return_codes() output to original",
+      "appropriate error is thrown when qs2 format is requested but qs2 package is not installed"
+    ],
+    "pass_to_pass": [
+      "save_object() method works with default rds format",
+      "existing save_object() functionality with profiles continues to work",
+      "saved rds object can be read with readRDS() and has identical summary()"
+    ],
+    "test_files": []
+  },
+  "solution": {
+    "key_changes": [
+      "Add 'qs2' to Suggests in DESCRIPTION file",
+      "Add format parameter with match.arg(c('rds', 'qs2'))",
+      "Add conditional logic to use saveRDS() or qs2::qs_save() based on format",
+      "Add requireNamespace check for qs2 with informative error message",
+      "Update roxygen documentation for new parameter",
+      "Add test for qs2 format functionality"
+    ],
+    "potential_pitfalls": [
+      "Forgetting to add qs2 to Suggests in DESCRIPTION",
+      "Not using match.arg() for parameter validation",
+      "Not handling missing qs2 package gracefully with informative error",
+      "Forgetting to update documentation/man files after roxygen changes",
+      "Not testing that the saved object can be read back correctly"
+    ],
+    "reference_diff": "diff --git a/DESCRIPTION b/DESCRIPTION\nindex 78bc2fa3a..3280baa04 100644\n--- a/DESCRIPTION\n+++ b/DESCRIPTION\n@@ -52,6 +52,7 @@ Suggests:\n     ggplot2,\n     knitr (>= 1.37),\n     loo (>= 2.0.0),\n+    qs2,\n     rmarkdown,\n     testthat (>= 2.1.0),\n     Rcpp\ndiff --git a/R/fit.R b/R/fit.R\nindex 58005ca63..703bc5ef9 100644\n--- a/R/fit.R\n+++ b/R/fit.R\n@@ -108,12 +108,19 @@ CmdStanFit <- R6::R6Class(\n #'   read into R lazily (i.e., as needed), the `$save_object()` method is the\n #'   safest way to guarantee that everything has been read in before saving.\n #'\n+#'   If you have a big object to save, use `format = \"qs2\"` to save using the\n+#'   **qs2** package.\n+#'\n #'   See the \"Saving fitted model objects\" section of the\n #'   [_Getting started with CmdStanR_](https://mc-stan.org/cmdstanr/articles/cmdstanr.html)\n #'   vignette for some suggestions on faster model saving for large models.\n #'\n #' @param file (string) Path where the file should be saved.\n-#' @param ... Other arguments to pass to [base::saveRDS()] besides `object` and `file`.\n+#' @param format (string) Serialization format for the object. The default is\n+#'   `\"rds\"`. The `\"qs2\"` format uses `qs2::qs_save()` and requires the **qs2**\n+#'   package.\n+#' @param ... Other arguments to pass to [base::saveRDS()] (for `format = \"rds\"`)\n+#'   or `qs2::qs_save()` (for `format = \"qs2\"`).\n #'\n #' @seealso [`CmdStanMCMC`], [`CmdStanMLE`], [`CmdStanVB`], [`CmdStanGQ`]\n #'\n@@ -129,12 +136,20 @@ CmdStanFit <- R6::R6Class(\n #' fit$summary()\n #' }\n #'\n-save_object <- function(file, ...) {\n+save_object <- function(file, format = c(\"rds\", \"qs2\"), ...) {\n   self$draws()\n   try(self$sampler_diagnostics(), silent = TRUE)\n   try(self$init(), silent = TRUE)\n   try(self$profiles(), silent = TRUE)\n-  saveRDS(self, file = file, ...)\n+  format <- match.arg(format)\n+  if (format == \"rds\") {\n+    saveRDS(self, file = file, ...)\n+  } else {\n+    if (!requireNamespace(\"qs2\", quietly = TRUE)) {\n+      stop(\"The 'qs2' package is required for format = \\\"qs2\\\".\", call. = FALSE)\n+    }\n+    qs2::qs_save(self, file = file, ...)\n+  }\n   invisible(self)\n }\n CmdStanFit$set(\"public\", name = \"save_object\", value = save_object)\ndiff --git a/man/fit-method-save_object.Rd b/man/fit-method-save_object.Rd\nindex 6b1999fb9..080f46eb6 100644\n--- a/man/fit-method-save_object.Rd\n+++ b/man/fit-method-save_object.Rd\n@@ -5,12 +5,17 @@\n \\alias{save_object}\n \\title{Save fitted model object to a file}\n \\usage{\n-save_object(file, ...)\n+save_object(file, format = c(\"rds\", \"qs2\"), ...)\n }\n \\arguments{\n \\item{file}{(string) Path where the file should be saved.}\n \n-\\item{...}{Other arguments to pass to \\code{\\link[base:readRDS]{base::saveRDS()}} besides \\code{object} and \\code{file}.}\n+\\item{format}{(string) Serialization format for the object. The default is\n+\\code{\"rds\"}. The \\code{\"qs2\"} format uses \\code{qs2::qs_save()} and requires the \\strong{qs2}\n+package.}\n+\n+\\item{...}{Other arguments to pass to \\code{\\link[base:readRDS]{base::saveRDS()}} (for \\code{format = \"rds\"})\n+or \\code{qs2::qs_save()} (for \\code{format = \"qs2\"}).}\n }\n \\description{\n This method is a wrapper around \\code{\\link[base:readRDS]{base::saveRDS()}} that ensures\n@@ -19,6 +24,9 @@ model object. Because the contents of the CmdStan output CSV files are only\n read into R lazily (i.e., as needed), the \\verb{$save_object()} method is the\n safest way to guarantee that everything has been read in before saving.\n \n+If you have a big object to save, use \\code{format = \"qs2\"} to save using the\n+\\strong{qs2} package.\n+\n See the \"Saving fitted model objects\" section of the\n \\href{https://mc-stan.org/cmdstanr/articles/cmdstanr.html}{\\emph{Getting started with CmdStanR}}\n vignette for some suggestions on faster model saving for large models.\ndiff --git a/vignettes/cmdstanr.Rmd b/vignettes/cmdstanr.Rmd\nindex 8d9e30468..c52765578 100644\n--- a/vignettes/cmdstanr.Rmd\n+++ b/vignettes/cmdstanr.Rmd\n@@ -432,9 +432,9 @@ fit_pf$print(\"theta\")\n \n \n Let's extract the draws, make the same plot we made after running the other\n-algorithms, and compare them all. approximation, and compare them all. In this\n-simple example the distributions are quite similar, but this will not always be\n-the case for more challenging problems.\n+algorithms, and compare them all. In this simple example the distributions are\n+quite similar, but this will not always be the case for more challenging\n+problems.\n \n ```{r plot-compare-pf, message = FALSE}\n mcmc_hist(fit_pf$draws(\"theta\"), binwidth = 0.025) +\n@@ -469,57 +469,29 @@ For more details on the `$optimize()`, `$laplace()`, `$variational()`, and\n ## Saving fitted model objects\n \n The [`$save_object()`](http://mc-stan.org/cmdstanr/reference/fit-method-save_object.html)\n-method provided by CmdStanR is the most convenient way to save a fitted model object\n-to disk and ensure that all of the contents are available when reading the object back into R.\n+method provided by CmdStanR is the most convenient way to save a fitted model\n+object to disk and ensure that all of the contents are available when reading\n+the object back into R. By default, `fit$save_object()` will use the `RDS`\n+format to save the object. The saved object can then be read back into R using\n+`readRDS()`.\n \n ```{r save_object, eval=FALSE}\n fit$save_object(file = \"fit.RDS\")\n \n-# can be read back in using readRDS\n fit2 <- readRDS(\"fit.RDS\")\n ```\n \n-But if your model object is large, then\n-[`$save_object()`](http://mc-stan.org/cmdstanr/reference/fit-method-save_object.html)\n-could take a long time.\n-[`$save_object()`](http://mc-stan.org/cmdstanr/reference/fit-method-save_object.html)\n-reads the CmdStan results files into memory, stores them in the model object,\n-and saves the object with `saveRDS()`. To speed up the process, you can emulate\n-[`$save_object()`](http://mc-stan.org/cmdstanr/reference/fit-method-save_object.html)\n-and replace `saveRDS` with the much faster `qsave()` function from the\n-[`qs`](https://github.com/traversc/qs) package.\n+But if your model object is large, then `fit$save_object()` can take a long time\n+if saving in the default RDS format. For large objects, we recommend using the\n+much faster [`qs2`](https://github.com/traversc/qs2) format. The saved object\n+can then be read back into R using `qs2::qs_read()`.\n \n ```{r save_object_qs_full, eval = FALSE}\n-# Load CmdStan output files into the fitted model object.\n-fit$draws() # Load posterior draws into the object.\n-try(fit$sampler_diagnostics(), silent = TRUE) # Load sampler diagnostics.\n-try(fit$init(), silent = TRUE) # Load user-defined initial values.\n-try(fit$profiles(), silent = TRUE) # Load profiling samples.\n+fit$save_object(file = \"fit.qs2\", format = \"qs2\")\n \n-# Save the object to a file.\n-qs::qsave(x = fit, file = \"fit.qs\")\n-\n-# Read the object.\n-fit2 <- qs::qread(\"fit.qs\")\n-```\n-\n-Storage is even faster if you discard results you do not need to save.\n-The following example saves only posterior draws and discards\n-sampler diagnostics, user-specified initial values, and profiling data.\n-\n-```{r save_object_qs_small, eval = FALSE}\n-# Load posterior draws into the fitted model object and omit other output.\n-fit$draws()\n-\n-# Save the object to a file.\n-qs::qsave(x = fit, file = \"fit.qs\")\n-\n-# Read the object.\n-fit2 <- qs::qread(\"fit.qs\")\n+fit2 <- qs2::qs_read(\"fit.qs2\")\n ```\n \n-See the vignette [_How does CmdStanR work?_](http://mc-stan.org/cmdstanr/articles/cmdstanr-internals.html)\n-for more information about the composition of CmdStanR objects.\n \n ## Comparison with RStan\n \n@@ -537,7 +509,8 @@ To ask a question please post on the Stan forums:\n \n * https://discourse.mc-stan.org/\n \n-To report a bug, suggest a feature (including additions to these vignettes), or to start contributing to CmdStanR\n-development (new contributors welcome!) please open an issue on GitHub:\n+To report a bug, suggest a feature (including additions to these vignettes), or\n+to start contributing to CmdStanR development (new contributors welcome!) please\n+open an issue on GitHub:\n \n * https://github.com/stan-dev/cmdstanr/issues\n"
+  },
+  "source": {
+    "type": "github_pr",
+    "repo": "stan-dev/cmdstanr",
+    "pr_number": 1125,
+    "pr_url": "https://github.com/stan-dev/cmdstanr/pull/1125",
+    "merged_at": "2026-01-02T21:14:54+00:00",
+    "issue_number": null,
+    "issue_url": "https://github.com/stan-dev/cmdstanr/issues/1040"
+  },
+  "files": {
+    "changed": [],
+    "source_files": [],
+    "test_changes": null
+  },
+  "quality_score": 8.0,
+  "split": "mined",
+  "dependencies": [],
+  "constraints": {},
+  "created_at": "2026-02-22T18:56:38.226127+00:00",
+  "updated_at": null
+}

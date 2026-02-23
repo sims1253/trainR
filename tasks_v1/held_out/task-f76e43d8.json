@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.0",
+  "task_id": "task-f76e43d8",
+  "task_type": "test_gen",
+  "difficulty": "medium",
+  "instruction": "Add proper test fixtures to the tests for `compose` using the withr package.\n\n\n\nRequirements:\n1. Identify tests that modify global state (options, env vars, working directory)\n2. Wrap state modifications with withr::local_* for automatic cleanup:\n   - withr::local_options() for R options\n   - withr::local_envvar() for environment variables\n   - withr::local_tempdir() for temporary directories\n   - withr::local_file() for temporary files\n3. Ensure tests can run in any order without side effects\n4. Use local_* (not with_*) inside test_that() blocks\n",
+  "context": "Package: purrr v1.2.1.9000\nDescription: Functional Programming Tools\nFunction: compose\nParameters: .dir\nTest patterns used: test_that\nExpectations used: expect_false, expect_identical, expect_s3_class, expect_true\n\nFunction Code:\n```r\ncompose <- function(..., .dir = c(\"backward\", \"forward\")) {\n  .dir <- arg_match0(.dir, c(\"backward\", \"forward\"))\n\n  fns <- map(list2(...), rlang::as_closure, env = caller_env())\n  if (!length(fns)) {\n    # Return the identity function\n    return(compose(function(x, ...) x))\n  }\n\n  if (.dir == \"backward\") {\n    n <- length(fns)\n    first_fn <- fns[[n]]\n    fns <- rev(fns[-n])\n  } else {\n    first_fn <- fns[[1]]\n    fns <- fns[-1]\n  }\n\n  composed <- function() {\n    env <- env(caller_env(), `_fn` = first_fn)\n\n    first_call <- sys.call()\n    first_call[[1]] <- quote(`_fn`)\n    env$`_out` <- .Call(purrr_eval, first_call, env)\n\n    call <- quote(`_fn`(`_out`))\n\n    for (fn in fns) {\n      env$`_fn` <- fn\n      env$`_out` <- .Call(purrr_eval, call, env)\n    }\n\n    env$`_out`\n  }\n  formals(composed) <- formals(first_fn)\n\n  structure(\n    composed,\n    class = c(\"purrr_function_compose\", \"function\"),\n    first_fn = first_fn,\n    fns = fns\n  )\n}\n```",
+  "hints": [],
+  "source_package": "purrr",
+  "source_file": "R/adverb-compose.R",
+  "tests": {
+    "fail_to_pass": [],
+    "pass_to_pass": [],
+    "test_files": [
+      "testthat"
+    ]
+  },
+  "solution": null,
+  "source": null,
+  "files": {
+    "changed": [
+      "R/adverb-compose.R"
+    ],
+    "source_files": [
+      "R/adverb-compose.R"
+    ],
+    "test_changes": null
+  },
+  "quality_score": 0.51,
+  "split": "held_out",
+  "dependencies": [
+    "testthat"
+  ],
+  "constraints": {},
+  "created_at": "2026-02-23T20:26:51.805399+00:00",
+  "updated_at": null
+}

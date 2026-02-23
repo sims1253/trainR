@@ -1,0 +1,59 @@
+{
+  "schema_version": "1.0",
+  "task_id": "r-lib_testthat_2307",
+  "task_type": "swe",
+  "difficulty": "easy",
+  "instruction": "Fix the bug in `expect_snapshot()` where base R errors are incorrectly reported as `rlang_error` instead of their original class (e.g., `simpleError`). When testthat started entracing snapshots for better backtraces, it had the side effect of changing the reported error class. Implement an `error_class()` helper function that extracts the original error class from entraced errors, and use it in `snapshot_replay.condition()` when reporting condition classes.",
+  "context": "The `snapshot_replay.condition()` function in R/snapshot.R handles how conditions are displayed in snapshots. When `cnd_class = TRUE`, it shows the condition class. The issue is that entraced base R errors now show `rlang_error` instead of `simpleError`. An entraced error from base R has an `$error` field containing the original error object. The fix requires checking for this field and extracting the original class.\n\nKey function context:\nr\nsnapshot_replay.condition <- function(x, ...) {\n  # ... existing code ...\n  if (cnd_class) {\n    type <- paste0(type, \" <\", class(x)[[1]], \">\")  # Currently uses wrong class\n  }\n}\n",
+  "hints": [],
+  "source_package": "testthat",
+  "source_file": null,
+  "tests": {
+    "fail_to_pass": [
+      "test_that('extracts original error class', { ... }) - verifies error_class() returns 'simpleError' for entraced base errors",
+      "test_that('extracts original error class', { ... }) - verifies error_class() returns custom class for entraced custom errors",
+      "test_that('extracts original error class', { ... }) - verifies error_class() returns 'rlang_error' for native rlang abort() errors",
+      "Snapshot test showing Condition <simpleError> instead of Condition <rlang_error>"
+    ],
+    "pass_to_pass": [
+      "Existing snapshot tests continue to work correctly",
+      "Warning conditions still display correctly with their original class"
+    ],
+    "test_files": []
+  },
+  "solution": {
+    "key_changes": [
+      "Add new helper function `error_class(x)` that checks if error was entraced from base R",
+      "If error inherits from 'rlang_error' AND has `$error` field, return class of `x$error`",
+      "Otherwise return `class(x)[[1]]`",
+      "Update `snapshot_replay.condition()` to use `error_class(x)` instead of `class(x)[[1]]`"
+    ],
+    "potential_pitfalls": [
+      "The `$error` field behavior is not officially documented by rlang, making this somewhat fragile",
+      "Need to handle both base R errors (simpleError) and custom error classes correctly",
+      "Native rlang errors (from `abort()`) should still show as 'rlang_error'",
+      "Must not break existing snapshot behavior for warnings and other conditions"
+    ],
+    "reference_diff": "diff --git a/NEWS.md b/NEWS.md\nindex fce396ec8..2901b040a 100644\n--- a/NEWS.md\n+++ b/NEWS.md\n@@ -1,5 +1,6 @@\n # testthat 3.3.1\n \n+* `expect_snapshot()` now reports the original error class for base errors, rather than `rlang_error` (#2286).\n * `expect_success()` and `expect_failure()` are more clear about what the expectation actually did (#2297).\n * The hint to use `snapshot_download_gh()` is now only emitted when running in a job named \"R-CMD-check\" (#2300).\n * `expect_snapshot_file()` correctly reports file name if duplicated (@MichaelChirico, #2296).\ndiff --git a/R/snapshot.R b/R/snapshot.R\nindex d95f4f2e8..971f895cf 100644\n--- a/R/snapshot.R\n+++ b/R/snapshot.R\n@@ -185,12 +185,22 @@ snapshot_replay.condition <- function(\n   }\n \n   if (cnd_class) {\n-    type <- paste0(type, \" <\", class(x)[[1]], \">\")\n+    type <- paste0(type, \" <\", error_class(x), \">\")\n   }\n \n   c(snap_header(state, type), snapshot_lines(msg, transform))\n }\n \n+error_class <- function(x) {\n+  # If error was entraced from base R error, use original error class\n+  # This is a little fragile because entrace() does not document this behaviour\n+  if (inherits(x, \"rlang_error\") && !is.null(x$error)) {\n+    x <- x$error\n+  }\n+  class(x)[[1]]\n+}\n+\n+\n snapshot_lines <- function(x, transform = NULL) {\n   x <- split_lines(x)\n   if (!is.null(transform)) {"
+  },
+  "source": {
+    "type": "github_pr",
+    "repo": "r-lib/testthat",
+    "pr_number": 2307,
+    "pr_url": "https://github.com/r-lib/testthat/pull/2307",
+    "merged_at": "2026-01-07T19:23:34+00:00",
+    "issue_number": null,
+    "issue_url": "https://github.com/r-lib/testthat/issues/2286"
+  },
+  "files": {
+    "changed": [],
+    "source_files": [],
+    "test_changes": null
+  },
+  "quality_score": 8.0,
+  "split": "mined",
+  "dependencies": [],
+  "constraints": {},
+  "created_at": "2026-02-22T18:51:09.750278+00:00",
+  "updated_at": null
+}
