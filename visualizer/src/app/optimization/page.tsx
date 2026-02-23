@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import {
   Card,
   CardContent,
@@ -31,7 +31,6 @@ import {
   ArrowUpIcon,
   ArrowDownIcon,
   CheckCircleIcon,
-  XCircleIcon,
   AlertTriangleIcon,
   TargetIcon,
   TrendingUpIcon,
@@ -339,8 +338,6 @@ function NoDataState() {
 }
 
 export default function OptimizationPage() {
-  const [selectedRun, setSelectedRun] = useState<string | null>(null);
-
   // Cast imported data to types
   const trajectory = optimizationTrajectoryData as unknown as OptimizationTrajectoryV1;
   const holdoutSummary = holdoutSummaryData as unknown as HoldoutSummaryV1;

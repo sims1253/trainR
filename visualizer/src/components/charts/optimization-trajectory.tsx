@@ -126,7 +126,6 @@ export function OptimizationTrajectory({
   // Calculate statistics
   const scores = trajectory.trajectory.map((p) => p.score);
   const initialScore = scores[0];
-  const finalScore = scores[scores.length - 1];
   const bestScore = Math.max(...scores);
   const improvement = ((bestScore - initialScore) / initialScore) * 100;
   const trend = calculateTrend(trajectory.trajectory);

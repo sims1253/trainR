@@ -17,7 +17,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import type { ProvenanceV1, MetadataV1 } from "@/lib/types";
 import {
@@ -147,9 +146,6 @@ export function ProvenancePanel({ metadata, trigger }: ProvenancePanelProps) {
   const [open, setOpen] = useState(false);
   const provenance: ProvenanceV1 | undefined = metadata.provenance;
 
-  // Calculate a summary for the footer
-  const hasProvenance = provenance !== undefined;
-  const hasFingerprint = provenance?.manifest_fingerprint !== undefined;
   const hasArtifacts = provenance?.artifact_paths !== undefined;
 
   return (
