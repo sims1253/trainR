@@ -457,12 +457,29 @@ class DockerPiRunner:
             repo = getattr(source, "repo", "")
             base_commit = getattr(source, "base_commit", "")
 
-        # Get patches and tests
-        test_patch = getattr(task, "test_patch", "") or ""
-        gold_patch = getattr(task, "patch", "") or ""
-        tests = getattr(task, "tests", {}) or {}
-        fail_to_pass = tests.get("fail_to_pass", []) if isinstance(tests, dict) else []
-        pass_to_pass = tests.get("pass_to_pass", []) if isinstance(tests, dict) else []
+        # Check for synthetic task (has source_package but no repo)
+        source_package = getattr(task, "source_package", "") or ""
+
+        if not repo and source_package:
+            # Synthetic task - look up repo from package name
+            from config import get_package_repo
+
+            repo = get_package_repo(source_package) or ""
+            if not repo:
+                raise ValueError(f"No repo mapping for package: {source_package}")
+            # Synthetic tasks don't have these fields
+            base_commit = ""
+            test_patch = ""
+            gold_patch = ""
+            fail_to_pass = []
+            pass_to_pass = []
+        else:
+            # Mined task - use git repo with patches
+            test_patch = getattr(task, "test_patch", "") or ""
+            gold_patch = getattr(task, "patch", "") or ""
+            tests = getattr(task, "tests", {}) or {}
+            fail_to_pass = tests.get("fail_to_pass", []) if isinstance(tests, dict) else []
+            pass_to_pass = tests.get("pass_to_pass", []) if isinstance(tests, dict) else []
 
         skill_b64 = base64.b64encode(skill_content.encode()).decode() if skill_content else ""
 
@@ -553,9 +570,10 @@ Write the tests now."""
             [
                 "-v",
                 f"{unique_workspace}:/workspace",
-                self.config.docker_image,
             ]
         )
+
+        docker_cmd.append(self.config.docker_image)
 
         console.print(f"[dim]Running Docker+Pi batch mode with model: {model}[/dim]")
 

@@ -79,8 +79,20 @@ class LLMConfig:
             return model_name
 
         model_cfg = models[model_name]
-        provider_name = model_cfg.get("provider")
-        model_id = model_cfg.get("id", model_name)
+
+        # Handle multi-provider format (use first provider)
+        if "providers" in model_cfg:
+            provider_list = model_cfg["providers"]
+            if provider_list:
+                first_provider = provider_list[0]
+                provider_name = first_provider.get("provider")
+                model_id = first_provider.get("id", model_name)
+            else:
+                return model_name
+        else:
+            # Single provider format
+            provider_name = model_cfg.get("provider")
+            model_id = model_cfg.get("id", model_name)
 
         if provider_name and provider_name in providers:
             provider_cfg = providers[provider_name]
@@ -97,20 +109,61 @@ class LLMConfig:
             raise ValueError(f"Model '{model_name}' not found in llm.yaml")
 
         model_cfg = models[model_name]
-        provider_name = model_cfg.get("provider")
         providers = self.config.get("providers", {})
-        provider_cfg = providers.get(provider_name, {})
+
+        # Handle multi-provider format (use first provider for primary config)
+        if "providers" in model_cfg:
+            provider_list = model_cfg["providers"]
+            if provider_list:
+                first_provider = provider_list[0]
+                provider_name = first_provider.get("provider")
+                model_id = first_provider.get("id", model_name)
+            else:
+                provider_name = None
+                model_id = model_name
+        else:
+            # Single provider format
+            provider_name = model_cfg.get("provider")
+            model_id = model_cfg.get("id", model_name)
+
+        provider_cfg = providers.get(provider_name, {}) if provider_name else {}
 
         # Merge model and provider config
         return {
             "name": model_name,
-            "id": model_cfg.get("id"),
+            "id": model_id,
             "provider": provider_name,
             "base_url": provider_cfg.get("base_url"),
             "api_key_env": provider_cfg.get("api_key_env"),
             "litellm_prefix": provider_cfg.get("litellm_prefix"),
-            **model_cfg.get("capabilities", {}),
+            "capabilities": model_cfg.get("capabilities", []),
         }
+
+    def get_providers(self, model_name: str) -> list[dict]:
+        """Get list of available providers for a model.
+
+        Returns a list of provider configs, each with 'id' and 'provider' keys.
+        For single-provider models, returns a list with one element.
+        For multi-provider models, returns all configured providers.
+
+        Args:
+            model_name: The model name from llm.yaml
+
+        Returns:
+            List of dicts with 'id' and 'provider' keys, e.g.:
+            [{"id": "arcee-ai/trinity-large-preview:free", "provider": "openrouter"},
+             {"id": "trinity-large-preview-free", "provider": "opencode"}]
+        """
+        cfg = self.get_model_config(model_name)
+        models = self.config.get("models", {})
+        model_cfg = models.get(model_name, {})
+
+        # Multi-provider format
+        if "providers" in model_cfg:
+            return model_cfg["providers"]
+
+        # Single provider format - return as list for consistency
+        return [{"id": cfg.get("id", model_name), "provider": cfg.get("provider")}]
 
     def get_litellm_model(self, model_name: str) -> str:
         """Get the LiteLLM-compatible model string."""
@@ -267,3 +320,36 @@ def list_available_providers() -> list[str]:
         if key and provider not in available:
             available.append(provider)
     return available
+
+
+# Package repo mapping cache
+_package_repos_cache: dict | None = None
+
+
+def get_package_repo(package_name: str) -> str | None:
+    """Get GitHub repo for a package name.
+
+    Looks up the package in configs/package_repos.yaml to find the
+    corresponding GitHub repository (e.g., "dplyr" -> "tidyverse/dplyr").
+
+    Args:
+        package_name: The CRAN package name to look up.
+
+    Returns:
+        The GitHub repo in "owner/repo" format, or None if not found.
+    """
+    global _package_repos_cache
+
+    config_path = Path("configs/package_repos.yaml")
+    if not config_path.exists():
+        return None
+
+    # Load and cache the config
+    if _package_repos_cache is None:
+        with open(config_path) as f:
+            config = yaml.safe_load(f) or {}
+        _package_repos_cache = config.get("packages", {})
+
+    # Type narrowing: _package_repos_cache is guaranteed to be a dict here
+    assert _package_repos_cache is not None
+    return _package_repos_cache.get(package_name)

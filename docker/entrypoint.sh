@@ -87,6 +87,9 @@ if [ -n "$REPO" ]; then
     # Clean up any existing package
     rm -rf /workspace/package
     
+    # Configure git safe directory to avoid ownership issues with Docker mounts
+    git config --global --add safe.directory /workspace/package
+    
     # Clone with token if available (for rate limits / private repos)
     if [ -n "$GITHUB_TOKEN" ]; then
         git clone "https://${GITHUB_TOKEN}@github.com/${REPO}.git" /workspace/package 2>&1 || {
@@ -102,13 +105,16 @@ if [ -n "$REPO" ]; then
     
     cd /workspace/package
     
-    # Checkout specific commit if BASE_COMMIT is specified
+    # Checkout specific commit if provided (for mined tasks)
+    # Synthetic tasks just use the default branch
     if [ -n "$BASE_COMMIT" ]; then
         log "Checking out commit: $BASE_COMMIT"
         git checkout "$BASE_COMMIT" 2>&1 || {
             log "WARNING: Failed to checkout $BASE_COMMIT, using default branch"
         }
     fi
+    
+    cd /workspace/package
     
     # Install the package
     log "Installing package..."

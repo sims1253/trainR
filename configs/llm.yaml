@@ -26,7 +26,7 @@ providers:
 # Use the 'name' field to reference this model elsewhere
 models:
   # OpenCode free models
-  glm-5-free:
+  glm-5:
     id: "glm-5-free"
     provider: opencode
     capabilities:
@@ -34,15 +34,15 @@ models:
       json_mode: prompt      # "native" | "prompt" | "none" - how to get JSON output
       max_tokens_default: 2000
       
-  # kimi-k2.5-free:
-    # id: "kimi-k2.5-free"
+  # kimi-k2.5:
+    # id: "kimi-k2.5"
     # provider: opencode
     # capabilities:
       # reasoning: true
       # json_mode: prompt
       # max_tokens_default: 2000
       
-  minimax-m2.5-free:
+  minimax-m2.5:
     id: "minimax-m2.5-free"
     provider: opencode
     capabilities:
@@ -50,17 +50,17 @@ models:
       json_mode: prompt
       max_tokens_default: 2000
       
-  gpt-5-nano:
-    id: "gpt-5-nano"
-    provider: opencode
-    capabilities:
-      reasoning: false
-      json_mode: native
-      max_tokens_default: 1000
-      drop_params: [temperature]  # These params are not supported
+  # gpt-5-nano:
+  #   id: "gpt-5-nano"
+  #   provider: opencode
+  #   capabilities:
+  #     reasoning: false
+  #     json_mode: native
+  #     max_tokens_default: 1000
+  #     drop_params: [temperature]  # These params are not supported
       
   # OpenRouter models
-  gpt-oss-120b-free:
+  gpt-oss-120b:
     id: "openai/gpt-oss-120b:free"
     provider: openrouter
     capabilities:
@@ -75,11 +75,14 @@ models:
       json_mode: native
       
   trinity-large-preview:
-    id: "arcee-ai/trinity-large-preview:free"
-    provider: openrouter
+    providers:
+      - id: "arcee-ai/trinity-large-preview:free"
+        provider: openrouter
+      - id: "trinity-large-preview-free"
+        provider: opencode
     capabilities:
-      reasoning: false
-      json_mode: native
+      - reasoning
+    max_tokens_default: 8192
       
   nemotron-3-nano:
     id: "nvidia/nemotron-3-nano-30b-a3b"
@@ -97,7 +100,7 @@ models:
 
 # Default model assignments for different purposes
 defaults:
-  mining: glm-5-free
-  task_agent: gpt-oss-120b-free
-  reflection: glm-5-free
-  judge: glm-5-free
+  mining: glm-5
+  task_agent: gpt-oss-120b
+  reflection: glm-5
+  judge: glm-5

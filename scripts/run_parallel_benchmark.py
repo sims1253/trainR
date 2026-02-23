@@ -5,19 +5,20 @@ This script orchestrates parallel execution of benchmark runs across multiple
 models, respecting provider-level concurrency limits.
 
 Example usage:
-    # Run all models on all tasks
-    uv run python scripts/run_parallel_benchmark.py \\
-        --tasks tasks/mined/*.json \\
-        --models all
+    # Run all models on all tasks (default)
+    uv run python scripts/run_parallel_benchmark.py --models all
 
-    # Run specific models
+    # Run specific models on all tasks
+    uv run python scripts/run_parallel_benchmark.py --models glm-5-free minimax-m2.5-free
+
+    # Run specific tasks
     uv run python scripts/run_parallel_benchmark.py \\
         --tasks tasks/mined/tidyverse_readr_1615.json \\
-        --models glm-5-free minimax-m2.5-free
+        --models all
 
     # Custom concurrency
     uv run python scripts/run_parallel_benchmark.py \\
-        --tasks tasks/mined/*.json \\
+        --tasks "tasks/mined/*.json" \\
         --models all \\
         --max-per-provider 3 \\
         --output results/benchmarks/parallel_{timestamp}
@@ -28,7 +29,9 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import logging
 import os
+import shutil
 import statistics
 import sys
 import time
@@ -36,7 +39,10 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
+
+# Setup logging
+log = logging.getLogger(__name__)
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -46,14 +52,323 @@ import yaml
 from config import get_llm_config
 
 
+class ProgressDisplay:
+    """Clean in-place progress display using ANSI escape codes."""
+
+    # Unicode box-drawing characters for progress bar
+    FILLED = "█"
+    EMPTY = "░"
+    # Alternative ASCII characters
+    # FILLED = "#"
+    # EMPTY = "-"
+
+    def __init__(self, terminal_width: int = 80):
+        self.terminal_width = terminal_width or 80
+        self._last_update = 0.0
+        self._update_interval = 1.5  # Update every 1.5 seconds
+        self._initialized = False
+
+    def _get_terminal_width(self) -> int:
+        """Get terminal width, with fallback."""
+        try:
+            return shutil.get_terminal_size((80, 24)).columns
+        except Exception:
+            return 80
+
+    def _move_cursor_top(self) -> None:
+        """Move cursor to top of screen."""
+        sys.stdout.write("\033[H")
+
+    def _clear_from_cursor(self) -> None:
+        """Clear screen from cursor to end."""
+        sys.stdout.write("\033[J")
+
+    def _clear_line(self) -> None:
+        """Clear current line."""
+        sys.stdout.write("\033[2K")
+
+    def _format_duration(self, seconds: float) -> str:
+        """Format duration in human-readable form."""
+        if seconds < 0 or seconds == float("inf"):
+            return "calculating..."
+        if seconds < 60:
+            return f"{int(seconds)}s"
+        elif seconds < 3600:
+            minutes = int(seconds // 60)
+            secs = int(seconds % 60)
+            return f"{minutes}m {secs}s"
+        else:
+            hours = int(seconds // 3600)
+            minutes = int((seconds % 3600) // 60)
+            return f"{hours}h {minutes}m"
+
+    def _truncate_string(self, s: str, max_len: int) -> str:
+        """Truncate string to max length with ellipsis."""
+        if len(s) <= max_len:
+            return s
+        return s[: max_len - 1] + "…"
+
+    def _render_progress_bar(self, progress: float, width: int) -> str:
+        """Render a progress bar."""
+        if width <= 0:
+            return ""
+        filled_count = int(progress / 100 * width)
+        filled_count = max(0, min(width, filled_count))
+        empty_count = width - filled_count
+        return self.FILLED * filled_count + self.EMPTY * empty_count
+
+    def _format_worker_line(self, worker: WorkerInfo, max_width: int) -> str:
+        """Format a single worker line with truncation."""
+        elapsed = worker.format_elapsed()
+        # Format: "provider/model → task_name (elapsed)"
+        provider_model = f"{worker.provider}/{worker.model}"
+        task_part = f"→ {worker.task_id}"
+
+        # Calculate available space
+        elapsed_part = f" ({elapsed})"
+        min_prefix = 10  # Minimum for provider/model
+
+        available = max_width - len(elapsed_part) - 3  # 3 for spacing and arrow
+
+        if available < 20:
+            # Very narrow terminal, just show truncated whole line
+            full = f"{provider_model} {task_part} {elapsed_part}"
+            return self._truncate_string(full, max_width)
+
+        # Truncate components if needed
+        if len(provider_model) + len(task_part) > available:
+            # Need to truncate - prefer showing full model, truncate task
+            task_avail = available - len(provider_model) - 3
+            if task_avail < 10:
+                # Not enough for task, truncate model instead
+                provider_model = self._truncate_string(provider_model, min_prefix)
+                task_avail = available - len(provider_model) - 3
+            task_part = f"→ {self._truncate_string(worker.task_id, task_avail - 2)}"
+
+        return f"{provider_model} {task_part}{elapsed_part}"
+
+    def should_update(self, force: bool = False) -> bool:
+        """Check if enough time has passed for an update."""
+        now = time.time()
+        if force or not self._initialized:
+            self._last_update = now
+            self._initialized = True
+            return True
+        if now - self._last_update >= self._update_interval:
+            self._last_update = now
+            return True
+        return False
+
+    def render(self, benchmark: "ParallelBenchmark") -> str:
+        """Render the full progress display."""
+        width = self._get_terminal_width()
+        lines = []
+
+        # Top border
+        border = "━" * width
+        lines.append(border)
+
+        # Header line
+        task_count = len(set(w.task_id for w in benchmark.workers))
+        model_count = sum(len(m) for m in benchmark.models_by_provider.values())
+        header = f"BENCHMARK: {benchmark.total_runs} runs ({task_count} tasks × {model_count} models) | Workers: {benchmark.max_per_provider} per provider"
+        lines.append(self._center_or_truncate(header, width))
+        lines.append(border)
+
+        # Progress bar
+        progress = benchmark.progress_pct
+        completed = benchmark.completed_count + benchmark.failed_count + benchmark.timeout_count
+        bar_width = width - 30  # Leave room for stats
+        bar_width = max(20, bar_width)
+        bar = self._render_progress_bar(progress, bar_width)
+
+        eta_str = self._format_duration(benchmark.eta_seconds)
+        progress_line = (
+            f"[{bar}] {completed}/{benchmark.total_runs} ({progress:.0f}%) | ETA: {eta_str}"
+        )
+        lines.append(progress_line)
+        lines.append("")  # Blank line
+
+        # Running workers
+        running = benchmark.running
+        if running:
+            lines.append(f"RUNNING ({len(running)}):")
+            # Show max 6 running workers
+            max_display = 6
+            sorted_running = sorted(running, key=lambda x: x.start_time or 0)
+            for w in sorted_running[:max_display]:
+                line = self._format_worker_line(w, width - 2)
+                lines.append(f"  {line}")
+            if len(running) > max_display:
+                lines.append(f"  ... and {len(running) - max_display} more")
+        else:
+            lines.append("RUNNING: (none)")
+
+        lines.append("")  # Blank line
+
+        # Stats line
+        passed_count = len([r for r in benchmark.completed if r.passed])
+        failed_count = len([r for r in benchmark.completed if not r.passed])
+        worker_failed = benchmark.failed_count
+        timeout_count = benchmark.timeout_count
+
+        total_completed = benchmark.completed_count
+        total_done = total_completed + worker_failed + timeout_count
+        if total_done > 0:
+            pass_pct = passed_count / total_done * 100
+            fail_pct = (failed_count + worker_failed) / total_done * 100
+        else:
+            pass_pct = 0
+            fail_pct = 0
+
+        stats_line = f"COMPLETED: {total_completed} | PASSED: {passed_count} ({pass_pct:.0f}%) | FAILED: {failed_count + worker_failed} ({fail_pct:.0f}%) | TIMEOUT: {timeout_count}"
+        lines.append(stats_line)
+
+        # Bottom border
+        lines.append(border)
+
+        return "\n".join(lines)
+
+    def _center_or_truncate(self, text: str, width: int) -> str:
+        """Center text or truncate if too long."""
+        if len(text) <= width:
+            # Center within width
+            padding = (width - len(text)) // 2
+            return " " * padding + text + " " * (width - len(text) - padding)
+        return text[:width]
+
+    def display(self, benchmark: "ParallelBenchmark") -> None:
+        """Display progress in-place."""
+        output = self.render(benchmark)
+
+        # Move to top and clear
+        self._move_cursor_top()
+        self._clear_from_cursor()
+
+        # Write output
+        sys.stdout.write(output)
+        sys.stdout.flush()
+
+    def clear(self) -> None:
+        """Clear the progress display area."""
+        self._move_cursor_top()
+        self._clear_from_cursor()
+        sys.stdout.flush()
+
+    def render_final_summary(self, results: dict, benchmark: "ParallelBenchmark") -> str:
+        """Render final summary with top performers."""
+        width = self._get_terminal_width()
+        border = "━" * width
+        lines = []
+
+        lines.append(border)
+        lines.append(self._center_or_truncate("BENCHMARK COMPLETE", width))
+        lines.append(border)
+        lines.append("")
+
+        # Overall stats
+        duration = results.get("duration_s", 0)
+        lines.append(f"Total Duration: {self._format_duration(duration)}")
+        lines.append(f"Total Runs: {results.get('total_runs', 0)}")
+        lines.append(f"Completed: {results.get('completed', 0)}")
+        lines.append(f"Failed: {results.get('failed', 0)}")
+        lines.append(f"Timeouts: {results.get('timeouts', 0)}")
+        lines.append("")
+
+        # Token usage
+        total_input = sum(r.get("input_tokens", 0) for r in results.get("results", []))
+        total_output = sum(r.get("output_tokens", 0) for r in results.get("results", []))
+        lines.append(
+            f"Total Tokens: {self._format_token_count(total_input)} in / {self._format_token_count(total_output)} out"
+        )
+        lines.append("")
+
+        # Top performers by pass rate
+        lines.append(border)
+        lines.append(self._center_or_truncate("TOP PERFORMERS BY PASS RATE", width))
+        lines.append(border)
+
+        # Group by model
+        model_stats: dict[str, dict] = {}
+        for r in results.get("results", []):
+            model = r.get("model", "unknown")
+            if model not in model_stats:
+                model_stats[model] = {"total": 0, "passed": 0, "total_latency": 0}
+            model_stats[model]["total"] += 1
+            if r.get("passed"):
+                model_stats[model]["passed"] += 1
+            model_stats[model]["total_latency"] += r.get("latency_s", 0)
+
+        # Sort by pass rate
+        sorted_models = sorted(
+            model_stats.items(),
+            key=lambda x: (x[1]["passed"] / max(x[1]["total"], 1), x[1]["passed"]),
+            reverse=True,
+        )
+
+        # Header
+        lines.append(f"{'Model':<35} {'Pass Rate':>12} {'Avg Time':>12} {'Tests':>8}")
+        lines.append("─" * min(width, 70))
+
+        for model, stats in sorted_models[:10]:  # Top 10
+            if stats["total"] > 0:
+                pass_rate = stats["passed"] / stats["total"]
+                avg_lat = stats["total_latency"] / stats["total"]
+            else:
+                pass_rate = 0
+                avg_lat = 0
+
+            # Color based on pass rate
+            if pass_rate >= 0.7:
+                color = "\033[32m"  # Green
+            elif pass_rate >= 0.3:
+                color = "\033[33m"  # Yellow
+            else:
+                color = "\033[31m"  # Red
+            reset = "\033[0m"
+
+            model_display = self._truncate_string(model, 33)
+            lines.append(
+                f"{model_display:<35} {color}{pass_rate:>11.1%}{reset} "
+                f"{self._format_duration(avg_lat):>12} {stats['total']:>8}"
+            )
+
+        if len(sorted_models) > 10:
+            lines.append(f"... and {len(sorted_models) - 10} more models")
+
+        lines.append("")
+        lines.append(border)
+
+        return "\n".join(lines)
+
+    def _format_token_count(self, n: int) -> str:
+        """Format token count with K/M suffix."""
+        if n >= 1_000_000:
+            return f"{n / 1_000_000:.1f}M"
+        elif n >= 1_000:
+            return f"{n / 1_000:.0f}K"
+        return str(n)
+
+
 class WorkerState(Enum):
     """State of a benchmark worker."""
 
     QUEUED = "queued"
-    WAITING = "waiting"  # Waiting for semaphore slot
     RUNNING = "running"
     COMPLETED = "completed"
     FAILED = "failed"
+    TIMEOUT = "timeout"
+
+
+@dataclass
+class WorkItem:
+    """A work item for scheduling with provider preferences."""
+
+    model: str
+    task_id: str
+    task_path: str
+    providers: list[str]  # List of available providers for this model
+    preferred_provider: str | None = None  # Set during scheduling
 
 
 @dataclass
@@ -64,6 +379,7 @@ class WorkerInfo:
     provider: str
     task_id: str
     task_path: str
+    available_providers: list[str] = field(default_factory=list)
     state: WorkerState = WorkerState.QUEUED
     start_time: float | None = None
     end_time: float | None = None
@@ -210,8 +526,12 @@ class BenchmarkWorker:
             task_path=task_path,
         )
 
-    async def run(self) -> WorkerInfo:
-        """Execute the benchmark and return result info."""
+    async def run(self, timeout: int = 900) -> WorkerInfo:
+        """Execute the benchmark and return result info.
+
+        Args:
+            timeout: Maximum time in seconds to wait for the benchmark (default: 900 = 15 min)
+        """
         # Note: state and start_time are set by the coordinator in _run_worker
 
         # Create output subdirectory for this run
@@ -232,7 +552,7 @@ class BenchmarkWorker:
         ]
 
         try:
-            # Run subprocess
+            # Run subprocess with timeout
             process = await asyncio.create_subprocess_exec(
                 *cmd,
                 stdout=asyncio.subprocess.PIPE,
@@ -240,7 +560,30 @@ class BenchmarkWorker:
                 cwd=Path(__file__).parent.parent,
             )
 
-            stdout, stderr = await process.communicate()
+            try:
+                stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=timeout)
+            except asyncio.TimeoutError:
+                # Graceful shutdown - send SIGTERM first
+                try:
+                    process.terminate()
+                    # Wait up to 30 seconds for graceful shutdown
+                    try:
+                        stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=30)
+                    except asyncio.TimeoutError:
+                        # Force kill if graceful shutdown didn't work
+                        process.kill()
+                        await process.wait()
+                        stdout, stderr = b"", b""
+                except Exception:
+                    pass
+
+                self.info.state = WorkerState.TIMEOUT
+                self.info.error = f"Timeout after {timeout}s"
+                self.info.end_time = time.time()
+
+                # Try to collect partial results even after timeout
+                await self._collect_partial_results(run_output_dir)
+                return self.info
 
             self.info.end_time = time.time()
 
@@ -269,9 +612,28 @@ class BenchmarkWorker:
 
         return self.info
 
+    async def _collect_partial_results(self, run_output_dir: Path) -> None:
+        """Try to collect partial results after timeout."""
+        try:
+            result_files = list(run_output_dir.glob("**/benchmark_results.json"))
+            if result_files:
+                with open(result_files[0]) as f:
+                    result = json.load(f)
+                if "results" in result and result["results"]:
+                    r = result["results"][0]
+                    self.info.result = {
+                        "passed": False,
+                        "token_usage": r.get("token_usage", {}),
+                        "latency_s": r.get("latency_s", 0),
+                        "partial": True,
+                        "timeout": True,
+                    }
+        except Exception:
+            pass
+
 
 class ParallelBenchmark:
-    """Coordinates parallel benchmark execution with provider-level concurrency."""
+    """Coordinates parallel benchmark execution with worker pool pattern."""
 
     def __init__(
         self,
@@ -279,20 +641,19 @@ class ParallelBenchmark:
         models_by_provider: dict[str, list[dict]],
         max_per_provider: int,
         output_dir: Path,
+        timeout: int = 900,
     ):
         self.tasks = tasks
         self.models_by_provider = models_by_provider
         self.max_per_provider = max_per_provider
         self.output_dir = output_dir
+        self.timeout = timeout
 
-        # Create all workers
+        # Create all workers (will be populated with load-balancing in run())
         self.workers: list[WorkerInfo] = []
-        self._create_workers()
 
-        # Semaphores per provider
-        self._semaphores: dict[str, asyncio.Semaphore] = {}
-        for provider in models_by_provider:
-            self._semaphores[provider] = asyncio.Semaphore(max_per_provider)
+        # Per-provider queues for worker pools (will be populated in run())
+        self._queues: dict[str, asyncio.Queue] = {}
 
         # Results tracking
         self.completed: list[BenchmarkResult] = []
@@ -302,18 +663,146 @@ class ParallelBenchmark:
         self._start_time: float | None = None
         self._lock = asyncio.Lock()
 
-    def _create_workers(self) -> None:
-        """Create worker info for all model/task combinations."""
-        for provider, models in self.models_by_provider.items():
-            for model in models:
-                for task_path in self.tasks:
-                    worker = WorkerInfo(
-                        model=model["name"],
-                        provider=provider,
+    def _strip_thinking_from_trajectory(self, trajectory_path: Path) -> None:
+        """Strip encrypted thinking content from trajectory file to save disk space.
+
+        Reasoning models like gpt-5-nano output encrypted thinking content that can
+        cause trajectory files to balloon to 70+ MB. This removes thinking_content
+        fields while preserving the rest of the trajectory.
+
+        Args:
+            trajectory_path: Path to the trajectory JSONL file
+        """
+        if not trajectory_path.exists():
+            return
+
+        temp_file = trajectory_path.with_suffix(".tmp")
+        bytes_saved = 0
+
+        try:
+            with open(trajectory_path, "r") as infile, open(temp_file, "w") as outfile:
+                for line in infile:
+                    try:
+                        if line.strip().startswith("{"):
+                            event = json.loads(line)
+                            # Remove thinking_content if present
+                            if "thinking_content" in event:
+                                bytes_saved += len(event["thinking_content"])
+                                del event["thinking_content"]
+                            # Also check in nested message
+                            if "message" in event and isinstance(event["message"], dict):
+                                if "thinking_content" in event["message"]:
+                                    bytes_saved += len(event["message"]["thinking_content"])
+                                    del event["message"]["thinking_content"]
+                            outfile.write(json.dumps(event) + "\n")
+                        else:
+                            outfile.write(line)
+                    except json.JSONDecodeError:
+                        outfile.write(line)
+
+            # Replace original with stripped version
+            shutil.move(str(temp_file), str(trajectory_path))
+
+            if bytes_saved > 0:
+                log.debug(
+                    f"Stripped {bytes_saved / 1024 / 1024:.1f} MB of thinking content from {trajectory_path}"
+                )
+
+        except Exception as e:
+            log.warning(f"Failed to strip thinking content: {e}")
+            if temp_file.exists():
+                temp_file.unlink()
+
+    def _strip_thinking_from_run_dir(self, run_dir: Path) -> None:
+        """Strip thinking content from all trajectory files in a run directory.
+
+        Args:
+            run_dir: Directory containing benchmark run outputs
+        """
+        # Find trajectory files (typically named trajectory.jsonl or similar)
+        for trajectory_path in run_dir.glob("**/trajectory*.jsonl"):
+            self._strip_thinking_from_trajectory(trajectory_path)
+
+    def _get_model_providers(self, model_name: str) -> list[str]:
+        """Get list of available providers for a model.
+
+        Args:
+            model_name: The model name from llm.yaml
+
+        Returns:
+            List of provider names that support this model
+        """
+        llm_config = get_llm_config()
+        providers = llm_config.get_providers(model_name)
+        # Extract just the provider names
+        return [p.get("provider", "unknown") for p in providers if p.get("provider")]
+
+    def _create_workers_with_load_balancing(self) -> None:
+        """Create workers using intelligent load balancing across providers.
+
+        Strategy:
+        1. Build work items with all available providers for each model/task
+        2. Sort: exclusive models (1 provider) first, then flexible (2+ providers)
+        3. Schedule exclusive models to their only provider
+        4. Use flexible models to balance load across providers
+        """
+        # Build work items with provider options
+        work_items: list[WorkItem] = []
+
+        # Get all unique models from the provider-grouped dict
+        all_models: set[str] = set()
+        for provider_models in self.models_by_provider.values():
+            for model in provider_models:
+                all_models.add(model["name"])
+
+        for model_name in all_models:
+            providers = self._get_model_providers(model_name)
+            for task_path in self.tasks:
+                work_items.append(
+                    WorkItem(
+                        model=model_name,
                         task_id=Path(task_path).stem,
                         task_path=task_path,
+                        providers=providers,
                     )
-                    self.workers.append(worker)
+                )
+
+        # Sort: exclusive models first (fewer providers = higher priority for assignment)
+        work_items.sort(key=lambda w: len(w.providers))
+
+        # Track provider load for balancing
+        provider_load: dict[str, int] = {p: 0 for p in self.models_by_provider.keys()}
+
+        # Schedule work items
+        for item in work_items:
+            if len(item.providers) == 1:
+                # Exclusive - must use this provider
+                item.preferred_provider = item.providers[0]
+            else:
+                # Flexible - assign to least loaded available provider
+                # Only consider providers that are in our models_by_provider
+                available = [p for p in item.providers if p in self.models_by_provider]
+                if not available:
+                    # Fallback to first provider if none match
+                    available = item.providers
+                least_loaded = min(available, key=lambda p: provider_load.get(p, 0))
+                item.preferred_provider = least_loaded
+
+            # Update load tracking
+            if item.preferred_provider:
+                provider_load[item.preferred_provider] = (
+                    provider_load.get(item.preferred_provider, 0) + 1
+                )
+
+            # Create WorkerInfo
+            worker = WorkerInfo(
+                model=item.model,
+                provider=item.preferred_provider or item.providers[0],
+                task_id=item.task_id,
+                task_path=item.task_path,
+                available_providers=item.providers,
+            )
+            self.workers.append(worker)
 
     @property
     def total_runs(self) -> int:
@@ -326,14 +815,14 @@ class ParallelBenchmark:
         return [w for w in self.workers if w.state == WorkerState.RUNNING]
 
     @property
-    def waiting(self) -> list[WorkerInfo]:
-        """Workers waiting for semaphore slot."""
-        return [w for w in self.workers if w.state == WorkerState.WAITING]
-
-    @property
     def queued(self) -> list[WorkerInfo]:
         """Queued workers."""
         return [w for w in self.workers if w.state == WorkerState.QUEUED]
+
+    @property
+    def queue_size(self) -> int:
+        """Number of items remaining across all provider queues."""
+        return sum(q.qsize() for q in self._queues.values())
 
     @property
     def completed_count(self) -> int:
@@ -346,9 +835,14 @@ class ParallelBenchmark:
         return len([w for w in self.workers if w.state == WorkerState.FAILED])
 
     @property
+    def timeout_count(self) -> int:
+        """Number of timed-out workers."""
+        return len([w for w in self.workers if w.state == WorkerState.TIMEOUT])
+
+    @property
     def progress_pct(self) -> float:
         """Progress percentage."""
-        done = self.completed_count + self.failed_count
+        done = self.completed_count + self.failed_count + self.timeout_count
         return (done / self.total_runs * 100) if self.total_runs > 0 else 0
 
     @property
@@ -357,14 +851,14 @@ class ParallelBenchmark:
         latencies = [
             w.elapsed
             for w in self.workers
-            if w.state in (WorkerState.COMPLETED, WorkerState.FAILED)
+            if w.state in (WorkerState.COMPLETED, WorkerState.FAILED, WorkerState.TIMEOUT)
         ]
         return statistics.mean(latencies) if latencies else 0
 
     @property
     def eta_seconds(self) -> float:
         """Estimated time remaining in seconds."""
-        remaining = len(self.queued) + len(self.running)
+        remaining = self.queue_size + len(self.running)
         if remaining == 0:
             return 0
 
@@ -373,11 +867,8 @@ class ParallelBenchmark:
             # No completed runs yet, estimate based on running count
             return remaining * 120  # Assume 2 min average
 
-        # Factor in parallelism
-        total_workers = sum(
-            min(len(m), self.max_per_provider) for m in self.models_by_provider.values()
-        )
-        effective_parallelism = max(1, total_workers)
+        # Factor in parallelism (max_per_provider workers per provider)
+        effective_parallelism = max(1, self.max_per_provider * len(self.models_by_provider))
 
         return (remaining * avg_lat) / effective_parallelism
 
@@ -401,41 +892,69 @@ class ParallelBenchmark:
                 models.append(model["name"])
         return models
 
-    async def _run_worker(self, worker_info: WorkerInfo) -> WorkerInfo:
-        """Run a single worker with semaphore control."""
-        provider = worker_info.provider
-        semaphore = self._semaphores.get(provider)
+    async def _worker(self, worker_id: str, queue: asyncio.Queue, results_list: list) -> None:
+        """Worker that pulls tasks from its provider's queue.
 
-        if semaphore is None:
-            worker_info.state = WorkerState.FAILED
-            worker_info.error = f"Unknown provider: {provider}"
-            return worker_info
+        Args:
+            worker_id: Identifier for this worker (e.g., "openai_0")
+            queue: Provider-specific queue containing WorkerInfo items
+            results_list: Shared list to append results to
+        """
+        while True:
+            try:
+                worker_info = queue.get_nowait()
+            except asyncio.QueueEmpty:
+                break
 
-        # Set state to WAITING before semaphore acquisition
-        worker_info.state = WorkerState.WAITING
-        worker_info.start_time = time.time()
-
-        async with semaphore:
-            # Now actually running (have semaphore slot)
+            # Update state to running
             worker_info.state = WorkerState.RUNNING
+            worker_info.start_time = time.time()
 
             try:
-                worker = BenchmarkWorker(
+                # Create and run the benchmark worker
+                benchmark_worker = BenchmarkWorker(
                     model=worker_info.model,
                     provider=worker_info.provider,
                     task_path=worker_info.task_path,
                     output_dir=self.output_dir,
                 )
-                result = await worker.run()
+                result_info = await benchmark_worker.run(timeout=self.timeout)
 
-                async with self._lock:
-                    if result.state == WorkerState.COMPLETED and result.result:
-                        bench_result = BenchmarkResult.from_dict(result.result)
-                        self.completed.append(bench_result)
-                    elif result.state == WorkerState.FAILED:
-                        self.failed.append(result)
+                # Copy result data to worker_info
+                worker_info.end_time = result_info.end_time
+                worker_info.result = result_info.result
+                worker_info.error = result_info.error
 
-                return result
+                # Update state based on result
+                if result_info.state == WorkerState.COMPLETED:
+                    worker_info.state = WorkerState.COMPLETED
+                    # Strip thinking content from trajectory files to save disk space
+                    run_output_dir = self.output_dir / f"{worker_info.task_id}_{worker_info.model}"
+                    self._strip_thinking_from_run_dir(run_output_dir)
+                    async with self._lock:
+                        if result_info.result:
+                            bench_result = BenchmarkResult.from_dict(result_info.result)
+                            self.completed.append(bench_result)
+                        results_list.append({"worker_info": worker_info, "success": True})
+                elif result_info.state == WorkerState.TIMEOUT:
+                    worker_info.state = WorkerState.TIMEOUT
+                    # Strip thinking content from partial trajectory files
+                    run_output_dir = self.output_dir / f"{worker_info.task_id}_{worker_info.model}"
+                    self._strip_thinking_from_run_dir(run_output_dir)
+                    async with self._lock:
+                        # Add partial result if available
+                        if result_info.result:
+                            bench_result = BenchmarkResult.from_dict(result_info.result)
+                            self.completed.append(bench_result)
+                        self.failed.append(worker_info)  # Track in failed for summary
+                        results_list.append(
+                            {"worker_info": worker_info, "success": False, "timeout": True}
+                        )
+                else:
+                    worker_info.state = WorkerState.FAILED
+                    async with self._lock:
+                        self.failed.append(worker_info)
+                        results_list.append({"worker_info": worker_info, "success": False})
 
             except Exception as e:
                 worker_info.state = WorkerState.FAILED
@@ -443,51 +962,83 @@ class ParallelBenchmark:
                 worker_info.error = f"Worker exception: {e}"
                 async with self._lock:
                     self.failed.append(worker_info)
-                return worker_info
+                    results_list.append({"worker_info": worker_info, "success": False})
+            finally:
+                queue.task_done()
 
-    async def run(self, progress_callback: callable | None = None) -> dict:
-        """Run all benchmarks in parallel.
+    async def run(self, progress_callback: Callable | None = None) -> dict:
+        """Run all benchmarks with intelligent load balancing.
+
+        Uses load-aware scheduling:
+        1. Exclusive models (1 provider) are assigned to their only provider
+        2. Flexible models (2+ providers) are used to balance load across providers
+
+        This ensures optimal utilization by allowing faster providers to pick up
+        more work from flexible models.
 
         Args:
-            progress_callback: Optional async callback for progress updates
+            progress_callback: Optional callback for progress updates
 
         Returns:
             Dict with results summary
         """
+        from collections import defaultdict
+
         self._start_time = time.time()
 
-        # Create tasks for all workers
-        tasks = []
-        for worker_info in self.workers:
-            task = asyncio.create_task(self._run_worker(worker_info))
-            tasks.append(task)
+        # Create workers with load balancing (if not already created)
+        if not self.workers:
+            self._create_workers_with_load_balancing()
 
-        # Wait for all tasks with periodic progress updates
-        if progress_callback:
-            done, pending = set(), set(tasks)
-            while pending:
-                # Wait for any task to complete or timeout
-                done_subset, pending = await asyncio.wait(
-                    pending,
-                    timeout=0.5,
-                    return_when=asyncio.FIRST_COMPLETED,
-                )
-                done.update(done_subset)
+        # Group workers by their assigned provider
+        workers_by_provider: dict[str, list[WorkerInfo]] = defaultdict(list)
+        for worker_info in self.workers:
+            workers_by_provider[worker_info.provider].append(worker_info)
+
+        # Create one queue per provider, populated with that provider's tasks
+        self._queues = {}
+        for provider, worker_list in workers_by_provider.items():
+            queue = asyncio.Queue()
+            for worker_info in worker_list:
+                await queue.put(worker_info)
+            self._queues[provider] = queue
+
+        # Shared results list for tracking
+        results_list: list[dict] = []
+        all_worker_tasks: list[asyncio.Task] = []
+
+        # Create worker pool for each provider
+        for provider, queue in self._queues.items():
+            num_provider_workers = min(
+                self.max_per_provider, queue.qsize()
+            )  # Don't create more workers than tasks
+            for i in range(num_provider_workers):
+                worker_id = f"{provider}_{i}"
+                worker_task = asyncio.create_task(self._worker(worker_id, queue, results_list))
+                all_worker_tasks.append(worker_task)
+
+        # Wait for completion with progress updates
+        while any(not w.done() for w in all_worker_tasks):
+            if progress_callback:
                 await progress_callback(self)
-        else:
-            await asyncio.gather(*tasks)
+            await asyncio.sleep(0.5)
+
+        # Wait for all workers to finish (should already be done)
+        await asyncio.gather(*all_worker_tasks)
 
         # Collect final results
         results = {
             "total_runs": self.total_runs,
             "completed": self.completed_count,
             "failed": self.failed_count,
+            "timeouts": self.timeout_count,
             "results": [r.__dict__ for r in self.completed],
             "failed_workers": [
                 {
                     "model": w.model,
                     "task_id": w.task_id,
                     "error": w.error,
+                    "timeout": w.state == WorkerState.TIMEOUT,
                 }
                 for w in self.failed
             ],
@@ -502,91 +1053,19 @@ def clear_screen() -> None:
     os.system("cls" if os.name == "nt" else "clear")
 
 
-def display_progress(benchmark: ParallelBenchmark, verbose: bool = False) -> None:
+def display_progress(
+    benchmark: ParallelBenchmark, display_obj: ProgressDisplay | None = None
+) -> None:
     """Print the progress display."""
-    clear_screen()
-
-    # Header
-    print("=" * 80)
-    print("BENCHMARK PROGRESS")
-    print("=" * 80)
-
-    # Summary stats
-    task_count = len(set(w.task_id for w in benchmark.workers))
-    model_count = sum(len(m) for m in benchmark.models_by_provider.values())
-
-    print(f"Tasks: {task_count} | Models: {model_count} | Total runs: {benchmark.total_runs}")
-    print(
-        f"Completed: {benchmark.completed_count} | Failed: {benchmark.failed_count} | "
-        f"Running: {len(benchmark.running)} | Waiting: {len(benchmark.waiting)} | Queued: {len(benchmark.queued)}"
-    )
-    print(f"Progress: {benchmark.progress_pct:.1f}% | ETA: {benchmark.format_eta()}")
-    print()
-
-    # Running workers
-    running = benchmark.running
-    if running:
-        print("RUNNING:")
-        for w in sorted(running, key=lambda x: x.start_time or 0):
-            elapsed = w.format_elapsed()
-            print(f"  [{w.provider}] {w.model:25s} → {w.task_id:30s} ({elapsed})")
-        print()
-
-    # Waiting workers (waiting for semaphore slot)
-    waiting = benchmark.waiting
-    if waiting:
-        print(f"WAITING ({len(waiting)} for semaphore slot):")
-        for w in sorted(waiting, key=lambda x: x.start_time or 0)[:5]:  # Show max 5
-            elapsed = w.format_elapsed()
-            print(f"  [{w.provider}] {w.model:25s} → {w.task_id:30s} ({elapsed})")
-        if len(waiting) > 5:
-            print(f"  ... and {len(waiting) - 5} more")
-        print()
-
-    # Completed workers (show last 5)
-    completed = [w for w in benchmark.workers if w.state == WorkerState.COMPLETED]
-    if completed:
-        print("COMPLETED:")
-        for w in completed[-5:]:
-            if w.result:
-                passed = w.result.get("passed", False)
-                symbol = "✓" if passed else "✗"
-                token_usage = w.result.get("token_usage", {})
-                inp = token_usage.get("input_tokens", 0)
-                out = token_usage.get("output_tokens", 0)
-
-                def abbrev(n: int) -> str:
-                    if n >= 1_000_000:
-                        return f"{n / 1_000_000:.1f}M"
-                    elif n >= 1_000:
-                        return f"{n / 1_000:.0f}K"
-                    return str(n)
-
-                latency = w.elapsed
-                color_start = "\033[32m" if passed else "\033[31m"
-                color_end = "\033[0m"
-                print(
-                    f"  {color_start}{symbol}{color_end} {w.model}: "
-                    f"passed={passed}, {abbrev(inp)} in / {abbrev(out)} out, {latency:.1f}s"
-                )
-            else:
-                print(f"  ✓ {w.model}: completed (no result data)")
-
-    # Failed workers
-    failed = [w for w in benchmark.workers if w.state == WorkerState.FAILED]
-    if failed:
-        print()
-        print("FAILED:")
-        for w in failed[-3:]:
-            error_preview = (w.error or "Unknown error")[:60]
-            print(f"  ✗ {w.model}: {error_preview}")
-
-    print("=" * 80)
+    if display_obj is None:
+        display_obj = ProgressDisplay()
+    display_obj.display(benchmark)
 
 
-async def progress_updater(benchmark: ParallelBenchmark) -> None:
+async def progress_updater(benchmark: ParallelBenchmark, display_obj: ProgressDisplay) -> None:
     """Async callback for progress updates."""
-    display_progress(benchmark)
+    if display_obj.should_update():
+        display_obj.display(benchmark)
 
 
 def save_final_results(results: dict, output_dir: Path) -> Path:
@@ -667,29 +1146,45 @@ def print_summary(results: dict) -> None:
     print(f"Total runs: {results.get('total_runs', 0)}")
     print(f"Completed: {results.get('completed', 0)}")
     print(f"Failed: {results.get('failed', 0)}")
+    print(f"Timeouts: {results.get('timeouts', 0)}")
     print(f"Duration: {results.get('duration_s', 0):.1f}s")
 
 
 async def main_async(args: argparse.Namespace) -> int:
     """Main async entry point."""
-    # Resolve task paths
-    task_paths = []
-    for pattern in args.tasks:
-        path = Path(pattern)
-        if path.exists():
-            task_paths.append(str(path))
-        else:
-            # Treat as glob pattern
-            import glob as glob_module
+    import glob
 
-            matched = glob_module.glob(pattern)
-            task_paths.extend(matched)
+    # Resolve task paths
+    if args.tasks is None or args.tasks == ["all"]:
+        # Load tasks from all directories
+        task_paths = []
+        for task_dir in ["tasks/mined", "tasks/train", "tasks/dev", "tasks/held_out"]:
+            task_paths.extend(glob.glob(f"{task_dir}/*.json"))
+        task_paths = sorted(task_paths)
+    else:
+        # Use specified task patterns
+        task_paths = []
+        for pattern in args.tasks:
+            path = Path(pattern)
+            if path.exists():
+                task_paths.append(str(path))
+            else:
+                # Treat as glob pattern
+                matched = glob.glob(pattern)
+                task_paths.extend(matched)
 
     if not task_paths:
         print("Error: No task files found")
         return 1
 
-    print(f"Found {len(task_paths)} task(s)")
+    # Determine if progress should be shown
+    show_progress = args.progress and not args.no_progress
+
+    if show_progress:
+        print(f"Found {len(task_paths)} task(s)")
+    else:
+        # Programmatic mode: just print basic info as JSON-compatible
+        print(json.dumps({"status": "starting", "tasks": len(task_paths)}))
 
     # Load models
     models_by_provider = load_models_from_config()
@@ -703,9 +1198,11 @@ async def main_async(args: argparse.Namespace) -> int:
         return 1
 
     total_models = sum(len(m) for m in models_by_provider.values())
-    print(f"Using {total_models} model(s) across {len(models_by_provider)} provider(s)")
-    for provider, models in models_by_provider.items():
-        print(f"  {provider}: {', '.join(m['name'] for m in models)}")
+
+    if show_progress:
+        print(f"Using {total_models} model(s) across {len(models_by_provider)} provider(s)")
+        for provider, models in models_by_provider.items():
+            print(f"  {provider}: {', '.join(m['name'] for m in models)}")
 
     # Setup output directory
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -717,27 +1214,59 @@ async def main_async(args: argparse.Namespace) -> int:
         models_by_provider=models_by_provider,
         max_per_provider=args.max_per_provider,
         output_dir=output_dir,
+        timeout=args.timeout,
     )
 
-    print(f"\nTotal benchmark runs: {benchmark.total_runs}")
-    print(f"Max workers per provider: {args.max_per_provider}")
-    print(f"Output directory: {output_dir}")
-    print("\nStarting parallel benchmark...")
+    if show_progress:
+        print(f"\nTotal benchmark runs: {benchmark.total_runs}")
+        print(f"Max workers per provider: {args.max_per_provider}")
+        print(f"Output directory: {output_dir}")
+        print("\nStarting parallel benchmark...")
 
-    # Run with progress display
-    results = await benchmark.run(progress_callback=progress_updater)
+    # Create progress display
+    progress_display = ProgressDisplay() if show_progress else None
+
+    # Clear screen and initialize display area before starting
+    if show_progress and progress_display:
+        # Print enough newlines to reserve space for the display
+        # Then move cursor up to start position
+        print("\n" * 15, end="")
+        sys.stdout.write("\033[15A")  # Move cursor back up
+        sys.stdout.flush()
+
+    # Run with progress display callback
+    async def progress_callback(bench: ParallelBenchmark) -> None:
+        if progress_display and progress_display.should_update():
+            progress_display.display(bench)
+
+    results = await benchmark.run(progress_callback=progress_callback if show_progress else None)
 
     # Final display
-    clear_screen()
-    display_progress(benchmark)
+    if show_progress and progress_display:
+        progress_display.clear()
+        final_summary = progress_display.render_final_summary(results, benchmark)
+        print(final_summary)
+    else:
+        # Programmatic mode: print JSON summary
+        summary = {
+            "status": "complete",
+            "total_runs": results.get("total_runs", 0),
+            "completed": results.get("completed", 0),
+            "failed": results.get("failed", 0),
+            "timeouts": results.get("timeouts", 0),
+            "duration_s": results.get("duration_s", 0),
+            "output_dir": str(output_dir),
+        }
+        print(json.dumps(summary))
 
     # Save results
     results_file = save_final_results(results, output_dir)
-    print(f"\nResults saved to: {results_file}")
+    if show_progress:
+        print(f"\nResults saved to: {results_file}")
 
-    # Print summary
-    print_summary(results)
-
+    # Return appropriate exit code (consider both failures and timeouts as non-success)
+    if results.get("failed", 0) > 0 or results.get("timeouts", 0) > 0:
+        return 1
     return 0
 
 
@@ -748,13 +1277,16 @@ def main() -> int:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Run all models on all mined tasks
-  uv run python scripts/run_parallel_benchmark.py --tasks "tasks/mined/*.json" --models all
+  # Run all models on all tasks (default)
+  uv run python scripts/run_parallel_benchmark.py --models all
 
-  # Run specific models on a single task
+  # Run specific models on all tasks
+  uv run python scripts/run_parallel_benchmark.py --models glm-5-free minimax-m2.5-free
+
+  # Run specific tasks
   uv run python scripts/run_parallel_benchmark.py \\
       --tasks tasks/mined/tidyverse_readr_1615.json \\
-      --models glm-5-free minimax-m2.5-free
+      --models all
 
   # Custom concurrency and output
   uv run python scripts/run_parallel_benchmark.py \\
@@ -768,8 +1300,8 @@ Examples:
     parser.add_argument(
         "--tasks",
         nargs="+",
-        required=True,
-        help="Task file paths or glob patterns (e.g., 'tasks/mined/*.json')",
+        default=None,
+        help="Task file paths or glob patterns (e.g., 'tasks/mined/*.json'). Default: all task directories",
     )
     parser.add_argument(
         "--models",
@@ -793,6 +1325,24 @@ Examples:
         "-v",
         action="store_true",
         help="Enable verbose output",
+    )
+    parser.add_argument(
+        "--no-progress",
+        action="store_true",
+        help="Disable progress display for programmatic use",
+    )
+    parser.add_argument(
+        "--progress",
+        dest="progress",
+        action="store_true",
+        default=True,
+        help="Show live progress display (default)",
+    )
+    parser.add_argument(
+        "--timeout",
+        type=int,
+        default=900,
+        help="Timeout in seconds per benchmark run (default: 900 = 15 min)",
     )
 
     args = parser.parse_args()
