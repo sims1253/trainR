@@ -238,7 +238,7 @@ class PairingConfig(BaseModel):
 
     def get_all_profiles(self) -> list[str]:
         """Get all profiles (control first, then treatments)."""
-        return [self.control_profile] + list(self.treatment_profiles)
+        return [self.control_profile, *list(self.treatment_profiles)]
 
 
 class ExperimentConfig(BaseModel):

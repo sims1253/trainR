@@ -28,7 +28,6 @@ from pydantic import ValidationError
 from bench.dataset.decontam import (
     DecontaminationReport,
     analyze_decontamination,
-    compute_task_fingerprint,
 )
 from bench.schema.v1 import TaskV1
 
@@ -555,7 +554,7 @@ def run_validate_command(input_dir: Path, strict: bool = False) -> int:
     print(f"Validating tasks in {input_dir}...")
     report = validate_dataset(input_dir, strict)
 
-    print(f"\nValidation Report:")
+    print("\nValidation Report:")
     print(f"  Total files: {report.total_files}")
     print(f"  Valid: {report.valid_tasks}")
     print(f"  Invalid: {report.invalid_tasks}")
@@ -594,7 +593,7 @@ def run_export_command(input_dir: Path, output_path: Path, check_contamination: 
     config = DatasetConfig(check_contamination=check_contamination)
     manifest = export_dataset(input_dir, output_path, config)
 
-    print(f"\nDataset Manifest:")
+    print("\nDataset Manifest:")
     print(f"  Version: {manifest.version}")
     print(f"  Fingerprint: {manifest.fingerprint}")
     print(f"  Created: {manifest.created_at}")

@@ -12,21 +12,21 @@ from bench.reports.paired import (
     # Tool A/B pairing
     BootstrapStats,
     PairedToolReport,
+    # Support profile pairing (WP-04B)
+    SupportPairDelta,
+    SupportPairReport,
     ToolPairDelta,
     analyze_tool_ab_matrix,
     bootstrap_significance_test,
     compute_paired_deltas,
-    generate_paired_tool_report,
-    save_paired_report,
-    # Support profile pairing (WP-04B)
-    SupportPairDelta,
-    SupportPairReport,
     compute_support_pair_deltas,
     emit_support_pair_deltas,
     emit_support_pair_report,
+    generate_paired_tool_report,
     generate_support_pair_report,
     load_paired_support_results,
     process_support_pair_experiment,
+    save_paired_report,
 )
 
 # Backward compatibility aliases
@@ -47,27 +47,27 @@ def load_paired_results(path):
 
 
 __all__ = [
-    # Tool A/B pairing (primary)
-    "ToolPairDelta",
     "BootstrapStats",
-    "PairedToolReport",
-    "bootstrap_significance_test",
-    "compute_paired_deltas",
-    "generate_paired_tool_report",
-    "analyze_tool_ab_matrix",
-    "save_paired_report",
-    # Support profile pairing (WP-04B)
-    "SupportPairDelta",
-    "SupportPairReport",
-    "compute_support_pair_deltas",
-    "emit_support_pair_deltas",
-    "emit_support_pair_report",
-    "generate_support_pair_report",
-    "load_paired_support_results",
-    "process_support_pair_experiment",
     # Backward compatibility
     "PairedDelta",
     "PairedDeltaReport",
+    "PairedToolReport",
+    # Support profile pairing (WP-04B)
+    "SupportPairDelta",
+    "SupportPairReport",
+    # Tool A/B pairing (primary)
+    "ToolPairDelta",
+    "analyze_tool_ab_matrix",
+    "bootstrap_significance_test",
+    "compute_paired_deltas",
+    "compute_support_pair_deltas",
     "emit_paired_deltas",
+    "emit_support_pair_deltas",
+    "emit_support_pair_report",
+    "generate_paired_tool_report",
+    "generate_support_pair_report",
     "load_paired_results",
+    "load_paired_support_results",
+    "process_support_pair_experiment",
+    "save_paired_report",
 ]

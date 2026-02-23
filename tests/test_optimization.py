@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from evaluation.models import FailureCategory
 from optimization.adapter import SkillEvaluator, optimize_skill
 from task_generator.models import Difficulty, TestingTask, TestPattern
 
@@ -110,13 +111,27 @@ class TestOptimizeSkill:
     @patch("optimization.adapter.oa.optimize_anything")
     @patch("evaluation.sandbox.DockerPiRunner")
     def test_raises_without_api_key(self, mock_runner, mock_oa):
-        """Should raise ValueError when OPENROUTER_API_KEY is not set."""
+        """Should raise ValueError when required API key is not set.
+
+        Note: The key required depends on the reflection model from config.
+        This test verifies the general behavior of requiring API keys.
+        """
         mock_runner.return_value = MagicMock()
         env = os.environ.copy()
-        env.pop("OPENROUTER_API_KEY", None)
+        # Clear all known API keys
+        for key in [
+            "OPENROUTER_API_KEY",
+            "Z_AI_API_KEY",
+            "OPENCODE_API_KEY",
+            "OPENAI_API_KEY",
+            "ANTHROPIC_API_KEY",
+            "GEMINI_API_KEY",
+            "GOOGLE_API_KEY",
+        ]:
+            env.pop(key, None)
         with (
             patch.dict(os.environ, env, clear=True),
-            pytest.raises(ValueError, match="OPENROUTER_API_KEY"),
+            pytest.raises(ValueError, match="_API_KEY"),
         ):
             optimize_skill(
                 seed_skill="# test",
@@ -168,3 +183,27 @@ class TestOptimizeSkill:
             call_kwargs = mock_oa.call_args
             config = call_kwargs.kwargs.get("config") or call_kwargs[1].get("config")
             assert config.reflection.reflection_lm == "custom-model-override"
+
+
+class TestFailureClassification:
+    """Tests for error classification in evaluation."""
+
+    def test_environment_error_category_exists(self):
+        """Test ENVIRONMENT_ERROR is a valid FailureCategory."""
+        assert FailureCategory.ENVIRONMENT_ERROR.value == "ENVIRONMENT_ERROR"
+
+    def test_config_error_category_exists(self):
+        """Test CONFIG_ERROR is a valid FailureCategory."""
+        assert FailureCategory.CONFIG_ERROR.value == "CONFIG_ERROR"
+
+    def test_package_not_found_category_exists(self):
+        """Test PACKAGE_NOT_FOUND is a valid FailureCategory."""
+        assert FailureCategory.PACKAGE_NOT_FOUND.value == "PACKAGE_NOT_FOUND"
+
+    def test_timeout_category_exists(self):
+        """Test TIMEOUT is a valid FailureCategory."""
+        assert FailureCategory.TIMEOUT.value == "TIMEOUT"
+
+    def test_test_failure_category_exists(self):
+        """Test TEST_FAILURE is a valid FailureCategory."""
+        assert FailureCategory.TEST_FAILURE.value == "TEST_FAILURE"

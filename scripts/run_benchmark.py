@@ -24,6 +24,8 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+import contextlib
+
 import yaml
 from rich.console import Console
 from rich.panel import Panel
@@ -150,7 +152,7 @@ def run_via_unified_runner(args: argparse.Namespace) -> int:
     Returns:
         Exit code (0 for success, non-zero for failure)
     """
-    print_deprecation_warning(f"uv run python scripts/run_experiment.py --config <config.yaml>")
+    print_deprecation_warning("uv run python scripts/run_experiment.py --config <config.yaml>")
 
     # Translate args to experiment config
     exp_config = translate_args_to_experiment_config(args)
@@ -167,11 +169,8 @@ def run_via_unified_runner(args: argparse.Namespace) -> int:
         # Import and run the unified runner
         from run_experiment import (
             main as run_experiment_main,
-            validate_config,
-            print_config_summary,
-            run_with_progress,
         )
-        from bench.experiments import ExperimentRunner
+
 
         # Monkey-patch sys.argv to pass our config
         original_argv = sys.argv
@@ -194,10 +193,8 @@ def run_via_unified_runner(args: argparse.Namespace) -> int:
 
     finally:
         # Clean up temp file
-        try:
+        with contextlib.suppress(Exception):
             os.unlink(temp_config_path)
-        except Exception:
-            pass
 
 
 def get_migration_command(args: argparse.Namespace) -> str:
@@ -638,7 +635,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         epilog="""
 DEPRECATION NOTICE:
     This script is deprecated. Please use the unified experiment runner:
-    
+
     uv run python scripts/run_experiment.py --config configs/experiments/your_config.yaml
 
 Examples:
@@ -749,7 +746,7 @@ def main() -> None:
     required_keys = set()
     for model_cfg in enabled_models:
         model_env = model_cfg.get("env", {})
-        for key_name in model_env.keys():
+        for key_name in model_env:
             if key_name and not os.environ.get(key_name):
                 required_keys.add(key_name)
 

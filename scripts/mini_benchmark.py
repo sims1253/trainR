@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Mini benchmark to test all models on a single task."""
 import subprocess
-import sys
+
 import yaml
 
 # Load models

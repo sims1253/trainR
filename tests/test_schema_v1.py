@@ -1,38 +1,30 @@
 """Tests for canonical schema v1 models."""
 
+
 import pytest
-from datetime import datetime
+from pydantic import ValidationError
 
 from bench.schema.v1 import (
-    TaskV1,
-    TaskTypeV1,
     DifficultyV1,
-    TaskSourceV1,
-    TaskTestsV1,
-    TaskSolutionV1,
-    TaskFilesV1,
-    ProfileV1,
-    ProfileTypeV1,
-    ModelConfigV1,
-    SkillConfigV1,
+    ErrorCategoryV1,
     JudgeConfigV1,
     JudgeModeV1,
-    VotingStrategyV1,
-    ExecutionConfigV1,
-    WorkerConfigV1,
-    ResultV1,
-    ErrorCategoryV1,
-    TokenUsageV1,
     ManifestV1,
-    ResultSummaryV1,
-    ModelSummaryV1,
-    validate_task,
-    validate_result,
-    validate_profile,
-    validate_manifest,
-    load_json_schema,
+    ModelConfigV1,
+    ProfileTypeV1,
+    ProfileV1,
+    ResultV1,
+    SkillConfigV1,
+    TaskTestsV1,
+    TaskTypeV1,
+    TaskV1,
+    TokenUsageV1,
+    VotingStrategyV1,
     adapt_from_legacy_result,
     adapt_from_legacy_task,
+    load_json_schema,
+    validate_result,
+    validate_task,
 )
 from bench.schema.v1.results import CaseResultV1
 
@@ -109,7 +101,7 @@ class TestTaskV1:
             assert task.quality_score == score
 
         # Invalid scores should raise
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             TaskV1(
                 task_id="test-001",
                 task_type=TaskTypeV1.SWE,

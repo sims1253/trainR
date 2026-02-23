@@ -167,7 +167,7 @@ def read_canonical_results(input_dir: Path) -> list[dict[str, Any]]:
                 result = json.loads(line)
                 results.append(result)
             except json.JSONDecodeError as e:
-                warnings.warn(f"Invalid JSON at line {line_num} in {results_file}: {e}")
+                warnings.warn(f"Invalid JSON at line {line_num} in {results_file}: {e}", stacklevel=2)
 
     return results
 
@@ -182,7 +182,7 @@ def read_canonical_manifest(input_dir: Path) -> dict[str, Any] | None:
         with open(manifest_file) as f:
             return json.load(f)
     except (OSError, json.JSONDecodeError) as e:
-        warnings.warn(f"Error reading manifest: {e}")
+        warnings.warn(f"Error reading manifest: {e}", stacklevel=2)
         return None
 
 
@@ -196,7 +196,7 @@ def read_canonical_summary(input_dir: Path) -> dict[str, Any] | None:
         with open(summary_file) as f:
             return json.load(f)
     except (OSError, json.JSONDecodeError) as e:
-        warnings.warn(f"Error reading summary: {e}")
+        warnings.warn(f"Error reading summary: {e}", stacklevel=2)
         return None
 
 
@@ -206,14 +206,15 @@ def discover_run_directories(input_dir: Path) -> list[Path]:
 
     # Look for directories containing manifest.json or results.jsonl
     for path in input_dir.rglob("*"):
-        if path.is_dir():
-            if (path / MANIFEST_FILE).exists() or (path / RESULTS_FILE).exists():
-                run_dirs.append(path)
+        if path.is_dir() and ((path / MANIFEST_FILE).exists() or (path / RESULTS_FILE).exists()):
+            run_dirs.append(path)
 
     # Also check input_dir itself
-    if (input_dir / MANIFEST_FILE).exists() or (input_dir / RESULTS_FILE).exists():
-        if input_dir not in run_dirs:
-            run_dirs.append(input_dir)
+    if (
+        ((input_dir / MANIFEST_FILE).exists() or (input_dir / RESULTS_FILE).exists())
+        and input_dir not in run_dirs
+    ):
+        run_dirs.append(input_dir)
 
     return sorted(run_dirs)
 
@@ -267,7 +268,7 @@ def read_legacy_results(input_dir: Path) -> dict[str, dict[str, list[dict[str, A
     for filepath in eval_files:
         parsed = parse_legacy_filename(filepath.name)
         if not parsed:
-            warnings.warn(f"Skipping file with unexpected name: {filepath.name}")
+            warnings.warn(f"Skipping file with unexpected name: {filepath.name}", stacklevel=2)
             continue
 
         model, file_skill, _timestamp = parsed
@@ -276,7 +277,7 @@ def read_legacy_results(input_dir: Path) -> dict[str, dict[str, list[dict[str, A
             with open(filepath) as f:
                 data = json.load(f)
         except (OSError, json.JSONDecodeError) as e:
-            warnings.warn(f"Error reading {filepath}: {e}")
+            warnings.warn(f"Error reading {filepath}: {e}", stacklevel=2)
             continue
 
         # Map skill name
@@ -607,13 +608,12 @@ def validate_visualizer_data(data: VisualizerDataV1) -> list[str]:
                     isinstance(overall.get("passed"), (int, float))
                     and isinstance(overall.get("failed"), (int, float))
                     and isinstance(overall.get("total"), (int, float))
-                ):
-                    if overall["passed"] + overall["failed"] != overall["total"]:
-                        errors.append(
-                            f"{skill_prefix}.overall has inconsistent counts: "
-                            f"passed ({overall['passed']}) + failed ({overall['failed']}) "
-                            f"!= total ({overall['total']})"
-                        )
+                ) and overall["passed"] + overall["failed"] != overall["total"]:
+                    errors.append(
+                        f"{skill_prefix}.overall has inconsistent counts: "
+                        f"passed ({overall['passed']}) + failed ({overall['failed']}) "
+                        f"!= total ({overall['total']})"
+                    )
 
             # Check by_difficulty
             if "by_difficulty" not in skill_data:

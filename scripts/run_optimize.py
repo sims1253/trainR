@@ -39,7 +39,6 @@ from rich.progress import (
     TextColumn,
     TimeElapsedColumn,
 )
-from rich.syntax import Syntax
 from rich.table import Table
 
 from bench.optimize import (
@@ -47,9 +46,6 @@ from bench.optimize import (
     OptimizationRun,
     OptimizationState,
     StopReason,
-    has_checkpoint,
-    load_checkpoint,
-    save_checkpoint,
 )
 
 console = Console()
@@ -373,7 +369,7 @@ def display_results(state: OptimizationState) -> None:
             marker = "[green]*[/green]" if entry.is_best else " "
             console.print(
                 f"  {marker} Iter {entry.iteration}: {entry.score:.2%}"
-                + (f" [dim](best)[/dim]" if entry.is_best else "")
+                + (" [dim](best)[/dim]" if entry.is_best else "")
             )
 
 
@@ -460,33 +456,33 @@ def run_optimization(config: dict, args: argparse.Namespace) -> tuple[Optimizati
 
     # Enter the run context (installs signal handlers)
     with run:
+        optimize_skill_fn = None
         # Import optimization function (deferred to allow for missing dependencies)
         try:
             from optimization import optimize_skill
             from task_generator import TaskGenerator
+
+            optimize_skill_fn = optimize_skill
+            task_generator_cls = TaskGenerator
         except ImportError as e:
             console.print(f"[red]Failed to import optimization module: {e}[/red]")
             console.print("[yellow]Running in simulation mode (no actual optimization)[/yellow]")
-            optimize_skill = None
-            TaskGenerator = None
+            task_generator_cls = None
 
         # Load seed skill
         if config.get("no_skill"):
             seed_skill = ""
-            seed_skill_name = "no_skill"
         else:
             seed_path = config.get("seed_skill")
             if seed_path and Path(seed_path).exists():
                 seed_skill = Path(seed_path).read_text()
-                seed_skill_name = Path(seed_path).stem
             else:
                 seed_skill = ""
-                seed_skill_name = "empty"
 
         # Load tasks
         tasks_dir = config.get("tasks_dir", "tasks")
-        if TaskGenerator and Path(tasks_dir).exists():
-            generator = TaskGenerator(tasks_dir)
+        if task_generator_cls and Path(tasks_dir).exists():
+            generator = task_generator_cls(tasks_dir)
             train_tasks = generator.load_all_tasks(split="train")
             val_tasks = generator.load_all_tasks(split="dev")
             if not val_tasks:
@@ -496,7 +492,7 @@ def run_optimization(config: dict, args: argparse.Namespace) -> tuple[Optimizati
             val_tasks = []
 
         # Run optimization loop
-        if not args.simulation and optimize_skill and train_tasks:
+        if not args.simulation and optimize_skill_fn and train_tasks:
             console.print("\n[blue]Starting optimization...[/blue]")
 
             # Create progress display
@@ -520,7 +516,7 @@ def run_optimization(config: dict, args: argparse.Namespace) -> tuple[Optimizati
 
                 try:
                     # Run actual optimization
-                    result = optimize_skill(
+                    result = optimize_skill_fn(
                         seed_skill=seed_skill,
                         train_tasks=train_tasks,
                         val_tasks=val_tasks,
@@ -548,9 +544,8 @@ def run_optimization(config: dict, args: argparse.Namespace) -> tuple[Optimizati
                             if (
                                 hasattr(result, "val_aggregate_scores")
                                 and result.val_aggregate_scores
-                            ):
-                                if i < len(result.val_aggregate_scores):
-                                    score = result.val_aggregate_scores[i]
+                            ) and i < len(result.val_aggregate_scores):
+                                score = result.val_aggregate_scores[i]
 
                             # Compute hash
                             from hashlib import sha256

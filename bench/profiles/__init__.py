@@ -6,9 +6,10 @@ This package provides:
 """
 
 from bench.profiles.support import (
+    DEFAULT_PROFILES,
     AgentConfig,
     ComposedSupportArtifact,
-    DEFAULT_PROFILES,
+    SelectionMetadata,
     SkillReference,
     SupportFingerprint,
     SupportMode,
@@ -25,20 +26,21 @@ from bench.profiles.tools import (
 )
 
 __all__ = [
+    "DEFAULT_PROFILES",
+    "AgentConfig",
+    "ComposedSupportArtifact",
+    "SelectionMetadata",
+    "SkillReference",
+    "SupportFingerprint",
+    "SupportMode",
     # Support profiles
     "SupportProfile",
-    "SupportMode",
-    "SupportFingerprint",
-    "SkillReference",
-    "AgentConfig",
     "SystemPromptConfig",
-    "ComposedSupportArtifact",
-    "load_support_profile",
-    "DEFAULT_PROFILES",
     # Tool profiles
     "ToolConfig",
     "ToolProfile",
     "ToolVersion",
+    "load_support_profile",
     "load_tool_profile",
     "validate_tool_config",
 ]

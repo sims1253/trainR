@@ -6,13 +6,12 @@ import time
 from pathlib import Path
 from typing import Any
 
-from config import get_llm_config
-
 from bench.eval.telemetry import (
     TelemetryCollector,
     ToolErrorType,
     classify_error_type,
 )
+from config import get_llm_config
 
 from .models import EvaluationResult, FailureCategory, TestResult, TrajectoryRecord
 from .pi_runner import DockerPiRunner, DockerPiRunnerConfig

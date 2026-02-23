@@ -7,12 +7,13 @@ This module provides:
 - SelectionResult for tracking selected skills and rationale
 """
 
+import contextlib
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 import yaml
 
@@ -57,17 +58,19 @@ class SkillMetadata:
         if content.startswith("---"):
             parts = content.split("---", 2)
             if len(parts) >= 3:
-                try:
+                with contextlib.suppress(yaml.YAMLError):
                     metadata = yaml.safe_load(parts[1]) or {}
-                except yaml.YAMLError:
-                    pass
 
         # Extract description from first paragraph after front matter
         description = metadata.get("description", "")
         if not description:
             # Try to extract from content
             body = content.split("---", 2)[-1].strip() if "---" in content else content
-            lines = [l.strip() for l in body.split("\n") if l.strip() and not l.startswith("#")]
+            lines = [
+                line.strip()
+                for line in body.split("\n")
+                if line.strip() and not line.startswith("#")
+            ]
             if lines:
                 description = lines[0][:200]
 
@@ -254,7 +257,7 @@ class HeuristicPolicy(SkillSelectionPolicy):
     policy_type = PolicyType.HEURISTIC
 
     # Domain keyword mappings
-    DOMAIN_KEYWORDS: dict[str, list[str]] = {
+    DOMAIN_KEYWORDS: ClassVar[dict[str, list[str]]] = {
         "testing": ["test", "testthat", "expect", "mock", "snapshot", "fixture"],
         "tidyverse": ["dplyr", "tidyr", "ggplot", "tibble", "purrr", "stringr"],
         "metaprogramming": ["rlang", "quote", "expr", "enquo", "tidyeval", "data-masking"],
@@ -264,7 +267,7 @@ class HeuristicPolicy(SkillSelectionPolicy):
     }
 
     # Task type patterns
-    TASK_PATTERNS: dict[str, list[str]] = {
+    TASK_PATTERNS: ClassVar[dict[str, list[str]]] = {
         "test_writing": ["write test", "add test", "test for", "testing"],
         "bug_fix": ["fix", "bug", "error", "issue", "broken"],
         "feature": ["implement", "add", "create", "new feature"],
@@ -574,23 +577,35 @@ def load_policy_from_config(config: dict[str, Any]) -> SkillSelectionPolicy:
     """
     policy_type = config.get("type", "heuristic")
 
-    common_args = {
-        "seed": config.get("seed"),
-        "max_skills": config.get("max_skills"),
-        "min_score": config.get("min_score", 0.0),
-    }
+    seed_raw = config.get("seed")
+    seed = seed_raw if isinstance(seed_raw, int) else None
+
+    max_skills_raw = config.get("max_skills")
+    max_skills = max_skills_raw if isinstance(max_skills_raw, int) else None
+
+    min_score_raw = config.get("min_score", 0.0)
+    min_score = float(min_score_raw) if isinstance(min_score_raw, (int, float)) else 0.0
 
     if policy_type == "heuristic":
         return HeuristicPolicy(
-            **common_args,
+            seed=seed,
+            max_skills=max_skills,
+            min_score=min_score,
             domain_weights=config.get("domain_weights"),
         )
     elif policy_type == "keyword":
+        keyword_weight_raw = config.get("keyword_weight", 0.3)
+        tag_weight_raw = config.get("tag_weight", 0.3)
+        name_weight_raw = config.get("name_weight", 0.4)
         return KeywordMatchPolicy(
-            **common_args,
-            keyword_weight=config.get("keyword_weight", 0.3),
-            tag_weight=config.get("tag_weight", 0.3),
-            name_weight=config.get("name_weight", 0.4),
+            seed=seed,
+            max_skills=max_skills,
+            min_score=min_score,
+            keyword_weight=float(keyword_weight_raw)
+            if isinstance(keyword_weight_raw, (int, float))
+            else 0.3,
+            tag_weight=float(tag_weight_raw) if isinstance(tag_weight_raw, (int, float)) else 0.3,
+            name_weight=float(name_weight_raw) if isinstance(name_weight_raw, (int, float)) else 0.4,
         )
     else:
         raise ValueError(f"Unknown policy type: {policy_type}")

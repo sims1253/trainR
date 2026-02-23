@@ -8,8 +8,6 @@ This module provides:
 """
 
 import json
-import warnings
-from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
@@ -142,10 +140,10 @@ def detect_task_format(data: dict[str, Any]) -> TaskFormat:
         return TaskFormat.MINED
 
     # Check for testing task format (has source_package, source_file, test_type)
-    if all(key in data for key in ["source_package", "source_file", "instruction"]):
-        # Additional check - testing tasks typically have patterns or test_type
-        if "test_type" in data or "patterns" in data:
-            return TaskFormat.TESTING
+    if all(key in data for key in ["source_package", "source_file", "instruction"]) and (
+        "test_type" in data or "patterns" in data
+    ):
+        return TaskFormat.TESTING
 
     # Check if it's a testing task with minimal fields
     if "source_package" in data and "instruction" in data and "task_id" in data:
@@ -174,7 +172,6 @@ def migrate_task(
     """
     local_warnings: list[MigrationWarning] = []
     task_id = data.get("task_id", "unknown")
-    source_file = str(source_path) if source_path else "unknown"
 
     def add_warning(field: str, message: str, severity: str = "warning") -> None:
         warning = MigrationWarning(
@@ -414,7 +411,7 @@ def migrate_tasks_directory(
 
         try:
             # Read legacy task
-            with open(json_file, "r", encoding="utf-8") as f:
+            with open(json_file, encoding="utf-8") as f:
                 data = json.load(f)
 
             # Migrate

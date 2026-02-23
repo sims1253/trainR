@@ -17,19 +17,19 @@ from bench.optimize.targets.system_prompt import SystemPromptCandidate, SystemPr
 from bench.optimize.targets.tool_policy import ToolPolicyCandidate, ToolPolicyTarget
 
 __all__ = [
+    "CandidateType",
     # Base interface
     "OptimizableTarget",
     "ParamSpace",
     "ParamType",
-    "CandidateType",
-    "TargetFingerprint",
+    "SkillCandidate",
     # Skill target
     "SkillTarget",
-    "SkillCandidate",
+    "SystemPromptCandidate",
     # System prompt target
     "SystemPromptTarget",
-    "SystemPromptCandidate",
+    "TargetFingerprint",
+    "ToolPolicyCandidate",
     # Tool policy target
     "ToolPolicyTarget",
-    "ToolPolicyCandidate",
 ]

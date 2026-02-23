@@ -186,7 +186,7 @@ class PairedToolReport:
 def compute_paired_deltas(
     control_results: list[dict[str, Any]],
     treatment_results: list[dict[str, Any]],
-    join_keys: list[str] = None,
+    join_keys: list[str] | None = None,
 ) -> list[ToolPairDelta]:
     """
     Compute paired deltas between control and treatment results.
@@ -470,8 +470,8 @@ def analyze_tool_ab_matrix(matrix_path: str | Path) -> PairedToolReport:
     pair_deltas: list[ToolPairDelta] = []
 
     for pair in pairs[:10]:  # Limit for demo
-        control = pair.get("control_run", {})
-        treatment = pair.get("treatment_run", {})
+        pair.get("control_run", {})
+        pair.get("treatment_run", {})
 
         join_keys = pair.get("join_key_summary", {})
 

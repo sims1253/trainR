@@ -161,7 +161,7 @@ def find_cross_split_overlap(
     return {
         fp: splits
         for fp, splits in fingerprint_to_splits.items()
-        if len(set(s[0] for s in splits)) > 1
+        if len({s[0] for s in splits}) > 1
     }
 
 
@@ -206,7 +206,7 @@ def analyze_decontamination(tasks_dir: Path) -> DecontaminationReport:
     report.duplicates_found = sum(len(ids) - 1 for ids in duplicates.values())
 
     # Record contaminated tasks
-    for fp, task_ids in duplicates.items():
+    for _fp, task_ids in duplicates.items():
         # Keep first, mark others as contaminated
         for task_id in task_ids[1:]:
             report.contaminated_tasks.append(task_id)
@@ -215,17 +215,17 @@ def analyze_decontamination(tasks_dir: Path) -> DecontaminationReport:
     overlaps = find_cross_split_overlap(tasks_by_split)
     report.cross_split_overlaps = len(overlaps)
 
-    for fp, splits in overlaps.items():
-        for split_name, task_id in splits[1:]:  # Keep first split
+    for _fp, splits in overlaps.items():
+        for _split_name, task_id in splits[1:]:  # Keep first split
             if task_id not in report.contaminated_tasks:
                 report.contaminated_tasks.append(task_id)
 
     # Build overlap matrix
     split_names = list(tasks_by_split.keys())
-    report.overlap_matrix = {s1: {s2: 0 for s2 in split_names} for s1 in split_names}
+    report.overlap_matrix = {s1: dict.fromkeys(split_names, 0) for s1 in split_names}
 
-    for fp, splits in overlaps.items():
-        split_set = list(set(s[0] for s in splits))
+    for _fp, splits in overlaps.items():
+        split_set = list({s[0] for s in splits})
         for i, s1 in enumerate(split_set):
             for s2 in split_set[i + 1 :]:
                 report.overlap_matrix[s1][s2] += 1

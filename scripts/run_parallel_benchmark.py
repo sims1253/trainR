@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
 import json
 import logging
 import os
@@ -46,18 +47,18 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable
+from typing import TYPE_CHECKING
+
+import yaml
+from rich.console import Console
+
+from config import get_llm_config
 
 # Setup logging
 log = logging.getLogger(__name__)
 
-# Add project root to path
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-import yaml
-
-from config import get_llm_config
-from rich.console import Console
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 console = Console()
 
@@ -199,10 +200,8 @@ def run_via_unified_runner(args: argparse.Namespace) -> int:
 
     finally:
         # Clean up temp file
-        try:
+        with contextlib.suppress(Exception):
             os.unlink(temp_config_path)
-        except Exception:
-            pass
 
 
 def get_migration_command(args: argparse.Namespace) -> str:
@@ -292,7 +291,7 @@ class ProgressDisplay:
         empty_count = width - filled_count
         return self.FILLED * filled_count + self.EMPTY * empty_count
 
-    def _format_worker_line(self, worker: "WorkerInfo", max_width: int) -> str:
+    def _format_worker_line(self, worker: WorkerInfo, max_width: int) -> str:
         """Format a single worker line with truncation."""
         elapsed = worker.format_elapsed()
         # Format: "provider/model → task_name (elapsed)"
@@ -334,7 +333,7 @@ class ProgressDisplay:
             return True
         return False
 
-    def render(self, benchmark: "ParallelBenchmark") -> str:
+    def render(self, benchmark: ParallelBenchmark) -> str:
         """Render the full progress display."""
         width = self._get_terminal_width()
         lines = []
@@ -344,9 +343,9 @@ class ProgressDisplay:
         lines.append(border)
 
         # Header line
-        task_count = len(set(w.task_id for w in benchmark.workers))
+        task_count = len({w.task_id for w in benchmark.workers})
         model_count = sum(len(m) for m in benchmark.models_by_provider.values())
-        header = f"BENCHMARK: {benchmark.total_runs} runs ({task_count} tasks × {model_count} models) | Workers: {benchmark.max_per_provider} per provider"
+        header = f"BENCHMARK: {benchmark.total_runs} runs ({task_count} tasks x {model_count} models) | Workers: {benchmark.max_per_provider} per provider"
         lines.append(self._center_or_truncate(header, width))
         lines.append(border)
 
@@ -412,7 +411,7 @@ class ProgressDisplay:
             return " " * padding + text + " " * (width - len(text) - padding)
         return text[:width]
 
-    def display(self, benchmark: "ParallelBenchmark") -> None:
+    def display(self, benchmark: ParallelBenchmark) -> None:
         """Display progress in-place."""
         output = self.render(benchmark)
 
@@ -430,7 +429,7 @@ class ProgressDisplay:
         self._clear_from_cursor()
         sys.stdout.flush()
 
-    def render_final_summary(self, results: dict, benchmark: "ParallelBenchmark") -> str:
+    def render_final_summary(self, results: dict, benchmark: ParallelBenchmark) -> str:
         """Render final summary with top performers."""
         width = self._get_terminal_width()
         border = "━" * width
@@ -594,7 +593,7 @@ class BenchmarkResult:
     error: str | None = None
 
     @classmethod
-    def from_dict(cls, data: dict) -> "BenchmarkResult":
+    def from_dict(cls, data: dict) -> BenchmarkResult:
         """Create from result dictionary."""
         token_usage = data.get("token_usage", {})
         return cls(
@@ -621,7 +620,7 @@ class BenchmarkResult:
         return f"{abbreviate(self.input_tokens)} in / {abbreviate(self.output_tokens)} out"
 
 
-def load_models_from_config(config_path: str = "configs/llm.yaml") -> dict[str, dict]:
+def load_models_from_config(config_path: str = "configs/llm.yaml") -> dict[str, list[dict]]:
     """Load models from llm.yaml, grouped by provider.
 
     Returns:
@@ -737,19 +736,19 @@ class BenchmarkWorker:
             )
 
             try:
-                stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=timeout)
+                _stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=timeout)
             except asyncio.TimeoutError:
                 # Graceful shutdown - send SIGTERM first
                 try:
                     process.terminate()
                     # Wait up to 30 seconds for graceful shutdown
                     try:
-                        stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=30)
+                        _stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=30)
                     except asyncio.TimeoutError:
                         # Force kill if graceful shutdown didn't work
                         process.kill()
                         await process.wait()
-                        stdout, stderr = b"", b""
+                        _stdout, stderr = b"", b""
                 except Exception:
                     pass
 
@@ -795,7 +794,7 @@ class BenchmarkWorker:
             if result_files:
                 with open(result_files[0]) as f:
                     result = json.load(f)
-                if "results" in result and result["results"]:
+                if result.get("results"):
                     r = result["results"][0]
                     self.info.result = {
                         "passed": False,
@@ -856,7 +855,7 @@ class ParallelBenchmark:
         bytes_saved = 0
 
         try:
-            with open(trajectory_path, "r") as infile, open(temp_file, "w") as outfile:
+            with open(trajectory_path) as infile, open(temp_file, "w") as outfile:
                 for line in infile:
                     try:
                         if line.strip().startswith("{"):
@@ -866,10 +865,11 @@ class ParallelBenchmark:
                                 bytes_saved += len(event["thinking_content"])
                                 del event["thinking_content"]
                             # Also check in nested message
-                            if "message" in event and isinstance(event["message"], dict):
-                                if "thinking_content" in event["message"]:
-                                    bytes_saved += len(event["message"]["thinking_content"])
-                                    del event["message"]["thinking_content"]
+                            if "message" in event and isinstance(event["message"], dict) and (
+                                "thinking_content" in event["message"]
+                            ):
+                                bytes_saved += len(event["message"]["thinking_content"])
+                                del event["message"]["thinking_content"]
                             outfile.write(json.dumps(event) + "\n")
                         else:
                             outfile.write(line)
@@ -947,7 +947,7 @@ class ParallelBenchmark:
         work_items.sort(key=lambda w: len(w.providers))
 
         # Track provider load for balancing
-        provider_load: dict[str, int] = {p: 0 for p in self.models_by_provider.keys()}
+        provider_load: dict[str, int] = dict.fromkeys(self.models_by_provider.keys(), 0)
 
         # Schedule work items
         for item in work_items:
@@ -1454,7 +1454,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         epilog="""
 DEPRECATION NOTICE:
     This script is deprecated. Please use the unified experiment runner:
-    
+
     uv run python scripts/run_experiment.py --config configs/experiments/your_config.yaml
 
     For parallel execution, set 'execution.parallel_workers' in your config.

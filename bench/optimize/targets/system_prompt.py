@@ -20,7 +20,10 @@ It does NOT modify:
 from dataclasses import dataclass, field
 from enum import Enum
 from hashlib import sha256
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from bench.experiments.config import ExperimentConfig
 
 from bench.optimize.targets.base import (
     OptimizableTarget,

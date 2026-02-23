@@ -262,6 +262,9 @@ class TaskV1(BaseModel):
         legacy_difficulty = data.get("difficulty", "medium")
         difficulty = difficulty_map.get(str(legacy_difficulty).lower(), DifficultyV1.MEDIUM)
 
+        source_file = data.get("source_file")
+        source_file_value = str(source_file) if source_file else None
+
         return cls(
             task_id=data.get("task_id", ""),
             task_type=TaskTypeV1.TEST_GEN,
@@ -269,15 +272,15 @@ class TaskV1(BaseModel):
             instruction=data.get("instruction", ""),
             context=data.get("context", ""),
             source_package=data.get("source_package", ""),
-            source_file=data.get("source_file"),
+            source_file=source_file_value,
             tests=TaskTestsV1(
                 fail_to_pass=[],
                 pass_to_pass=[],
                 test_files=data.get("dependencies", []),
             ),
             files=TaskFilesV1(
-                changed=[data.get("source_file")] if data.get("source_file") else [],
-                source_files=[data.get("source_file")] if data.get("source_file") else [],
+                changed=[source_file_value] if source_file_value else [],
+                source_files=[source_file_value] if source_file_value else [],
             ),
             quality_score=float(data.get("quality_score", 0)),
             split=data.get("split", "dev"),

@@ -27,9 +27,10 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
 from hashlib import sha256
-from typing import Any, Generic, Protocol, TypeVar, runtime_checkable
+from typing import TYPE_CHECKING, Any, Generic, Protocol, TypeVar
 
-from pydantic import BaseModel
+if TYPE_CHECKING:
+    from bench.experiments.config import ExperimentConfig
 
 
 class ParamType(str, Enum):
@@ -115,24 +116,17 @@ class ParamSpec:
                 return False
             if self.min_value is not None and value < self.min_value:
                 return False
-            if self.max_value is not None and value > self.max_value:
-                return False
-            return True
+            return not (self.max_value is not None and value > self.max_value)
 
         elif self.param_type == ParamType.FLOAT:
             if not isinstance(value, (int, float)):
                 return False
             if self.min_value is not None and value < self.min_value:
                 return False
-            if self.max_value is not None and value > self.max_value:
-                return False
-            return True
+            return not (self.max_value is not None and value > self.max_value)
 
         elif self.param_type == ParamType.LIST:
-            if not isinstance(value, list):
-                return False
-            # Optionally validate items
-            return True
+            return isinstance(value, list)
 
         return False
 
@@ -453,11 +447,11 @@ def _get_experiment_config_class() -> type:
 # Update the type hints at runtime
 # This allows the type hints to work without circular imports at module load
 __all__ = [
-    "ParamType",
-    "ParamSpec",
-    "ParamSpace",
-    "CandidateType",
-    "TargetFingerprint",
     "CandidateT",
+    "CandidateType",
     "OptimizableTarget",
+    "ParamSpace",
+    "ParamSpec",
+    "ParamType",
+    "TargetFingerprint",
 ]

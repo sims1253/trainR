@@ -19,7 +19,10 @@ It does NOT modify:
 
 from dataclasses import dataclass, field
 from hashlib import sha256
-from typing import Any
+from typing import TYPE_CHECKING, Any, ClassVar
+
+if TYPE_CHECKING:
+    from bench.experiments.config import ExperimentConfig
 
 from bench.optimize.targets.base import (
     OptimizableTarget,
@@ -164,7 +167,7 @@ class ToolPolicyTarget(OptimizableTarget[ToolPolicyCandidate]):
     """
 
     # Common tool IDs for reference
-    COMMON_TOOLS = [
+    COMMON_TOOLS: ClassVar[list[str]] = [
         "bash",
         "read",
         "write",

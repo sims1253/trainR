@@ -146,9 +146,7 @@ def run_with_progress(runner: ExperimentRunner) -> ManifestV1:
 def run_with_callbacks(runner: ExperimentRunner, on_result=None) -> ManifestV1:
     """Run experiment with callbacks for progress updates."""
     import time
-    from pathlib import Path
 
-    from bench.schema.v1 import CaseResultV1, ErrorCategoryV1, ResultV1, TokenUsageV1
 
     if not runner.matrix or not runner.output_dir or not runner.manifest:
         raise RuntimeError("Experiment not set up")
@@ -288,7 +286,7 @@ Examples:
         from bench.experiments import generate_matrix
 
         matrix = generate_matrix(config)
-        console.print(f"\n[blue]Experiment Matrix[/blue]")
+        console.print("\n[blue]Experiment Matrix[/blue]")
         console.print(f"  Tasks: {len(matrix.tasks)}")
         console.print(f"  Models: {len(matrix.models)}")
         console.print(f"  Repeats: {config.execution.repeats}")
@@ -313,7 +311,7 @@ Examples:
 
         # Print output location
         output_dir = runner.output_dir
-        console.print(f"\n[dim]Output artifacts:[/dim]")
+        console.print("\n[dim]Output artifacts:[/dim]")
         console.print(f"[dim]  - {output_dir}/manifest.json[/dim]")
         console.print(f"[dim]  - {output_dir}/results.jsonl[/dim]")
         console.print(f"[dim]  - {output_dir}/summary.json[/dim]")

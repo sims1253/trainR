@@ -3,8 +3,6 @@
 import os
 from unittest.mock import patch
 
-import pytest
-
 from evaluation.config import EvaluationConfig, ModelConfig, SkillConfig, TasksConfig
 from evaluation.models import FailureCategory
 from evaluation.sandbox import get_required_api_key

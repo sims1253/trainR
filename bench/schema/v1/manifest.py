@@ -264,7 +264,7 @@ class ManifestV1(BaseModel):
             task_count=data.get("task_count", 0),
             skill_version=data.get("skill_version", "none"),
             git_sha=data.get("git_sha", "unknown"),
-            timestamp=data.get("timestamp", datetime.utcnow().isoformat()),
+            timestamp=data.get("timestamp", datetime.now(timezone.utc).isoformat()),
             config=data.get("config", {}),
             summary=summary,
             results=results,

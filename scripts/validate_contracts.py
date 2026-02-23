@@ -7,8 +7,8 @@ Returns non-zero exit code on validation failures with actionable error messages
 """
 
 import sys
-from pathlib import Path
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 import yaml
@@ -279,12 +279,12 @@ class ConfigValidator:
 
         # Validate model section
         model = config.get("model", {})
-        for field in ["task", "reflection"]:
-            if field not in model:
+        for required_field in ["task", "reflection"]:
+            if required_field not in model:
                 self.result.add_error(
                     ValidationError(
                         config_file=filename,
-                        field_path=f"model.{field}",
+                        field_path=f"model.{required_field}",
                         issue="Required field missing",
                     )
                 )
@@ -294,8 +294,8 @@ class ConfigValidator:
         valid_models = self.get_llm_models()
         model_fields = ["task", "reflection"]
 
-        for field in model_fields:
-            model_value = model.get(field)
+        for model_field in model_fields:
+            model_value = model.get(model_field)
             if model_value and isinstance(model_value, str):
                 # Handle provider-prefixed model strings (e.g., "openai/gpt-4")
                 # These reference models indirectly, so we extract the model part
@@ -316,7 +316,7 @@ class ConfigValidator:
                     self.result.add_error(
                         ValidationError(
                             config_file=filename,
-                            field_path=f"model.{field}",
+                            field_path=f"model.{model_field}",
                             issue=f"Model '{model_value}' not defined in llm.yaml",
                             expected=f"One of: {sorted(valid_models)}",
                             actual=model_value,
@@ -386,12 +386,12 @@ class ConfigValidator:
         for i, repo in enumerate(repos):
             if not isinstance(repo, dict):
                 continue
-            for field in required_repo_fields:
-                if field not in repo:
+            for required_field in required_repo_fields:
+                if required_field not in repo:
                     self.result.add_error(
                         ValidationError(
                             config_file="mining.yaml",
-                            field_path=f"repos[{i}].{field}",
+                            field_path=f"repos[{i}].{required_field}",
                             issue="Required field missing",
                         )
                     )
@@ -405,7 +405,7 @@ class ConfigValidator:
                 ValidationError(
                     config_file=config_file,
                     field_path=field_path,
-                    issue=f"Referenced file does not exist",
+                    issue="Referenced file does not exist",
                     expected=str(full_path),
                     actual=file_path,
                 )

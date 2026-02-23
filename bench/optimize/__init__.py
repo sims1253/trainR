@@ -19,6 +19,14 @@ Each target must define:
 - Stop rule: When to halt optimization (e.g., max iterations, convergence)
 """
 
+from bench.optimize.gepa_adapter import (
+    BatchEvaluator,
+    EvaluationResult,
+    GEPASkillEvaluator,
+    ObjectiveConfig,
+    ObjectiveType,
+    create_gepa_evaluator,
+)
 from bench.optimize.runtime import (
     BudgetConfig,
     BudgetExceededError,
@@ -40,50 +48,42 @@ from bench.optimize.targets.base import (
     ParamType,
     TargetFingerprint,
 )
-from bench.optimize.gepa_adapter import (
-    BatchEvaluator,
-    EvaluationResult,
-    GEPASkillEvaluator,
-    ObjectiveConfig,
-    ObjectiveType,
-    create_gepa_evaluator,
-)
 from bench.optimize.targets.skill import SkillCandidate, SkillTarget
 from bench.optimize.targets.system_prompt import SystemPromptCandidate, SystemPromptTarget
 from bench.optimize.targets.tool_policy import ToolPolicyCandidate, ToolPolicyTarget
 
 __all__ = [
-    # GEPA adapter
-    "GEPASkillEvaluator",
     "BatchEvaluator",
-    "ObjectiveType",
-    "ObjectiveConfig",
-    "EvaluationResult",
-    "create_gepa_evaluator",
-    # Base interface
-    "OptimizableTarget",
-    "ParamSpace",
-    "ParamType",
-    "CandidateType",
-    "TargetFingerprint",
-    # Concrete targets
-    "SkillTarget",
-    "SkillCandidate",
-    "SystemPromptTarget",
-    "SystemPromptCandidate",
-    "ToolPolicyTarget",
-    "ToolPolicyCandidate",
     # Runtime
     "BudgetConfig",
-    "BudgetUsage",
     "BudgetExceededError",
-    "StopReason",
-    "TrajectoryEntry",
-    "OptimizationState",
-    "OptimizationRun",
+    "BudgetUsage",
+    "CandidateType",
+    "EvaluationResult",
+    # GEPA adapter
+    "GEPASkillEvaluator",
     "InterruptHandler",
+    "ObjectiveConfig",
+    "ObjectiveType",
+    # Base interface
+    "OptimizableTarget",
+    "OptimizationRun",
+    "OptimizationState",
+    "ParamSpace",
+    "ParamType",
+    "SkillCandidate",
+    # Concrete targets
+    "SkillTarget",
+    "StopReason",
+    "SystemPromptCandidate",
+    "SystemPromptTarget",
+    "TargetFingerprint",
+    "ToolPolicyCandidate",
+    "ToolPolicyTarget",
+    "TrajectoryEntry",
     "check_budget",
-    "save_checkpoint",
-    "load_checkpoint",
+    "create_gepa_evaluator",
     "has_checkpoint",
+    "load_checkpoint",
+    "save_checkpoint",
 ]

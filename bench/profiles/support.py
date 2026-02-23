@@ -24,9 +24,12 @@ from typing import TYPE_CHECKING, Any
 import yaml
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from bench.eval.skill_policy import (
+    SelectionResult,
+)
+
 if TYPE_CHECKING:
     from bench.eval.skill_policy import (
-        SelectionResult,
         SkillSelectionPolicy,
     )
 
@@ -356,9 +359,11 @@ class SupportProfile(BaseModel):
         if self.mode == SupportMode.SINGLE_SKILL:
             if not self.skills:
                 raise ValueError("single_skill mode requires at least one skill reference")
-        elif self.mode in (SupportMode.COLLECTION_FORCED, SupportMode.COLLECTION_SELECTIVE):
-            if not self.collection_path:
-                raise ValueError(f"{self.mode.value} mode requires collection_path")
+        elif self.mode in (
+            SupportMode.COLLECTION_FORCED,
+            SupportMode.COLLECTION_SELECTIVE,
+        ) and not self.collection_path:
+            raise ValueError(f"{self.mode.value} mode requires collection_path")
         return self
 
     @cached_property
@@ -701,10 +706,7 @@ class SupportProfile(BaseModel):
         """Create a support profile from dictionary."""
         # Parse mode
         mode_data = data.get("mode", "none")
-        if isinstance(mode_data, str):
-            mode = SupportMode(mode_data)
-        else:
-            mode = mode_data
+        mode = SupportMode(mode_data) if isinstance(mode_data, str) else mode_data
 
         # Parse skills
         skills_data = data.get("skills", [])

@@ -38,9 +38,9 @@ from bench.schema.v1.profiles import (
     validate_profile,
 )
 from bench.schema.v1.results import (
+    CaseResultV1,
     ErrorCategoryV1,
     ResultV1,
-    CaseResultV1,
     TokenUsageV1,
     validate_result,
 )
@@ -56,44 +56,44 @@ from bench.schema.v1.task import (
 )
 
 __all__ = [
-    # Task schemas
-    "TaskV1",
-    "TaskTypeV1",
+    "CaseResultV1",
+    "ConfigFingerprintV1",
     "DifficultyV1",
-    "TaskSourceV1",
-    "TaskTestsV1",
-    "TaskSolutionV1",
-    "TaskFilesV1",
-    "validate_task",
-    # Profile schemas
-    "ProfileV1",
-    "ProfileTypeV1",
-    "ModelConfigV1",
-    "ModelCapabilityV1",
-    "SkillConfigV1",
+    "EnvironmentFingerprintV1",
+    "ErrorCategoryV1",
+    "ExecutionConfigV1",
     "JudgeConfigV1",
     "JudgeModeV1",
-    "VotingStrategyV1",
-    "ExecutionConfigV1",
-    "WorkerConfigV1",
-    "validate_profile",
-    # Result schemas
-    "ResultV1",
-    "ErrorCategoryV1",
-    "CaseResultV1",
-    "TokenUsageV1",
-    "validate_result",
     # Manifest schemas
     "ManifestV1",
-    "ResultSummaryV1",
+    "ModelCapabilityV1",
+    "ModelConfigV1",
     "ModelSummaryV1",
-    "ConfigFingerprintV1",
-    "EnvironmentFingerprintV1",
-    "validate_manifest",
-    # Helpers
-    "load_json_schema",
+    "ProfileTypeV1",
+    # Profile schemas
+    "ProfileV1",
+    "ResultSummaryV1",
+    # Result schemas
+    "ResultV1",
+    "SkillConfigV1",
+    "TaskFilesV1",
+    "TaskSolutionV1",
+    "TaskSourceV1",
+    "TaskTestsV1",
+    "TaskTypeV1",
+    # Task schemas
+    "TaskV1",
+    "TokenUsageV1",
+    "VotingStrategyV1",
+    "WorkerConfigV1",
     "adapt_from_legacy_result",
     "adapt_from_legacy_task",
+    # Helpers
+    "load_json_schema",
+    "validate_manifest",
+    "validate_profile",
+    "validate_result",
+    "validate_task",
 ]
 
 # JSON Schema directory

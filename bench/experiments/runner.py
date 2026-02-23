@@ -8,6 +8,7 @@ It handles:
 - Progress tracking
 """
 
+import contextlib
 import json
 import logging
 import os
@@ -26,8 +27,8 @@ from bench.schema.v1 import (
     EnvironmentFingerprintV1,
     ErrorCategoryV1,
     ManifestV1,
-    ResultV1,
     ResultSummaryV1,
+    ResultV1,
     TokenUsageV1,
 )
 from evaluation import DockerPiRunnerConfig, EvaluationSandbox
@@ -196,9 +197,8 @@ class ExperimentRunner:
 
         missing_keys = []
         for model_spec in self.matrix.models:
-            if model_spec.api_key_env:
-                if not os.environ.get(model_spec.api_key_env):
-                    missing_keys.append((model_spec.name, model_spec.api_key_env))
+            if model_spec.api_key_env and not os.environ.get(model_spec.api_key_env):
+                missing_keys.append((model_spec.name, model_spec.api_key_env))
 
         if missing_keys:
             for model_name, key_name in missing_keys:
@@ -320,7 +320,7 @@ class ExperimentRunner:
         env_backup = {}
         if run.model.api_key_env:
             # Key should already be validated, but double-check
-            api_key = os.environ.get(run.model.api_key_env, "")
+            os.environ.get(run.model.api_key_env, "")
             env_backup[run.model.api_key_env] = os.environ.get(run.model.api_key_env)
 
         # Get skill content
@@ -361,10 +361,8 @@ class ExperimentRunner:
         task_data = {}
 
         if task_path.exists():
-            try:
+            with contextlib.suppress(Exception):
                 task_data = json.loads(task_path.read_text())
-            except Exception:
-                pass
 
         # Create a task object with all necessary attributes
         task = type(
@@ -435,13 +433,17 @@ class ExperimentRunner:
 
         # Save trajectory if enabled
         trajectory_path = None
-        if self.config.execution.save_trajectories and hasattr(eval_result, "generated_code"):
-            if eval_result.generated_code and self.output_dir:
-                traj_dir = self.output_dir / "trajectories" / run.model.name
-                traj_dir.mkdir(parents=True, exist_ok=True)
-                traj_file = traj_dir / f"{run.task.task_id}.txt"
-                traj_file.write_text(eval_result.generated_code)
-                trajectory_path = str(traj_file.relative_to(self.output_dir))
+        if (
+            self.config.execution.save_trajectories
+            and hasattr(eval_result, "generated_code")
+            and eval_result.generated_code
+            and self.output_dir
+        ):
+            traj_dir = self.output_dir / "trajectories" / run.model.name
+            traj_dir.mkdir(parents=True, exist_ok=True)
+            traj_file = traj_dir / f"{run.task.task_id}.txt"
+            traj_file.write_text(eval_result.generated_code)
+            trajectory_path = str(traj_file.relative_to(self.output_dir))
 
         return ResultV1(
             result_id=f"{run.fingerprint}",

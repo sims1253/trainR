@@ -22,12 +22,11 @@ Usage:
     score, info = evaluator(candidate_skill, task)
 """
 
-import json
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 
 from bench.experiments.config import ExperimentConfig
 from bench.experiments.runner import ExperimentRunner
@@ -199,7 +198,7 @@ class GEPASkillEvaluator:
             logging.getLogger("bench.experiments.runner").setLevel(logging.WARNING)
 
             try:
-                manifest = runner.run()
+                runner.run()
             finally:
                 logging.getLogger("bench.experiments.runner").setLevel(old_level)
 

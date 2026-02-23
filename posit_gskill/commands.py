@@ -104,7 +104,7 @@ def run_generate(args: Any) -> None:
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    generator = TaskGenerator(output_dir)
+    TaskGenerator(output_dir)
     console.print(f"[green]Task generator initialized at {output_dir}[/green]")
     console.print(
         "[yellow]Use task_generator module directly for full generation capabilities[/yellow]"
@@ -113,7 +113,7 @@ def run_generate(args: Any) -> None:
 
 def run_evaluate(args: Any) -> None:
     """Evaluate a skill against tasks."""
-    from evaluation.test_runner import TestRunner
+    from evaluation.test_runner import DockerTestRunner
     from task_generator import TaskGenerator
 
     skill_path = Path(args.skill)
@@ -134,8 +134,17 @@ def run_evaluate(args: Any) -> None:
     console.print(f"[blue]Evaluating skill against {len(tasks)} tasks...[/blue]")
 
     # Run evaluation
-    runner = TestRunner()
-    results = runner.evaluate_skill(skill_content, tasks)
+    runner = DockerTestRunner()
+    results = []
+    for task in tasks:
+        package_dir = Path("packages") / task.source_package
+        result = runner.run_evaluation(
+            skill_content=skill_content,
+            task_instruction=task.instruction,
+            task_context=task.context,
+            package_dir=package_dir,
+        )
+        results.append({"task_id": task.task_id, "result": result})
 
-    console.print(f"\n[green]Evaluation complete![/green]")
+    console.print("\n[green]Evaluation complete![/green]")
     console.print(f"Results: {json.dumps(results, indent=2)}")

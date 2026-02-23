@@ -20,7 +20,10 @@ It does NOT modify:
 from dataclasses import dataclass, field
 from hashlib import sha256
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from bench.experiments.config import ExperimentConfig
 
 from bench.optimize.targets.base import (
     OptimizableTarget,
@@ -202,7 +205,7 @@ class SkillTarget(OptimizableTarget[SkillCandidate]):
         Returns:
             New ExperimentConfig with skill content applied
         """
-        from bench.experiments.config import ExperimentConfig, SkillConfig
+        from bench.experiments.config import ExperimentConfig
 
         # Create a deep copy of the config
         config_dict = config.model_dump(mode="json")

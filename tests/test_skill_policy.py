@@ -9,7 +9,6 @@ from bench.eval.skill_policy import (
     SelectionRationale,
     SelectionResult,
     SkillMetadata,
-    SkillSelectionPolicy,
     load_policy_from_config,
 )
 from bench.profiles.support import (

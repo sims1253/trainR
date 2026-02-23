@@ -16,18 +16,10 @@ import json
 import sys
 from pathlib import Path
 
-# Add project root to path for imports
-project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root))
-
-from bench.dataset.migrate import (
-    MigrationCounter,
-    MigrationWarning,
-    migrate_tasks_directory,
-)
-
 
 def main() -> int:
+    from bench.dataset.migrate import MigrationCounter, MigrationWarning, migrate_tasks_directory
+
     parser = argparse.ArgumentParser(
         description="Migrate legacy tasks to canonical v1 format",
         formatter_class=argparse.RawDescriptionHelpFormatter,

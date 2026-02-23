@@ -173,7 +173,7 @@ class ToolRegistry:
                 if storage_key in profiles:
                     return profiles[storage_key]
                 # Try to find variant across any version
-                for key, p in profiles.items():
+                for _key, p in profiles.items():
                     if p.variant == variant:
                         return p
                 raise ToolVersionNotFoundError(
@@ -185,7 +185,7 @@ class ToolRegistry:
                 return profiles[version_str]
 
             # Look for any profile with this base version (has variant)
-            for key, p in profiles.items():
+            for _key, p in profiles.items():
                 if p.get_version_string() == version_str and not p.variant:
                     return p
 
@@ -218,7 +218,7 @@ class ToolRegistry:
             candidates = version_profiles[latest_version]
 
             # Return base (non-variant) if available, otherwise first variant
-            for key, p in candidates:
+            for _key, p in candidates:
                 if not p.variant:
                     return p
             return candidates[0][1]
@@ -263,7 +263,7 @@ class ToolRegistry:
 
         # Return unique base versions (without variant suffix)
         versions = set()
-        for key, p in self._tools[tool_id].items():
+        for _key, p in self._tools[tool_id].items():
             versions.add(p.get_version_string())
         return sorted(versions)
 
@@ -284,7 +284,7 @@ class ToolRegistry:
         variants = []
         base_version = profile.get_version_string()
 
-        for v, p in self._tools.get(tool_id, {}).items():
+        for _v, p in self._tools.get(tool_id, {}).items():
             if p.variant and p.base_version == base_version:
                 variants.append(p.variant)
 
@@ -420,8 +420,8 @@ class ToolRegistry:
             data = yaml.safe_load(f) or {}
 
         tools_data = data.get("tools", {})
-        for tool_id, versions in tools_data.items():
-            for version, profile_data in versions.items():
+        for _tool_id, versions in tools_data.items():
+            for _version, profile_data in versions.items():
                 profile = ToolProfile.from_dict(profile_data)
                 registry.register(profile)
 
