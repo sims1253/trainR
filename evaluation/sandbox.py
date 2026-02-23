@@ -109,7 +109,7 @@ class EvaluationSandbox:
             test_results=test_results,
             failure_category=failure_category,
             execution_time=time.time() - start_time,
-            token_usage={},  # cc-mirror doesn't return token counts easily
+            token_usage=result.get("token_usage", {}),
         )
 
     def _parse_test_results(self, result: dict) -> list[TestResult]:

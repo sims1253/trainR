@@ -335,9 +335,10 @@ Write the tests now.
                 event = json.loads(line)
                 event_type = event.get("type", "")
 
-                # Check for turn_end or message_end with usage at TOP LEVEL
+                # Check for turn_end or message_end with usage
                 if event_type in ("turn_end", "message_end"):
-                    usage = event.get("usage", {})  # TOP LEVEL, not nested
+                    # Usage may be at top level (message_end) or nested in message (turn_end)
+                    usage = event.get("usage") or event.get("message", {}).get("usage", {})
 
                     if usage:
                         total_input += usage.get("input", 0)
@@ -419,7 +420,7 @@ class DockerPiRunner:
         model: str | None = None,
         task: Any = None,
     ) -> dict[str, Any]:
-        """Run evaluation in Docker container using Pi CLI RPC mode."""
+        """Run evaluation in Docker container using Pi CLI batch mode."""
         import base64
 
         from config import get_llm_config
@@ -429,15 +430,19 @@ class DockerPiRunner:
 
         # Resolve model from llm.yaml if needed
         llm_config = get_llm_config()
+        model_cfg = {}  # Initialize to avoid unbound issues
+        provider = ""  # Initialize to avoid unbound issues
         try:
             model_cfg = llm_config.get_model_config(model)
             provider = model_cfg.get("provider", "")
+            model_id = model_cfg.get("id", model)
+            # Pi CLI supports: openrouter/, openai/, zai/, opencode/ (via OPENCODE_API_KEY)
             if provider == "opencode":
-                pi_model = f"openrouter/{model_cfg.get('id', model)}"
+                pi_model = f"opencode/{model_id}"
             elif provider == "openrouter":
-                pi_model = model_cfg.get("id", model)
+                pi_model = f"openrouter/{model_id}"
             else:
-                pi_model = model
+                pi_model = model_id
         except ValueError:
             pi_model = model
 
@@ -489,7 +494,7 @@ Write the tests now."""
         )
         prompt = "\n\n".join(prompt_parts)
 
-        # Build docker command with RPC mode
+        # Build docker command - container runs everything in batch mode
         env_vars = {
             "PI_MODEL": pi_model,
             "SKILL_B64": skill_b64,
@@ -502,12 +507,28 @@ Write the tests now."""
             "PASS_TO_PASS": json.dumps(pass_to_pass),
         }
 
-        # Add API keys based on model prefix
-        if pi_model.startswith("openrouter/"):
+        # Add API keys based on provider
+        if provider == "opencode":
+            # opencode.ai uses OPENCODE_API_KEY
+            api_key = os.environ.get("OPENCODE_API_KEY")
+            if api_key:
+                env_vars["OPENCODE_API_KEY"] = api_key
+            # Pi handles opencode base URL internally
+        elif provider == "openrouter":
+            api_key = os.environ.get("OPENROUTER_API_KEY")
+            if api_key:
+                env_vars["OPENROUTER_API_KEY"] = api_key
+        elif provider == "openai":
+            api_key = os.environ.get("OPENAI_API_KEY")
+            if api_key:
+                env_vars["OPENAI_API_KEY"] = api_key
+        elif pi_model.startswith("openrouter/"):
+            # Fallback for models not in llm.yaml
             api_key = os.environ.get("OPENROUTER_API_KEY")
             if api_key:
                 env_vars["OPENROUTER_API_KEY"] = api_key
         elif pi_model.startswith("openai/"):
+            # Fallback for models not in llm.yaml
             api_key = os.environ.get("OPENAI_API_KEY")
             if api_key:
                 env_vars["OPENAI_API_KEY"] = api_key
@@ -516,111 +537,59 @@ Write the tests now."""
         if github_token:
             env_vars["GITHUB_TOKEN"] = github_token
 
-        # Build docker run command
-        docker_cmd = ["docker", "run", "--rm", "-i"]  # -i for stdin
+        # Create unique workspace directory for this run to avoid parallel conflicts
+        task_name = repo.replace("/", "_") if repo else "unknown"
+        safe_model_name = model.replace("/", "_").replace(":", "_")
+        unique_workspace = self.workspace_dir / f"{task_name}_{safe_model_name}"
+        unique_workspace.mkdir(parents=True, exist_ok=True)
+
+        # Build docker run command (no -i needed for batch mode)
+        docker_cmd = ["docker", "run", "--rm"]
         for key, value in env_vars.items():
             docker_cmd.extend(["-e", f"{key}={value}"])
         docker_cmd.extend(
             [
                 "-v",
-                f"{self.workspace_dir}:/workspace",
+                f"{unique_workspace}:/workspace",
                 self.config.docker_image,
             ]
         )
 
-        console.print(f"[dim]Running Docker+Pi RPC with model: {model}[/dim]")
+        console.print(f"[dim]Running Docker+Pi batch mode with model: {model}[/dim]")
 
-        proc = None
         try:
-            # Start container with RPC mode
-            proc = subprocess.Popen(
+            # Run container and wait for completion
+            result = subprocess.run(
                 docker_cmd,
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                capture_output=True,
                 text=True,
+                timeout=self.config.timeout,
             )
-            stdin = proc.stdin
-            stdout = proc.stdout
-            assert stdin is not None
-            assert stdout is not None
 
-            output_lines = []
-            token_usage = {
-                "input_tokens": 0,
-                "output_tokens": 0,
-                "cache_read_tokens": 0,
-                "cache_write_tokens": 0,
-            }
-
-            def send_command(cmd: dict):
-                stdin.write(json.dumps(cmd) + "\n")
-                stdin.flush()
-
-            def read_response():
-                for line in stdout:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    try:
-                        event = json.loads(line)
-                        output_lines.append(line)
-                        yield event
-                    except json.JSONDecodeError:
-                        continue
-
-            # Wait for container to be ready, then send prompt via RPC
-            prompt_sent = False
-            for event in read_response():
-                event_type = event.get("type", "")
-
-                # Track token usage from turn_end and message_end events
-                if event_type in ("turn_end", "message_end"):
-                    usage = event.get("usage", {})
-                    if usage:
-                        token_usage["input_tokens"] += usage.get("input", 0)
-                        token_usage["output_tokens"] += usage.get("output", 0)
-                        token_usage["cache_read_tokens"] += usage.get("cacheRead", 0)
-                        token_usage["cache_write_tokens"] += usage.get("cacheWrite", 0)
-
-                # Send prompt when ready
-                if not prompt_sent and event_type == "agent_start":
-                    send_command({"type": "prompt", "message": prompt})
-                    prompt_sent = True
-
-                # Check for completion
-                if event_type == "agent_end":
-                    # Get session stats for final token counts
-                    send_command({"type": "get_session_stats"})
-                    break
-
-            # Get final stats and abort
-            for event in read_response():
-                if event.get("type") == "response" and event.get("command") == "get_session_stats":
-                    stats = event.get("data", {}).get("tokens", {})
-                    if stats:
-                        token_usage["input_tokens"] = stats.get("input", 0)
-                        token_usage["output_tokens"] = stats.get("output", 0)
-                        token_usage["cache_read_tokens"] = stats.get("cacheRead", 0)
-                        token_usage["cache_write_tokens"] = stats.get("cacheWrite", 0)
-                    break
-
-            # Send abort to stop the agent
-            send_command({"type": "abort"})
-
-            proc.wait(timeout=10)
-
-            output = "\n".join(output_lines)
             execution_time = time.time() - start_time
+            stdout = result.stdout
+            stderr = result.stderr
 
-            # Parse testthat results from output
-            test_result = self._parse_testthat_output(output)
+            # Parse JSON events from stdout for token usage
+            token_usage = self._parse_token_usage(stdout)
+
+            # Parse testthat results from combined output
+            test_result = self._parse_testthat_output(stdout + stderr)
+
+            # Build error message from stderr if container failed
+            error_msg = ""
+            if result.returncode != 0:
+                error_msg = (
+                    stderr.strip()
+                    if stderr.strip()
+                    else f"Container exited with code {result.returncode}"
+                )
 
             return {
                 "success": test_result.get("passed", False),
                 "score": 1.0 if test_result.get("passed", False) else 0.0,
-                "output": output,
-                "error": "",
+                "output": stdout,
+                "error": error_msg,
                 "test_results": test_result,
                 "execution_time": execution_time,
                 "model": model,
@@ -628,13 +597,11 @@ Write the tests now."""
             }
 
         except subprocess.TimeoutExpired:
-            if proc is not None:
-                proc.kill()
             return {
                 "success": False,
                 "score": 0.0,
                 "output": "",
-                "error": "Timeout",
+                "error": f"Evaluation timed out after {self.config.timeout}s",
                 "test_results": {},
                 "execution_time": self.config.timeout,
                 "model": model,
@@ -711,9 +678,10 @@ Write the tests now."""
                 event = json.loads(line)
                 event_type = event.get("type", "")
 
-                # Check for turn_end or message_end with usage at TOP LEVEL
+                # Check for turn_end or message_end with usage
                 if event_type in ("turn_end", "message_end"):
-                    usage = event.get("usage", {})  # TOP LEVEL, not nested
+                    # Usage may be at top level (message_end) or nested in message (turn_end)
+                    usage = event.get("usage") or event.get("message", {}).get("usage", {})
 
                     if usage:
                         total_input += usage.get("input", 0)

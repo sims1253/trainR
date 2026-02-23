@@ -13,7 +13,7 @@ providers:
   openrouter:
     base_url: null  # LiteLLM handles this natively
     api_key_env: "OPENROUTER_API_KEY"
-    litellm_prefix: null  # Use as-is
+    litellm_prefix: "openrouter"  # Prepend openrouter/ for LiteLLM
     supports_response_format: true
     
   zai:
@@ -34,13 +34,13 @@ models:
       json_mode: prompt      # "native" | "prompt" | "none" - how to get JSON output
       max_tokens_default: 2000
       
-  kimi-k2.5-free:
-    id: "kimi-k2.5-free"
-    provider: opencode
-    capabilities:
-      reasoning: true
-      json_mode: prompt
-      max_tokens_default: 2000
+  # kimi-k2.5-free:
+    # id: "kimi-k2.5-free"
+    # provider: opencode
+    # capabilities:
+      # reasoning: true
+      # json_mode: prompt
+      # max_tokens_default: 2000
       
   minimax-m2.5-free:
     id: "minimax-m2.5-free"
@@ -61,35 +61,35 @@ models:
       
   # OpenRouter models
   gpt-oss-120b-free:
-    id: "openrouter/openai/gpt-oss-120b:free"
+    id: "openai/gpt-oss-120b:free"
     provider: openrouter
     capabilities:
       reasoning: false
       json_mode: native
       
   step-3.5-flash:
-    id: "openrouter/stepfun/step-3.5-flash"
+    id: "stepfun/step-3.5-flash"
     provider: openrouter
     capabilities:
       reasoning: false
       json_mode: native
       
   trinity-large-preview:
-    id: "openrouter/arcee-ai/trinity-large-preview:free"
+    id: "arcee-ai/trinity-large-preview:free"
     provider: openrouter
     capabilities:
       reasoning: false
       json_mode: native
       
   nemotron-3-nano:
-    id: "openrouter/nvidia/nemotron-3-nano-30b-a3b"
+    id: "nvidia/nemotron-3-nano-30b-a3b"
     provider: openrouter
     capabilities:
       reasoning: false
       json_mode: prompt
       
   trinity-mini:
-    id: "openrouter/arcee-ai/trinity-mini"
+    id: "arcee-ai/trinity-mini"
     provider: openrouter
     capabilities:
       reasoning: false

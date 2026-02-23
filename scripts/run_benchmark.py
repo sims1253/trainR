@@ -343,7 +343,7 @@ def run_benchmark(
                     )
 
                     start = time.time()
-                    result = sandbox.evaluate_task(task, skill_prompt, model=litellm_model)
+                    result = sandbox.evaluate_task(task, skill_prompt, model=model_name)
                     latency = time.time() - start
 
                     # Log trace if enabled

@@ -7,6 +7,7 @@ set -e
 # - OPENROUTER_API_KEY: For openrouter/* models
 # - OPENAI_API_KEY: For openai/* models
 # - Z_AI_API_KEY: For zai/* models
+# - OPENCODE_API_KEY: For opencode/* models
 # - SKILL_CONTENT: The skill markdown content (base64 encoded, optional)
 # - TASK_CONTENT: The task instruction (base64 encoded)
 # - PACKAGE_PATH: Path to the R package to test (default: /workspace/packages/cli)
@@ -50,9 +51,15 @@ elif [[ "$PI_MODEL" == zai/* ]]; then
         exit 1
     fi
     export PI_API_KEY="$Z_AI_API_KEY"
+elif [[ "$PI_MODEL" == opencode/* ]]; then
+    if [ -z "$OPENCODE_API_KEY" ]; then
+        log "ERROR: OPENCODE_API_KEY must be set for opencode/* models"
+        exit 1
+    fi
+    export PI_API_KEY="$OPENCODE_API_KEY"
 else
     log "ERROR: Unknown model provider for: $PI_MODEL"
-    log "Supported prefixes: openrouter/*, openai/*, zai/*"
+    log "Supported prefixes: openrouter/*, openai/*, zai/*, opencode/*"
     exit 1
 fi
 
@@ -272,6 +279,7 @@ cat > /tmp/trainr_env.sh <<EOF
 export OPENROUTER_API_KEY="$OPENROUTER_API_KEY"
 export OPENAI_API_KEY="$OPENAI_API_KEY"
 export Z_AI_API_KEY="$Z_AI_API_KEY"
+export OPENCODE_API_KEY="$OPENCODE_API_KEY"
 export PATH="/home/trainr/.bun/bin:/home/trainr/.local/bin:\$PATH"
 EOF
 chown trainr:trainr /tmp/trainr_env.sh
@@ -283,11 +291,11 @@ log "Running Pi CLI agent with model: $PI_MODEL"
 chown -R trainr:trainr /workspace
 chmod 755 /workspace
 
-# Run the agent as non-root user using RPC mode
+# Run the agent as non-root user using batch mode
 cd "$WORKSPACE"
 set +e
 
-log "Running Pi CLI agent in RPC mode with model: $PI_MODEL"
+log "Running Pi CLI agent in batch mode with model: $PI_MODEL"
 
 # Ensure trainr owns workspace (Pi needs to write .pi directory)
 chown -R trainr:trainr /workspace
@@ -295,12 +303,26 @@ chmod 755 /workspace
 
 cd "$WORKSPACE"
 
-# Export environment for trainr user
-export HOME=/home/trainr
-export PATH="/home/trainr/.bun/bin:/home/trainr/.local/bin:$PATH"
+# Decode the prompt from base64
+if [ -n "$PROMPT_B64" ]; then
+    PROMPT=$(echo "$PROMPT_B64" | base64 -d)
+else
+    # Fallback to AGENT_PROMPT if no PROMPT_B64
+    PROMPT="$AGENT_PROMPT"
+fi
 
-# Use exec to replace this process with Pi, preserving stdin/stdout
-# The 2>&1 redirects stderr to stdout so all output goes to stdout
-exec su -s /bin/bash trainr -c "cd /workspace && bunx @mariozechner/pi-coding-agent --mode rpc --model '$PI_MODEL' --no-session" 2>&1
+# Write prompt to a file to avoid shell escaping issues
+echo "$PROMPT" > /tmp/pi_prompt.txt
+chmod 644 /tmp/pi_prompt.txt
 
-# This line will never be reached due to exec
+# Run Pi in batch mode - pass prompt via stdin to avoid shell escaping issues
+cd "$PACKAGE_PATH"
+# NOTE: Do NOT use 'exec' here - we need to continue after Pi finishes
+su -s /bin/bash trainr -c "cd /workspace/package && cat /tmp/pi_prompt.txt | /home/trainr/.bun/bin/pi --print --mode json --model '$PI_MODEL' --no-session"
+
+# Run tests after Pi finishes
+log "Running testthat tests..."
+cd "$PACKAGE_PATH"
+su -s /bin/bash trainr -c "cd /workspace/package && Rscript -e \"testthat::test_dir('tests/testthat', reporter = 'check')\" 2>&1" || true
+
+log "Tests completed"
