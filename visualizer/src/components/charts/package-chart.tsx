@@ -18,6 +18,12 @@ interface PackageChartProps {
   skill: string;
 }
 
+interface PackageChartData {
+  name: string;
+  no_skill?: number;
+  posit_skill?: number;
+}
+
 export function PackageChart({ model, skill }: PackageChartProps) {
   const skillsToShow = skill === "all" ? ["no_skill", "posit_skill"] : [skill];
   
@@ -27,8 +33,8 @@ export function PackageChart({ model, skill }: PackageChartProps) {
     ...Object.keys(model.results.posit_skill?.by_package || {}),
   ]));
 
-  const chartData = allPackages.map(pkg => {
-    const data: any = { name: pkg };
+  const chartData: PackageChartData[] = allPackages.map(pkg => {
+    const data: PackageChartData = { name: pkg };
     if (skillsToShow.includes("no_skill")) {
       data.no_skill = (model.results.no_skill?.by_package?.[pkg] || 0) * 100;
     }

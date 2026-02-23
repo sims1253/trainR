@@ -1,0 +1,52 @@
+{
+  "visualizer_data_version": 1,
+  "models": [
+    {
+      "name": "sample-model",
+      "display_name": "Sample Model",
+      "provider": "example",
+      "results": {
+        "no_skill": {
+          "overall": {
+            "pass_rate": 0.5,
+            "total": 10,
+            "passed": 5,
+            "failed": 5
+          },
+          "by_difficulty": {
+            "easy": 0.8,
+            "medium": 0.5,
+            "hard": 0.2
+          },
+          "by_package": {
+            "cli": 0.6,
+            "dplyr": 0.4
+          }
+        },
+        "posit_skill": {
+          "overall": {
+            "pass_rate": 0.7,
+            "total": 10,
+            "passed": 7,
+            "failed": 3
+          },
+          "by_difficulty": {
+            "easy": 0.9,
+            "medium": 0.7,
+            "hard": 0.5
+          },
+          "by_package": {
+            "cli": 0.8,
+            "dplyr": 0.6
+          }
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "last_updated": "2026-02-23T00:00:00Z",
+    "total_tasks": 10,
+    "packages": ["cli", "dplyr"],
+    "runs_included": 1
+  }
+}

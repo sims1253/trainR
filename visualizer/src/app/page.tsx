@@ -19,17 +19,55 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatPercent } from "@/lib/utils";
-import benchmarkData from "@/data/benchmark-results.json";
-import { BenchmarkData, ModelResult } from "@/lib/types";
+import benchmarkDataRaw from "@/data/benchmark-results.json";
+import { BenchmarkData, ModelResult, validateVisualizerDataV1 } from "@/lib/types";
 import { DifficultyChart } from "@/components/charts/difficulty-chart";
 import { PackageChart } from "@/components/charts/package-chart";
-import { ArrowUpIcon, ArrowDownIcon } from "lucide-react";
+import { ArrowUpIcon, ArrowDownIcon, AlertTriangleIcon } from "lucide-react";
 
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 
-export default function Home() {
-  const data = benchmarkData as BenchmarkData;
+/**
+ * Error display component for invalid data
+ */
+function DataError({ error }: { error: string }) {
+  return (
+    <div className="min-h-screen flex flex-col bg-background">
+      <Header />
+      <main className="flex-1 container mx-auto py-8 px-4">
+        <div className="max-w-2xl mx-auto p-6 bg-destructive/10 border border-destructive rounded-lg">
+          <div className="flex items-start gap-4">
+            <AlertTriangleIcon className="w-8 h-8 text-destructive flex-shrink-0 mt-1" />
+            <div className="space-y-2">
+              <h1 className="text-xl font-semibold text-destructive">
+                Failed to Load Benchmark Data
+              </h1>
+              <p className="text-muted-foreground">
+                The benchmark data file is invalid or corrupted.
+              </p>
+              <div className="mt-4 p-4 bg-muted rounded-md font-mono text-sm whitespace-pre-wrap overflow-auto max-h-[300px]">
+                {error}
+              </div>
+              <p className="text-sm text-muted-foreground mt-4">
+                To fix this issue, regenerate the benchmark data:
+              </p>
+              <code className="block p-2 bg-muted rounded text-sm">
+                uv run python scripts/aggregate_results.py
+              </code>
+            </div>
+          </div>
+        </div>
+      </main>
+      <Footer />
+    </div>
+  );
+}
+
+/**
+ * Dashboard content component - only rendered when data is valid
+ */
+function DashboardContent({ data }: { data: BenchmarkData }) {
   const [skillFilter, setSkillFilter] = useState<string>("posit_skill");
   const [difficultyFilter, setDifficultyFilter] = useState<string>("all");
   const [packageFilter, setPackageFilter] = useState<string>("all");
@@ -46,7 +84,7 @@ export default function Home() {
     if (!skillData) return null;
 
     if (difficultyFilter !== "all") {
-      return skillData.by_difficulty[difficultyFilter] ?? null;
+      return skillData.by_difficulty[difficultyFilter as keyof typeof skillData.by_difficulty] ?? null;
     }
 
     if (packageFilter !== "all") {
@@ -179,7 +217,7 @@ export default function Home() {
                       <TableCell className="text-right font-mono">
                         <div className="flex items-center justify-end gap-1">
                           {positSkillRate !== null ? formatPercent(positSkillRate) : "N/A"}
-                          {positSkillRate === 1 && <span className="text-green-500 text-xs">✓</span>}
+                          {positSkillRate === 1 && <span className="text-green-500 text-xs">ok</span>}
                         </div>
                       </TableCell>
                     )}
@@ -208,4 +246,22 @@ export default function Home() {
       <Footer />
     </div>
   );
+}
+
+export default function Home() {
+  // Validate data at runtime with explicit error handling
+  const validationResult = useMemo(() => {
+    return validateVisualizerDataV1(benchmarkDataRaw);
+  }, []);
+
+  // Show error state if validation fails
+  if (!validationResult.ok) {
+    const errorMessage = [
+      validationResult.error,
+      ...(validationResult.details || []),
+    ].join("\n");
+    return <DataError error={errorMessage} />;
+  }
+
+  return <DashboardContent data={validationResult.data} />;
 }

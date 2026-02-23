@@ -56,6 +56,7 @@ This script:
 
 ```json
 {
+  "visualizer_data_version": 1,
   "models": [
     {
       "name": "gpt-oss-120b:free",
@@ -78,6 +79,70 @@ This script:
     "runs_included": 10
   }
 }
+```
+
+## Data Contract
+
+The visualizer enforces a versioned data contract to prevent drift between the backend aggregation script and the frontend. The schema is defined in `src/lib/schema.ts`.
+
+### Contract Version
+
+Current version: **1**
+
+The `visualizer_data_version` field must be present and match the expected version. This ensures backward compatibility when the data format evolves.
+
+### Validation
+
+Data is validated at runtime using `validateVisualizerDataV1()` which:
+
+1. Checks required fields and types
+2. Validates numeric ranges (pass rates must be 0-1)
+3. Verifies consistency (passed + failed = total)
+4. Ensures both `no_skill` and `posit_skill` results exist
+
+### Error Handling
+
+If validation fails, the UI displays an explicit error state with:
+
+- The validation error message
+- Detailed information about what failed
+- Instructions to regenerate the data
+
+### Schema Types
+
+| Type | Description |
+|------|-------------|
+| `VisualizerDataV1` | Root data structure with version, models, metadata |
+| `ModelResultV1` | Individual model entry with results |
+| `SkillResultV1` | Per-skill results with overall, difficulty, package breakdowns |
+| `MetadataV1` | Benchmark metadata (timestamp, packages, run counts) |
+
+### Updating the Schema
+
+If you need to change the data format:
+
+1. Increment `VISUALIZER_DATA_VERSION` in `schema.ts`
+2. Create new types (e.g., `VisualizerDataV2`)
+3. Add a migration function for backward compatibility
+4. Update `aggregate_results.py` to output the new version
+5. Document breaking changes here
+
+### Validation Functions
+
+```typescript
+// Returns result object with ok/error
+const result = validateVisualizerDataV1(data);
+if (result.ok) {
+  // Use result.data
+} else {
+  // Handle result.error and result.details
+}
+
+// Throws on invalid data (for fail-fast scenarios)
+const data = guardVisualizerDataV1(rawData);
+
+// Returns tuple [isValid, dataOrError]
+const [valid, dataOrError] = isValidVisualizerDataV1(data);
 ```
 
 ## Deployment
@@ -134,7 +199,8 @@ visualizer/
 │   │   │   └── package-chart.tsx
 │   │   └── ui/               # shadcn components
 │   ├── lib/
-│   │   ├── types.ts          # TypeScript interfaces
+│   │   ├── schema.ts         # Versioned data contract and validation
+│   │   ├── types.ts          # TypeScript interfaces (re-exports from schema)
 │   │   └── utils.ts          # Helpers (formatPercent, etc.)
 │   └── data/
 │       └── benchmark-results.json

@@ -2,28 +2,36 @@
 # Three main workflows: benchmark, optimize, mine
 # Uses uv for Python tooling
 
-.PHONY: benchmark benchmark-all optimize optimize-test mine mine-all compare test lint
+.PHONY: benchmark benchmark-smoke benchmark-all optimize optimize-test mine mine-all compare test lint
 
 # =============================================================================
 # 1. BENCHMARK: Evaluate a skill on tasks
 # =============================================================================
 
-# Usage: make benchmark MODEL=openai SKILL=skill
-MODEL ?= openai
-SKILL ?= no_skill
+# Usage: make benchmark [CONFIG=configs/evaluation.yaml] [MODEL=model-name]
+#       make benchmark-smoke  # Quick test with 1 task
+CONFIG ?= configs/evaluation.yaml
+MODEL ?= 
 
 benchmark:
-	@echo "=== BENCHMARK: $(MODEL) / $(SKILL) ==="
+	@echo "=== BENCHMARK: $(CONFIG) $(if $(MODEL),model=$(MODEL),) ==="
 	@uv run python scripts/evaluate_batch.py \
-		--model $(MODEL) \
-		$(if $(filter no_skill,$(SKILL)),--no-skill,--skill skills/testing-r-packages-orig.md) \
-		--output results/benchmark/$(MODEL)_$(SKILL).json
+		--config $(CONFIG) \
+		$(if $(MODEL),--model $(MODEL),)
+
+# Smoke test: 1 model, 1 split, 1 task - for quick pipeline verification
+benchmark-smoke:
+	@echo "=== BENCHMARK SMOKE TEST ==="
+	@uv run python scripts/evaluate_batch.py \
+		--config configs/smoke.yaml \
+		--max-tasks 1 \
+		--splits dev \
+		--no-skill
 
 benchmark-all:
-	@for model in openai minimax nvidia stepfun; do \
-		$(MAKE) benchmark MODEL=$$model SKILL=no_skill; \
-		$(MAKE) benchmark MODEL=$$model SKILL=skill; \
-	done
+	@echo "=== BENCHMARK ALL MODELS ==="
+	@uv run python scripts/evaluate_batch.py \
+		--config configs/evaluation.yaml
 
 # =============================================================================
 # 2. OPTIMIZE: Iteratively improve skill with GEPA

@@ -60,9 +60,14 @@ ls tasks/train/ tasks/dev/ tasks/held_out/
 ### 4. Run Baselines
 
 ```bash
-# Run baseline with a specific model
-make baseline-openai-no-skill
-make baseline-openai-skill
+# Run baseline evaluation with default config
+make benchmark
+
+# Run with a specific model
+make benchmark MODEL=openai/gpt-oss-120b
+
+# Quick smoke test (1 task, verifies pipeline works)
+make benchmark-smoke
 
 # Compare results
 uv run python scripts/compare_results.py
@@ -156,8 +161,9 @@ make docker-build       # Build evaluation Docker image
 make generate-tasks     # Generate from package (PACKAGES=dplyr)
 
 # Evaluation
-make evaluate           # Single task evaluation
-make baseline-all-free  # Run all free model baselines
+make benchmark          # Run evaluation with default config
+make benchmark-smoke    # Quick test (1 task, verifies pipeline)
+make benchmark-all      # Run full benchmark
 
 # Optimization
 make optimize-test      # Quick test (3 calls)
