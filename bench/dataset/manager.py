@@ -281,17 +281,13 @@ def split_dataset(
     train_size = int(n * config.train_ratio)
     dev_size = int(n * config.dev_ratio)
 
-    # Create splits
+    # Create non-overlapping splits from a single shuffled list
+    # Remainder (due to int truncation) goes to test split
     splits: dict[str, list[tuple[TaskV1, Path]]] = {
         "train": shuffled[:train_size],
         "dev": shuffled[train_size : train_size + dev_size],
         "test": shuffled[train_size + dev_size :],
     }
-
-    # Handle remaining tasks (add to train)
-    remaining_start = train_size + dev_size + int(n * config.test_ratio)
-    if remaining_start < n:
-        splits["train"].extend(shuffled[remaining_start:])
 
     return splits
 
@@ -344,7 +340,11 @@ def validate_task_file(file_path: Path, strict: bool = False) -> ValidationResul
         if task.quality_score < 0 or task.quality_score > 10:
             result.warnings.append(f"Unusual quality_score: {task.quality_score}")
 
-        result.valid = strict or len(result.errors) == 0
+        # Valid only if NO errors; in strict mode, also require NO warnings
+        if strict:
+            result.valid = len(result.errors) == 0 and len(result.warnings) == 0
+        else:
+            result.valid = len(result.errors) == 0
 
     except ValidationError as e:
         for err in e.errors():

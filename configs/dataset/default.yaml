@@ -12,8 +12,9 @@ splits:
 seed: 42
 
 # Input/output directories
+# Use different paths to avoid reprocessing drift on repeated runs
 input_dir: "tasks_v1"
-output_dir: "tasks_v1"
+output_dir: "tasks_v1_split"
 
 # Validation settings
 validation:
