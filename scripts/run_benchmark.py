@@ -497,11 +497,6 @@ def main() -> None:
         format="%(message)s",
     )
 
-    # Check API key
-    if not os.environ.get("Z_AI_API_KEY"):
-        console.print("[red]Z_AI_API_KEY not set in environment[/red]")
-        sys.exit(1)
-
     config_path = Path(args.config)
     if not config_path.exists():
         console.print(f"[red]Config not found: {config_path}[/red]")
@@ -520,6 +515,22 @@ def main() -> None:
             # It's already a full config dict - keep as-is
             resolved_models.append(model_entry)
     config["models"] = resolved_models
+
+    # Provider-aware API key validation
+    # Only check keys for providers that will actually be used
+    enabled_models = [m for m in config.get("models", []) if m.get("enabled", True)]
+    required_keys = set()
+    for model_cfg in enabled_models:
+        model_env = model_cfg.get("env", {})
+        for key_name in model_env.keys():
+            if key_name and not os.environ.get(key_name):
+                required_keys.add(key_name)
+
+    if required_keys:
+        missing_keys = sorted(required_keys)
+        console.print(f"[red]Missing required API keys: {', '.join(missing_keys)}[/red]")
+        console.print("[dim]Set the required environment variables for the selected models[/dim]")
+        sys.exit(1)
 
     # Handle --task option (single task for testing)
     if args.task:

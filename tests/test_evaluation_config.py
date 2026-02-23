@@ -1,6 +1,13 @@
 """Tests for evaluation configuration."""
 
+import os
+from unittest.mock import patch
+
+import pytest
+
 from evaluation.config import EvaluationConfig, ModelConfig, SkillConfig, TasksConfig
+from evaluation.models import FailureCategory
+from evaluation.sandbox import get_required_api_key
 
 
 def test_model_config_defaults():
@@ -120,3 +127,87 @@ def test_evaluation_config_get_skill_name_unknown():
     """Test get_skill_name when no path and no_skill is False."""
     config = EvaluationConfig(skill=SkillConfig())
     assert config.get_skill_name() == "unknown"
+
+
+class TestFailureCategory:
+    """Tests for FailureCategory enum."""
+
+    def test_infrastructure_categories_exist(self):
+        """Test that infrastructure error categories exist."""
+        assert FailureCategory.CONFIG_ERROR.value == "CONFIG_ERROR"
+        assert FailureCategory.ENVIRONMENT_ERROR.value == "ENVIRONMENT_ERROR"
+        assert FailureCategory.PACKAGE_NOT_FOUND.value == "PACKAGE_NOT_FOUND"
+
+    def test_runtime_categories_exist(self):
+        """Test that runtime error categories exist."""
+        assert FailureCategory.TIMEOUT.value == "TIMEOUT"
+
+    def test_code_generation_categories_exist(self):
+        """Test that code generation error categories exist."""
+        assert FailureCategory.SYNTAX_ERROR.value == "SYNTAX_ERROR"
+        assert FailureCategory.MISSING_IMPORT.value == "MISSING_IMPORT"
+
+    def test_test_failure_categories_exist(self):
+        """Test that test failure categories exist."""
+        assert FailureCategory.TEST_FAILURE.value == "TEST_FAILURE"
+        assert FailureCategory.SNAPSHOT_MISMATCH.value == "SNAPSHOT_MISMATCH"
+        assert FailureCategory.INCOMPLETE_SOLUTION.value == "INCOMPLETE_SOLUTION"
+
+
+class TestProviderAwareKeyCheck:
+    """Tests for provider-aware API key checking."""
+
+    @patch.dict(os.environ, {}, clear=True)
+    def test_get_required_api_key_openrouter_missing(self):
+        """Test that missing OPENROUTER_API_KEY is detected for openrouter model."""
+        env_var, api_key = get_required_api_key("openrouter/some-model")
+        assert env_var == "OPENROUTER_API_KEY"
+        assert api_key is None
+
+    @patch.dict(os.environ, {"OPENROUTER_API_KEY": "test-key"}, clear=True)
+    def test_get_required_api_key_openrouter_present(self):
+        """Test that present OPENROUTER_API_KEY is returned for openrouter model."""
+        env_var, api_key = get_required_api_key("openrouter/some-model")
+        assert env_var == "OPENROUTER_API_KEY"
+        assert api_key == "test-key"
+
+    @patch.dict(os.environ, {}, clear=True)
+    def test_get_required_api_key_opencode_missing(self):
+        """Test that missing OPENCODE_API_KEY is detected for opencode model."""
+        env_var, api_key = get_required_api_key("opencode/some-model")
+        assert env_var == "OPENCODE_API_KEY"
+        assert api_key is None
+
+    @patch.dict(os.environ, {"OPENCODE_API_KEY": "test-key"}, clear=True)
+    def test_get_required_api_key_opencode_present(self):
+        """Test that present OPENCODE_API_KEY is returned for opencode model."""
+        env_var, api_key = get_required_api_key("opencode/some-model")
+        assert env_var == "OPENCODE_API_KEY"
+        assert api_key == "test-key"
+
+    @patch.dict(os.environ, {"Z_AI_API_KEY": "zai-key"}, clear=True)
+    def test_get_required_api_key_zai_present(self):
+        """Test that Z_AI_API_KEY is detected for zai model."""
+        env_var, api_key = get_required_api_key("zai/some-model")
+        assert env_var == "Z_AI_API_KEY"
+        assert api_key == "zai-key"
+
+    def test_get_required_api_key_unknown_prefix(self):
+        """Test that unknown prefix returns (None, None)."""
+        env_var, api_key = get_required_api_key("unknown-provider/some-model")
+        assert env_var is None
+        assert api_key is None
+
+    @patch.dict(os.environ, {"OPENAI_API_KEY": "openai-key"}, clear=True)
+    def test_get_required_api_key_openai(self):
+        """Test that OPENAI_API_KEY is detected for openai model."""
+        env_var, api_key = get_required_api_key("openai/gpt-4")
+        assert env_var == "OPENAI_API_KEY"
+        assert api_key == "openai-key"
+
+    @patch.dict(os.environ, {"ANTHROPIC_API_KEY": "anthropic-key"}, clear=True)
+    def test_get_required_api_key_anthropic(self):
+        """Test that ANTHROPIC_API_KEY is detected for anthropic model."""
+        env_var, api_key = get_required_api_key("anthropic/claude-3")
+        assert env_var == "ANTHROPIC_API_KEY"
+        assert api_key == "anthropic-key"

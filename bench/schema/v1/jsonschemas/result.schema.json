@@ -1,0 +1,162 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://trainr.dev/schemas/v1/result.schema.json",
+  "title": "ResultV1",
+  "description": "Canonical result schema for benchmark evaluation",
+  "type": "object",
+  "required": ["task_id", "model", "passed"],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "default": "1.0",
+      "description": "Schema version"
+    },
+    "result_id": {
+      "type": "string",
+      "default": "",
+      "description": "Unique identifier for this result"
+    },
+    "task_id": {
+      "type": "string",
+      "description": "ID of the evaluated task"
+    },
+    "model": {
+      "type": "string",
+      "description": "Model used for evaluation"
+    },
+    "profile_id": {
+      "type": "string",
+      "default": "default",
+      "description": "Profile used for evaluation"
+    },
+    "passed": {
+      "type": "boolean",
+      "description": "Whether the evaluation passed"
+    },
+    "score": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "default": 0,
+      "description": "Score from 0.0 to 1.0"
+    },
+    "error_category": {
+      "type": ["string", "null"],
+      "enum": [
+        "SYNTAX_ERROR",
+        "TEST_FAILURE",
+        "TIMEOUT",
+        "MISSING_IMPORT",
+        "WRONG_ASSERTION",
+        "INCOMPLETE_SOLUTION",
+        "OVERLY_COMPLEX",
+        "WRONG_FIXTURE_USAGE",
+        "SNAPSHOT_MISMATCH",
+        "LLM_ERROR",
+        "SANDBOX_ERROR",
+        "UNKNOWN",
+        null
+      ],
+      "description": "Category of error if failed"
+    },
+    "error_message": {
+      "type": ["string", "null"],
+      "description": "Error message if failed"
+    },
+    "latency_s": {
+      "type": "number",
+      "minimum": 0,
+      "default": 0,
+      "description": "Total latency in seconds"
+    },
+    "execution_time": {
+      "type": "number",
+      "minimum": 0,
+      "default": 0,
+      "description": "Execution time in seconds"
+    },
+    "token_usage": {
+      "$ref": "#/definitions/TokenUsageV1",
+      "description": "Token usage metrics"
+    },
+    "test_results": {
+      "type": "array",
+      "items": {"$ref": "#/definitions/CaseResultV1"},
+      "description": "Individual test results"
+    },
+    "generated_code": {
+      "type": ["string", "null"],
+      "description": "Generated code output"
+    },
+    "trajectory_path": {
+      "type": ["string", "null"],
+      "description": "Path to trajectory file"
+    },
+    "repeat_index": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "Repetition index (0-based)"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the result was recorded"
+    },
+    "metadata": {
+      "type": "object",
+      "default": {},
+      "description": "Additional metadata"
+    }
+  },
+  "definitions": {
+    "TokenUsageV1": {
+      "type": "object",
+      "properties": {
+        "prompt": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Prompt tokens"
+        },
+        "completion": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Completion tokens"
+        },
+        "total": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Total tokens"
+        }
+      }
+    },
+    "CaseResultV1": {
+      "type": "object",
+      "required": ["name", "passed"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Test name"
+        },
+        "passed": {
+          "type": "boolean",
+          "description": "Whether the test passed"
+        },
+        "message": {
+          "type": "string",
+          "default": "",
+          "description": "Test output or error message"
+        },
+        "execution_time": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0,
+          "description": "Execution time in seconds"
+        }
+      }
+    }
+  }
+}

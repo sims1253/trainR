@@ -1,0 +1,243 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://trainr.dev/schemas/v1/manifest.schema.json",
+  "title": "ManifestV1",
+  "description": "Canonical run manifest schema for benchmark metadata",
+  "type": "object",
+  "required": ["run_id"],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "default": "1.0",
+      "description": "Schema version"
+    },
+    "run_id": {
+      "type": "string",
+      "description": "Unique identifier for this run"
+    },
+    "run_name": {
+      "type": ["string", "null"],
+      "description": "Human-readable run name"
+    },
+    "models": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Models evaluated"
+    },
+    "task_count": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "Number of tasks"
+    },
+    "skill_version": {
+      "type": "string",
+      "default": "none",
+      "description": "Skill version or identifier"
+    },
+    "config_fingerprint": {
+      "$ref": "#/definitions/ConfigFingerprintV1",
+      "description": "Configuration fingerprint"
+    },
+    "environment_fingerprint": {
+      "$ref": "#/definitions/EnvironmentFingerprintV1",
+      "description": "Environment fingerprint"
+    },
+    "git_sha": {
+      "type": "string",
+      "default": "unknown",
+      "description": "Git commit SHA"
+    },
+    "git_branch": {
+      "type": ["string", "null"],
+      "description": "Git branch"
+    },
+    "git_dirty": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether repo has uncommitted changes"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the run started"
+    },
+    "end_timestamp": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "When the run ended"
+    },
+    "duration_s": {
+      "type": ["number", "null"],
+      "description": "Run duration in seconds"
+    },
+    "summary": {
+      "$ref": "#/definitions/ResultSummaryV1",
+      "description": "Overall result summary"
+    },
+    "model_summaries": {
+      "type": "array",
+      "items": {"$ref": "#/definitions/ModelSummaryV1"},
+      "description": "Per-model result summaries"
+    },
+    "config": {
+      "type": "object",
+      "default": {},
+      "description": "Configuration snapshot"
+    },
+    "results_path": {
+      "type": ["string", "null"],
+      "description": "Path to results file"
+    },
+    "results": {
+      "type": "array",
+      "items": {"type": "object"},
+      "description": "Individual results"
+    },
+    "metadata": {
+      "type": "object",
+      "default": {},
+      "description": "Additional metadata"
+    }
+  },
+  "definitions": {
+    "ConfigFingerprintV1": {
+      "type": "object",
+      "properties": {
+        "llm_config_hash": {
+          "type": ["string", "null"],
+          "description": "Hash of llm.yaml"
+        },
+        "benchmark_config_hash": {
+          "type": ["string", "null"],
+          "description": "Hash of benchmark.yaml"
+        },
+        "skill_hash": {
+          "type": ["string", "null"],
+          "description": "Hash of skill file"
+        },
+        "skill_name": {
+          "type": ["string", "null"],
+          "description": "Skill file name"
+        }
+      }
+    },
+    "EnvironmentFingerprintV1": {
+      "type": "object",
+      "properties": {
+        "python_version": {
+          "type": "string",
+          "default": "",
+          "description": "Python version"
+        },
+        "platform": {
+          "type": "string",
+          "default": "",
+          "description": "Platform/OS"
+        },
+        "docker_image": {
+          "type": ["string", "null"],
+          "description": "Docker image used"
+        },
+        "dependencies": {
+          "type": "object",
+          "default": {},
+          "description": "Key dependency versions"
+        }
+      }
+    },
+    "ResultSummaryV1": {
+      "type": "object",
+      "properties": {
+        "total_tasks": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Total number of tasks"
+        },
+        "completed": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Completed evaluations"
+        },
+        "passed": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Passed evaluations"
+        },
+        "failed": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Failed evaluations"
+        },
+        "errors": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Evaluations with errors"
+        },
+        "avg_score": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0,
+          "description": "Average score"
+        },
+        "avg_latency_s": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0,
+          "description": "Average latency in seconds"
+        },
+        "total_tokens": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Total tokens used"
+        }
+      }
+    },
+    "ModelSummaryV1": {
+      "type": "object",
+      "required": ["model"],
+      "properties": {
+        "model": {
+          "type": "string",
+          "description": "Model name"
+        },
+        "total": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Total evaluations"
+        },
+        "passed": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Passed evaluations"
+        },
+        "avg_score": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0,
+          "description": "Average score"
+        },
+        "avg_latency_s": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0,
+          "description": "Average latency"
+        },
+        "total_tokens": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Total tokens used"
+        }
+      }
+    }
+  }
+}

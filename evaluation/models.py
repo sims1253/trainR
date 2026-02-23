@@ -6,15 +6,27 @@ from typing import Any
 
 
 class FailureCategory(str, Enum):
-    SYNTAX_ERROR = "SYNTAX_ERROR"
-    TEST_FAILURE = "TEST_FAILURE"
-    TIMEOUT = "TIMEOUT"
-    MISSING_IMPORT = "MISSING_IMPORT"
-    WRONG_ASSERTION = "WRONG_ASSERTION"
-    INCOMPLETE_SOLUTION = "INCOMPLETE_SOLUTION"
-    OVERLY_COMPLEX = "OVERLY_COMPLEX"
-    WRONG_FIXTURE_USAGE = "WRONG_FIXTURE_USAGE"
-    SNAPSHOT_MISMATCH = "SNAPSHOT_MISMATCH"
+    """Classification of evaluation failures."""
+
+    # Configuration/Environment errors (blocking issues, not test failures)
+    CONFIG_ERROR = "CONFIG_ERROR"  # Misconfiguration, missing required config
+    ENVIRONMENT_ERROR = "ENVIRONMENT_ERROR"  # Missing env vars, API keys
+    PACKAGE_NOT_FOUND = "PACKAGE_NOT_FOUND"  # R package not available
+
+    # Runtime errors
+    TIMEOUT = "TIMEOUT"  # Operation timed out
+
+    # Code generation errors
+    SYNTAX_ERROR = "SYNTAX_ERROR"  # Generated code has syntax errors
+    MISSING_IMPORT = "MISSING_IMPORT"  # Required library not loaded
+
+    # Test failures (expected behavior, not infrastructure errors)
+    TEST_FAILURE = "TEST_FAILURE"  # Tests failed (expected behavior)
+    WRONG_ASSERTION = "WRONG_ASSERTION"  # Wrong test assertion used
+    SNAPSHOT_MISMATCH = "SNAPSHOT_MISMATCH"  # Snapshot test mismatch
+    INCOMPLETE_SOLUTION = "INCOMPLETE_SOLUTION"  # Partial/incomplete code
+    OVERLY_COMPLEX = "OVERLY_COMPLEX"  # Solution too complex
+    WRONG_FIXTURE_USAGE = "WRONG_FIXTURE_USAGE"  # Incorrect test fixture use
 
 
 @dataclass

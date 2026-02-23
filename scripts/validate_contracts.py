@@ -260,7 +260,7 @@ class ConfigValidator:
             self._validate_file_reference("benchmark.yaml", "skill", skill)
 
     def validate_evaluation_config(self, filename: str = "evaluation.yaml") -> None:
-        """Validate evaluation.yaml or smoke.yaml structure."""
+        """Validate evaluation.yaml or smoke.yaml structure and model references."""
         config = self.load_yaml(filename)
         if not config:
             return
@@ -289,12 +289,78 @@ class ConfigValidator:
                     )
                 )
 
+        # Validate model references against llm.yaml
+        # Models can be either bare names (e.g., "glm-5") or provider-prefixed (e.g., "openai/gpt-4")
+        valid_models = self.get_llm_models()
+        model_fields = ["task", "reflection"]
+
+        for field in model_fields:
+            model_value = model.get(field)
+            if model_value and isinstance(model_value, str):
+                # Handle provider-prefixed model strings (e.g., "openai/gpt-4")
+                # These reference models indirectly, so we extract the model part
+                if "/" in model_value:
+                    # Split provider/model format
+                    parts = model_value.split("/", 1)
+                    model_name = parts[1] if len(parts) > 1 else model_value
+                    # Check if this looks like a known model
+                    # Note: provider-prefixed strings may reference external models not in llm.yaml
+                    # We only warn if the model name looks like it should be in llm.yaml
+                    if model_name in valid_models or self._is_external_model(model_value):
+                        continue  # Valid reference or external model
+                elif model_value in valid_models:
+                    continue  # Valid direct reference
+
+                # Check if it's a known external model pattern
+                if not self._is_external_model(model_value):
+                    self.result.add_error(
+                        ValidationError(
+                            config_file=filename,
+                            field_path=f"model.{field}",
+                            issue=f"Model '{model_value}' not defined in llm.yaml",
+                            expected=f"One of: {sorted(valid_models)}",
+                            actual=model_value,
+                        )
+                    )
+
+        # Validate model.tasks list if present (batch comparison mode)
+        tasks_list = model.get("tasks")
+        if tasks_list and isinstance(tasks_list, list):
+            for i, model_name in enumerate(tasks_list):
+                if model_name not in valid_models:
+                    self.result.add_error(
+                        ValidationError(
+                            config_file=filename,
+                            field_path=f"model.tasks[{i}]",
+                            issue=f"Model '{model_name}' not defined in llm.yaml",
+                            expected=f"One of: {sorted(valid_models)}",
+                            actual=model_name,
+                        )
+                    )
+
         # Validate skill file reference
         skill = config.get("skill", {})
         if skill and isinstance(skill, dict):
             skill_path = skill.get("path")
             if skill_path and isinstance(skill_path, str):
                 self._validate_file_reference(filename, "skill.path", skill_path)
+
+    def _is_external_model(self, model_value: str) -> bool:
+        """Check if a model string references an external model (not in llm.yaml).
+
+        External models are provider-prefixed strings that reference models
+        from external providers like OpenRouter directly.
+        """
+        # Provider prefixes that indicate external model references
+        external_prefixes = [
+            "openrouter/",
+            "openai/",
+            "anthropic/",
+            "gemini/",
+            "zai/",
+            "opencode/",
+        ]
+        return any(model_value.startswith(prefix) for prefix in external_prefixes)
 
     def validate_mining_config(self) -> None:
         """Validate mining.yaml structure."""

@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """Run batch evaluations with parallel execution and YAML configuration."""
 
 import argparse
@@ -18,12 +17,51 @@ from rich.panel import Panel
 from rich.progress import BarColumn, Progress, SpinnerColumn, TaskProgressColumn, TextColumn
 from rich.table import Table
 
+from config import get_llm_config
 from evaluation.config import EvaluationConfig
 from evaluation.pi_runner import DockerPiRunner, DockerPiRunnerConfig
 from task_generator import TaskGenerator
 
 console = Console()
 logger = logging.getLogger(__name__)
+
+
+def get_required_api_key_for_model(model: str) -> tuple[str | None, str | None]:
+    """Get the required API key environment variable for a model.
+
+    Args:
+        model: Model name (either a short name from llm.yaml or full LiteLLM path)
+
+    Returns:
+        Tuple of (env_var_name, env_var_value) or (None, None) if no key required.
+    """
+    llm_config = get_llm_config()
+
+    # Try to resolve as a model name from llm.yaml
+    try:
+        model_cfg = llm_config.get_model_config(model)
+        env_var = model_cfg.get("api_key_env")
+        if env_var:
+            return env_var, os.environ.get(env_var)
+    except ValueError:
+        pass
+
+    # Fallback: infer from LiteLLM prefix in model string
+    provider_key_mapping = {
+        "openrouter/": "OPENROUTER_API_KEY",
+        "opencode/": "OPENCODE_API_KEY",
+        "zai/": "Z_AI_API_KEY",
+        "openai/": "OPENAI_API_KEY",
+        "anthropic/": "ANTHROPIC_API_KEY",
+        "gemini/": "GEMINI_API_KEY",
+    }
+
+    for prefix, key_name in provider_key_mapping.items():
+        if model.startswith(prefix):
+            return key_name, os.environ.get(key_name)
+
+    # No provider prefix - assume no key required or will be handled by LiteLLM
+    return None, None
 
 
 def load_config(config_path: Path, cli_overrides: dict) -> EvaluationConfig:
@@ -311,12 +349,7 @@ def main() -> None:
         format="%(message)s",
     )
 
-    # Check API key
-    if not os.environ.get("OPENROUTER_API_KEY"):
-        console.print("[red]OPENROUTER_API_KEY not set in environment[/red]")
-        sys.exit(1)
-
-    # Load config
+    # Load config first to determine which model(s) will be used
     config_path = Path(args.config)
     if not config_path.exists():
         console.print(f"[red]Config file not found: {config_path}[/red]")
@@ -331,6 +364,23 @@ def main() -> None:
     }
 
     config = load_config(config_path, cli_overrides)
+
+    # Provider-aware API key validation
+    # Only require API key for the model that will actually be used
+    models_to_check = config.model.get_models()
+    missing_keys = []
+    for model in models_to_check:
+        env_var, api_key = get_required_api_key_for_model(model)
+        if env_var and not api_key:
+            missing_keys.append((model, env_var))
+
+    if missing_keys:
+        for model, key_name in missing_keys:
+            console.print(
+                f"[red]{key_name} not set in environment (required for model: {model})[/red]"
+            )
+        console.print("[dim]Set the required environment variables for the selected models[/dim]")
+        sys.exit(1)
 
     # Show configuration
     console.print(

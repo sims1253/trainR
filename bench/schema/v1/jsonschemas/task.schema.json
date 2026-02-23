@@ -1,0 +1,197 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://trainr.dev/schemas/v1/task.schema.json",
+  "title": "TaskV1",
+  "description": "Canonical task schema for benchmark evaluation",
+  "type": "object",
+  "required": ["task_id", "task_type", "instruction"],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "default": "1.0",
+      "description": "Schema version"
+    },
+    "task_id": {
+      "type": "string",
+      "description": "Unique identifier for the task"
+    },
+    "task_type": {
+      "type": "string",
+      "enum": ["swe", "test_gen", "skill"],
+      "description": "Type of task"
+    },
+    "difficulty": {
+      "type": "string",
+      "enum": ["easy", "medium", "hard"],
+      "default": "medium",
+      "description": "Difficulty level"
+    },
+    "instruction": {
+      "type": "string",
+      "description": "Task instruction for the agent"
+    },
+    "context": {
+      "type": "string",
+      "default": "",
+      "description": "Code context to help understand the task"
+    },
+    "hints": {
+      "type": "array",
+      "items": {"type": "string"},
+      "default": [],
+      "description": "Optional hints for solving"
+    },
+    "source_package": {
+      "type": "string",
+      "default": "",
+      "description": "Source package name"
+    },
+    "source_file": {
+      "type": ["string", "null"],
+      "description": "Primary source file"
+    },
+    "tests": {
+      "$ref": "#/definitions/TaskTestsV1",
+      "description": "Test specifications"
+    },
+    "solution": {
+      "$ref": "#/definitions/TaskSolutionV1",
+      "description": "Solution hints"
+    },
+    "source": {
+      "$ref": "#/definitions/TaskSourceV1",
+      "description": "Source information"
+    },
+    "files": {
+      "$ref": "#/definitions/TaskFilesV1",
+      "description": "Related files"
+    },
+    "quality_score": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 10,
+      "default": 0,
+      "description": "Quality rating 0-10"
+    },
+    "split": {
+      "type": "string",
+      "default": "dev",
+      "description": "Dataset split"
+    },
+    "dependencies": {
+      "type": "array",
+      "items": {"type": "string"},
+      "default": [],
+      "description": "Package dependencies"
+    },
+    "constraints": {
+      "type": "object",
+      "default": {},
+      "description": "Task constraints"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the task was created"
+    },
+    "updated_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "When the task was last updated"
+    }
+  },
+  "definitions": {
+    "TaskTestsV1": {
+      "type": "object",
+      "properties": {
+        "fail_to_pass": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "Tests that should fail before fix, pass after"
+        },
+        "pass_to_pass": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "Tests that should always pass"
+        },
+        "test_files": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "Test file paths to run"
+        }
+      }
+    },
+    "TaskSolutionV1": {
+      "type": "object",
+      "properties": {
+        "key_changes": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "Key changes needed"
+        },
+        "potential_pitfalls": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "Common mistakes to avoid"
+        },
+        "reference_diff": {
+          "type": ["string", "null"],
+          "description": "Reference solution diff"
+        }
+      }
+    },
+    "TaskSourceV1": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "default": "github_pr",
+          "description": "Source type"
+        },
+        "repo": {
+          "type": ["string", "null"],
+          "description": "Repository name"
+        },
+        "pr_number": {
+          "type": ["integer", "null"],
+          "description": "Pull request number"
+        },
+        "pr_url": {
+          "type": ["string", "null"],
+          "description": "URL to the pull request"
+        },
+        "merged_at": {
+          "type": ["string", "null"],
+          "description": "When the PR was merged"
+        },
+        "issue_number": {
+          "type": ["integer", "null"],
+          "description": "Linked issue number"
+        },
+        "issue_url": {
+          "type": ["string", "null"],
+          "description": "URL to the linked issue"
+        }
+      }
+    },
+    "TaskFilesV1": {
+      "type": "object",
+      "properties": {
+        "changed": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "Files that were changed"
+        },
+        "source_files": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "Source files to modify"
+        },
+        "test_changes": {
+          "type": ["string", "null"],
+          "description": "Test file changes"
+        }
+      }
+    }
+  }
+}

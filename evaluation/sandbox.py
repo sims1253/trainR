@@ -6,10 +6,50 @@ import time
 from pathlib import Path
 from typing import Any
 
+from config import get_llm_config
+
 from .models import EvaluationResult, FailureCategory, TestResult, TrajectoryRecord
 from .pi_runner import DockerPiRunner, DockerPiRunnerConfig
 
 logger = logging.getLogger(__name__)
+
+
+def get_required_api_key(model: str) -> tuple[str | None, str | None]:
+    """Get the required API key environment variable for a model.
+
+    Args:
+        model: Model name (either a short name from llm.yaml or full LiteLLM path)
+
+    Returns:
+        Tuple of (env_var_name, env_var_value) or (None, None) if no key required.
+    """
+    llm_config = get_llm_config()
+
+    # Try to resolve as a model name from llm.yaml
+    try:
+        model_cfg = llm_config.get_model_config(model)
+        env_var = model_cfg.get("api_key_env")
+        if env_var:
+            return env_var, os.environ.get(env_var)
+    except ValueError:
+        pass
+
+    # Fallback: infer from LiteLLM prefix in model string
+    provider_key_mapping = {
+        "openrouter/": "OPENROUTER_API_KEY",
+        "opencode/": "OPENCODE_API_KEY",
+        "zai/": "Z_AI_API_KEY",
+        "openai/": "OPENAI_API_KEY",
+        "anthropic/": "ANTHROPIC_API_KEY",
+        "gemini/": "GEMINI_API_KEY",
+    }
+
+    for prefix, key_name in provider_key_mapping.items():
+        if model.startswith(prefix):
+            return key_name, os.environ.get(key_name)
+
+    # No provider prefix - assume no key required or will be handled by LiteLLM
+    return None, None
 
 
 class EvaluationSandbox:
@@ -43,18 +83,18 @@ class EvaluationSandbox:
         """
         # Resolve model from llm.yaml config
         if model is None:
-            from config import get_llm_config
-
             model = get_llm_config().task_agent
         start_time = time.time()
 
-        if not os.environ.get("OPENROUTER_API_KEY"):
+        # Provider-aware API key check
+        env_var, api_key = get_required_api_key(model)
+        if env_var and not api_key:
             return EvaluationResult(
                 task_id=task.task_id,
                 success=False,
                 score=0.0,
-                error_message="OPENROUTER_API_KEY not set in environment",
-                failure_category=FailureCategory.SYNTAX_ERROR,
+                error_message=f"{env_var} not set in environment (required for model: {model})",
+                failure_category=FailureCategory.ENVIRONMENT_ERROR,
                 execution_time=time.time() - start_time,
             )
 
@@ -79,7 +119,7 @@ class EvaluationSandbox:
                 success=False,
                 score=0.0,
                 error_message=f"Package directory not found: {package_dir}",
-                failure_category=FailureCategory.SYNTAX_ERROR,
+                failure_category=FailureCategory.PACKAGE_NOT_FOUND,
                 execution_time=time.time() - start_time,
             )
 
@@ -145,12 +185,25 @@ class EvaluationSandbox:
         error = result.get("error", "") or result.get("output", "")
         error_lower = error.lower()
 
+        # Check for infrastructure/environment issues first
         if "timeout" in error_lower:
             return FailureCategory.TIMEOUT
+        elif "package" in error_lower and (
+            "not found" in error_lower or "not available" in error_lower
+        ):
+            return FailureCategory.PACKAGE_NOT_FOUND
+        elif (
+            "api key" in error_lower or "api_key" in error_lower or "authentication" in error_lower
+        ):
+            return FailureCategory.ENVIRONMENT_ERROR
+        elif "config" in error_lower and "error" in error_lower:
+            return FailureCategory.CONFIG_ERROR
+        # Code generation issues
         elif "syntax" in error_lower or "parse" in error_lower:
             return FailureCategory.SYNTAX_ERROR
         elif "could not find function" in error_lower:
             return FailureCategory.MISSING_IMPORT
+        # Test failures (expected behavior)
         elif "snapshot" in error_lower:
             return FailureCategory.SNAPSHOT_MISMATCH
         elif "failure" in error_lower or "expect" in error_lower:
@@ -204,12 +257,18 @@ class EvaluationSandbox:
             return ""
 
         suggestions = {
-            FailureCategory.SYNTAX_ERROR: "Strengthen code examples in the skill to show correct R syntax",
-            FailureCategory.TEST_FAILURE: "Improve guidance on assertion selection and test structure",
+            FailureCategory.CONFIG_ERROR: "Check configuration files for missing or invalid settings",
+            FailureCategory.ENVIRONMENT_ERROR: "Ensure all required API keys and environment variables are set",
+            FailureCategory.PACKAGE_NOT_FOUND: "Verify required R packages are installed in the evaluation environment",
             FailureCategory.TIMEOUT: "Encourage simpler, more focused test approaches",
+            FailureCategory.SYNTAX_ERROR: "Strengthen code examples in the skill to show correct R syntax",
             FailureCategory.MISSING_IMPORT: "Emphasize the importance of loading required libraries",
+            FailureCategory.TEST_FAILURE: "Improve guidance on assertion selection and test structure",
             FailureCategory.SNAPSHOT_MISMATCH: "Provide better examples of snapshot testing patterns",
             FailureCategory.INCOMPLETE_SOLUTION: "Guide toward more comprehensive test coverage",
+            FailureCategory.WRONG_ASSERTION: "Improve guidance on selecting appropriate testthat assertions",
+            FailureCategory.OVERLY_COMPLEX: "Encourage simpler, more focused test patterns",
+            FailureCategory.WRONG_FIXTURE_USAGE: "Provide better examples of test fixture patterns",
         }
 
         failure_cat = result.failure_category

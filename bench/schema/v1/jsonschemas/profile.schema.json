@@ -1,0 +1,216 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://trainr.dev/schemas/v1/profile.schema.json",
+  "title": "ProfileV1",
+  "description": "Canonical profile schema for benchmark configuration",
+  "type": "object",
+  "required": ["profile_id"],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "default": "1.0",
+      "description": "Schema version"
+    },
+    "profile_id": {
+      "type": "string",
+      "description": "Unique identifier for the profile"
+    },
+    "profile_type": {
+      "type": "string",
+      "enum": ["agent", "tool", "evaluation"],
+      "default": "agent",
+      "description": "Type of profile"
+    },
+    "name": {
+      "type": "string",
+      "default": "",
+      "description": "Human-readable name"
+    },
+    "description": {
+      "type": "string",
+      "default": "",
+      "description": "Profile description"
+    },
+    "model": {
+      "$ref": "#/definitions/ModelConfigV1",
+      "description": "Primary model configuration"
+    },
+    "models": {
+      "type": "array",
+      "items": {"$ref": "#/definitions/ModelConfigV1"},
+      "description": "Multiple model configurations"
+    },
+    "skill": {
+      "$ref": "#/definitions/SkillConfigV1",
+      "description": "Skill configuration"
+    },
+    "judge": {
+      "$ref": "#/definitions/JudgeConfigV1",
+      "description": "Judge configuration"
+    },
+    "execution": {
+      "$ref": "#/definitions/ExecutionConfigV1",
+      "description": "Execution settings"
+    },
+    "workers": {
+      "$ref": "#/definitions/WorkerConfigV1",
+      "description": "Worker/parallelism settings"
+    },
+    "settings": {
+      "type": "object",
+      "default": {},
+      "description": "Additional settings"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the profile was created"
+    },
+    "updated_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "When the profile was last updated"
+    }
+  },
+  "definitions": {
+    "ModelConfigV1": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Model name as defined in llm.yaml"
+        },
+        "provider": {
+          "type": ["string", "null"],
+          "description": "Provider name"
+        },
+        "model_id": {
+          "type": ["string", "null"],
+          "description": "Full model ID for API calls"
+        },
+        "capabilities": {
+          "$ref": "#/definitions/ModelCapabilityV1",
+          "description": "Model capabilities"
+        }
+      },
+      "required": ["name"]
+    },
+    "ModelCapabilityV1": {
+      "type": "object",
+      "properties": {
+        "reasoning": {
+          "type": "boolean",
+          "default": false,
+          "description": "Supports reasoning output"
+        },
+        "json_mode": {
+          "type": "string",
+          "enum": ["native", "prompt", "none"],
+          "default": "prompt",
+          "description": "JSON mode"
+        },
+        "max_tokens_default": {
+          "type": "integer",
+          "default": 2000,
+          "description": "Default max tokens"
+        },
+        "drop_params": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "Params not supported"
+        }
+      }
+    },
+    "SkillConfigV1": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": ["string", "null"],
+          "description": "Path to skill file"
+        },
+        "no_skill": {
+          "type": "boolean",
+          "default": false,
+          "description": "Disable skill (baseline mode)"
+        },
+        "content": {
+          "type": ["string", "null"],
+          "description": "Inline skill content"
+        }
+      }
+    },
+    "JudgeConfigV1": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["single", "ensemble"],
+          "default": "single",
+          "description": "Judge mode"
+        },
+        "single": {
+          "type": ["string", "null"],
+          "description": "Single judge model name"
+        },
+        "ensemble_judges": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "Ensemble judge model names"
+        },
+        "voting": {
+          "type": "string",
+          "enum": ["majority", "average", "weighted"],
+          "default": "majority",
+          "description": "Voting strategy"
+        }
+      }
+    },
+    "ExecutionConfigV1": {
+      "type": "object",
+      "properties": {
+        "timeout": {
+          "type": "integer",
+          "default": 600,
+          "description": "Timeout in seconds"
+        },
+        "docker_image": {
+          "type": "string",
+          "default": "posit-gskill-eval:latest",
+          "description": "Docker image"
+        },
+        "repeats": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1,
+          "description": "Number of repeats per task"
+        },
+        "save_trajectories": {
+          "type": "boolean",
+          "default": true,
+          "description": "Save agent trajectories"
+        },
+        "save_traces": {
+          "type": "boolean",
+          "default": false,
+          "description": "Save LLM request/response traces"
+        }
+      }
+    },
+    "WorkerConfigV1": {
+      "type": "object",
+      "properties": {
+        "count": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 5,
+          "description": "Number of parallel workers"
+        },
+        "auto_detect": {
+          "type": "boolean",
+          "default": false,
+          "description": "Auto-detect worker count"
+        }
+      }
+    }
+  }
+}
