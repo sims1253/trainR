@@ -23,6 +23,8 @@ export type {
   ToolProfileRefV1,
   TaskSplitV1,
   PairedDeltaV1,
+  ProvenanceV1,
+  EnvironmentMetadataV1,
 } from "./schema";
 
 // Re-export validation functions

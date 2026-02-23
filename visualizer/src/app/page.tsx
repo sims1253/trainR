@@ -347,7 +347,7 @@ function DashboardContent({ data }: { data: BenchmarkData }) {
         )}
       </main>
 
-      <Footer />
+      <Footer data={data} />
     </div>
   );
 }

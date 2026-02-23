@@ -19,6 +19,20 @@ Each target must define:
 - Stop rule: When to halt optimization (e.g., max iterations, convergence)
 """
 
+from bench.optimize.runtime import (
+    BudgetConfig,
+    BudgetExceededError,
+    BudgetUsage,
+    InterruptHandler,
+    OptimizationRun,
+    OptimizationState,
+    StopReason,
+    TrajectoryEntry,
+    check_budget,
+    has_checkpoint,
+    load_checkpoint,
+    save_checkpoint,
+)
 from bench.optimize.targets.base import (
     CandidateType,
     OptimizableTarget,
@@ -26,11 +40,26 @@ from bench.optimize.targets.base import (
     ParamType,
     TargetFingerprint,
 )
+from bench.optimize.gepa_adapter import (
+    BatchEvaluator,
+    EvaluationResult,
+    GEPASkillEvaluator,
+    ObjectiveConfig,
+    ObjectiveType,
+    create_gepa_evaluator,
+)
 from bench.optimize.targets.skill import SkillCandidate, SkillTarget
 from bench.optimize.targets.system_prompt import SystemPromptCandidate, SystemPromptTarget
 from bench.optimize.targets.tool_policy import ToolPolicyCandidate, ToolPolicyTarget
 
 __all__ = [
+    # GEPA adapter
+    "GEPASkillEvaluator",
+    "BatchEvaluator",
+    "ObjectiveType",
+    "ObjectiveConfig",
+    "EvaluationResult",
+    "create_gepa_evaluator",
     # Base interface
     "OptimizableTarget",
     "ParamSpace",
@@ -44,4 +73,17 @@ __all__ = [
     "SystemPromptCandidate",
     "ToolPolicyTarget",
     "ToolPolicyCandidate",
+    # Runtime
+    "BudgetConfig",
+    "BudgetUsage",
+    "BudgetExceededError",
+    "StopReason",
+    "TrajectoryEntry",
+    "OptimizationState",
+    "OptimizationRun",
+    "InterruptHandler",
+    "check_budget",
+    "save_checkpoint",
+    "load_checkpoint",
+    "has_checkpoint",
 ]

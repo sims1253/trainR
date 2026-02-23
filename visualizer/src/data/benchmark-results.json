@@ -255,6 +255,31 @@
         "sample_count": 100,
         "p_value": 0.005
       }
-    ]
+    ],
+    "provenance": {
+      "manifest_fingerprint": "sha256:a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456",
+      "schema_version": 1,
+      "dataset_fingerprint": "sha256:fedcba0987654321fedcba0987654321fedcba0987654321fedcba0987654321",
+      "environment": {
+        "image_digest": "sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+        "python_version": "3.11.7",
+        "lock_hashes": {
+          "requirements.txt": "sha256:abc123def456",
+          "pyproject.toml": "sha256:789xyz012abc"
+        },
+        "package_versions": {
+          "pandas": "2.1.4",
+          "numpy": "1.26.3",
+          "click": "8.1.7"
+        }
+      },
+      "artifact_paths": {
+        "manifest": "data/runs/latest/manifest.json",
+        "summary": "data/runs/latest/summary.json",
+        "results": "data/runs/latest/results.jsonl"
+      },
+      "git_commit": "a1b2c3d4e5f6789012345678901234567890abcd",
+      "git_branch": "main"
+    }
   }
 }

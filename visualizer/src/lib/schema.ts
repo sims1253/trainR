@@ -145,6 +145,48 @@ export interface ModelResultV1 {
   tool_profile?: ToolProfileRefV1;
 }
 
+// ============================================================================
+// Provenance Types
+// ============================================================================
+
+/**
+ * Environment metadata for reproducibility
+ */
+export interface EnvironmentMetadataV1 {
+  /** Container image digest (e.g., sha256:...) */
+  image_digest?: string;
+  /** Lock file hashes (e.g., requirements.txt sha256) */
+  lock_hashes?: Record<string, string>;
+  /** Python version used */
+  python_version?: string;
+  /** Key package versions */
+  package_versions?: Record<string, string>;
+}
+
+/**
+ * Provenance information for traceability
+ */
+export interface ProvenanceV1 {
+  /** Run manifest fingerprint (sha256 hash) */
+  manifest_fingerprint?: string;
+  /** Schema version used when generating data */
+  schema_version: number;
+  /** Dataset fingerprint (sha256 hash of dataset) */
+  dataset_fingerprint?: string;
+  /** Environment metadata */
+  environment?: EnvironmentMetadataV1;
+  /** Paths to source artifacts (relative to data directory) */
+  artifact_paths?: {
+    manifest?: string;
+    summary?: string;
+    results?: string;
+  };
+  /** Git commit hash if available */
+  git_commit?: string;
+  /** Git branch if available */
+  git_branch?: string;
+}
+
 /**
  * Metadata about the benchmark run
  */
@@ -163,6 +205,8 @@ export interface MetadataV1 {
   difficulty_levels?: string[];
   /** Paired delta results for A/B comparisons */
   paired_deltas?: PairedDeltaV1[];
+  /** Provenance information for traceability */
+  provenance?: ProvenanceV1;
 }
 
 /**
