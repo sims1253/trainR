@@ -23,7 +23,9 @@ import benchmarkDataRaw from "@/data/benchmark-results.json";
 import { BenchmarkData, ModelResult, validateVisualizerDataV1 } from "@/lib/types";
 import { DifficultyChart } from "@/components/charts/difficulty-chart";
 import { PackageChart } from "@/components/charts/package-chart";
-import { ArrowUpIcon, ArrowDownIcon, AlertTriangleIcon } from "lucide-react";
+import { DeltaComparison } from "@/components/charts/delta-comparison";
+import { DimensionFilter, type DimensionFilters } from "@/components/charts/dimension-filter";
+import { ArrowUpIcon, ArrowDownIcon, AlertTriangleIcon, LayersIcon } from "lucide-react";
 
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
@@ -69,13 +71,45 @@ function DataError({ error }: { error: string }) {
  */
 function DashboardContent({ data }: { data: BenchmarkData }) {
   const [skillFilter, setSkillFilter] = useState<string>("posit_skill");
-  const [difficultyFilter, setDifficultyFilter] = useState<string>("all");
-  const [packageFilter, setPackageFilter] = useState<string>("all");
   const [selectedModelIndex, setSelectedModelIndex] = useState<number>(0);
 
+  // Initialize dimension filters
+  const [dimensionFilters, setDimensionFilters] = useState<DimensionFilters>({
+    supportProfile: "all",
+    toolProfile: "all",
+    taskSplit: "all",
+    difficulty: "all",
+    packageFilter: "all",
+  });
+
+  // Extract profile data from metadata
+  const supportProfiles = data.metadata.support_profiles || [];
+  const toolProfiles = data.metadata.tool_profiles || [];
+  const taskSplits = data.metadata.task_splits || [];
+  const pairedDeltas = data.metadata.paired_deltas || [];
+
+  // Filter models based on dimension filters
   const filteredModels = useMemo(() => {
-    return data.models;
-  }, [data.models]);
+    return data.models.filter((model) => {
+      // Filter by support profile
+      if (
+        dimensionFilters.supportProfile !== "all" &&
+        model.support_profile?.profile_id !== dimensionFilters.supportProfile
+      ) {
+        return false;
+      }
+
+      // Filter by tool profile
+      if (
+        dimensionFilters.toolProfile !== "all" &&
+        model.tool_profile?.tool_id !== dimensionFilters.toolProfile
+      ) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [data.models, dimensionFilters.supportProfile, dimensionFilters.toolProfile]);
 
   const selectedModel = filteredModels[selectedModelIndex] || filteredModels[0];
 
@@ -83,12 +117,15 @@ function DashboardContent({ data }: { data: BenchmarkData }) {
     const skillData = model.results[skill as keyof typeof model.results];
     if (!skillData) return null;
 
-    if (difficultyFilter !== "all") {
-      return skillData.by_difficulty[difficultyFilter as keyof typeof skillData.by_difficulty] ?? null;
+    if (dimensionFilters.difficulty !== "all") {
+      return (
+        skillData.by_difficulty[dimensionFilters.difficulty as keyof typeof skillData.by_difficulty] ??
+        null
+      );
     }
 
-    if (packageFilter !== "all") {
-      return skillData.by_package[packageFilter] ?? null;
+    if (dimensionFilters.packageFilter !== "all") {
+      return skillData.by_package[dimensionFilters.packageFilter] ?? null;
     }
 
     return skillData.overall.pass_rate;
@@ -104,7 +141,7 @@ function DashboardContent({ data }: { data: BenchmarkData }) {
 
   const renderDelta = (delta: number | null) => {
     if (delta === null) return <span className="text-muted-foreground">-</span>;
-    
+
     const value = (delta * 100).toFixed(1);
     if (delta > 0) {
       return (
@@ -128,8 +165,42 @@ function DashboardContent({ data }: { data: BenchmarkData }) {
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <Header />
-      
+
       <main className="flex-1 container mx-auto py-8 px-4 space-y-8">
+        {/* Page Header with Stats */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight">Benchmark Results</h2>
+            <p className="text-muted-foreground">
+              {filteredModels.length} models | {data.metadata.total_tasks} tasks |{" "}
+              {data.metadata.runs_included} runs
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="font-normal">
+              <LayersIcon className="w-3 h-3 mr-1" />
+              {supportProfiles.length} support profiles
+            </Badge>
+            <Badge variant="outline" className="font-normal">
+              {toolProfiles.length} tool profiles
+            </Badge>
+          </div>
+        </div>
+
+        {/* Dimension Filters */}
+        {(supportProfiles.length > 0 || toolProfiles.length > 0) && (
+          <DimensionFilter
+            filters={dimensionFilters}
+            onFiltersChange={setDimensionFilters}
+            supportProfiles={supportProfiles}
+            toolProfiles={toolProfiles}
+            taskSplits={taskSplits}
+            packages={data.metadata.packages}
+            difficultyLevels={data.metadata.difficulty_levels}
+          />
+        )}
+
+        {/* Legacy Skill Filter (simplified) */}
         <div className="flex flex-wrap gap-4 items-end bg-muted/30 p-4 rounded-lg border">
           <div className="space-y-2">
             <label className="text-sm font-medium">Skill Filter</label>
@@ -147,7 +218,13 @@ function DashboardContent({ data }: { data: BenchmarkData }) {
 
           <div className="space-y-2">
             <label className="text-sm font-medium">Difficulty</label>
-            <Tabs value={difficultyFilter} onValueChange={setDifficultyFilter} className="w-auto">
+            <Tabs
+              value={dimensionFilters.difficulty}
+              onValueChange={(v) =>
+                setDimensionFilters({ ...dimensionFilters, difficulty: v })
+              }
+              className="w-auto"
+            >
               <TabsList className="bg-background border">
                 <TabsTrigger value="all">All</TabsTrigger>
                 <TabsTrigger value="easy">Easy</TabsTrigger>
@@ -159,7 +236,12 @@ function DashboardContent({ data }: { data: BenchmarkData }) {
 
           <div className="space-y-2">
             <label className="text-sm font-medium">Package</label>
-            <Select value={packageFilter} onValueChange={setPackageFilter}>
+            <Select
+              value={dimensionFilters.packageFilter}
+              onValueChange={(v) =>
+                setDimensionFilters({ ...dimensionFilters, packageFilter: v })
+              }
+            >
               <SelectTrigger className="w-[180px] bg-background">
                 <SelectValue placeholder="All Packages" />
               </SelectTrigger>
@@ -175,6 +257,7 @@ function DashboardContent({ data }: { data: BenchmarkData }) {
           </div>
         </div>
 
+        {/* Results Table */}
         <div className="rounded-md border overflow-hidden bg-background">
           <Table>
             <TableHeader>
@@ -197,16 +280,27 @@ function DashboardContent({ data }: { data: BenchmarkData }) {
                 const delta = calculateDelta(model);
 
                 return (
-                  <TableRow 
+                  <TableRow
                     key={model.name}
-                    className={`cursor-pointer hover:bg-muted/50 transition-colors ${selectedModelIndex === index ? 'bg-primary/5' : ''}`}
+                    className={`cursor-pointer hover:bg-muted/50 transition-colors ${
+                      selectedModelIndex === index ? "bg-primary/5" : ""
+                    }`}
                     onClick={() => setSelectedModelIndex(index)}
                   >
                     <TableCell className="font-medium">
-                      {model.display_name}
+                      <div className="flex flex-col">
+                        <span>{model.display_name}</span>
+                        {model.support_profile && (
+                          <span className="text-xs text-muted-foreground">
+                            {model.support_profile.name || model.support_profile.profile_id}
+                          </span>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline" className="font-normal">{model.provider}</Badge>
+                      <Badge variant="outline" className="font-normal">
+                        {model.provider}
+                      </Badge>
                     </TableCell>
                     {(skillFilter === "all" || skillFilter === "no_skill") && (
                       <TableCell className="text-right font-mono">
@@ -217,13 +311,13 @@ function DashboardContent({ data }: { data: BenchmarkData }) {
                       <TableCell className="text-right font-mono">
                         <div className="flex items-center justify-end gap-1">
                           {positSkillRate !== null ? formatPercent(positSkillRate) : "N/A"}
-                          {positSkillRate === 1 && <span className="text-green-500 text-xs">ok</span>}
+                          {positSkillRate === 1 && (
+                            <span className="text-green-500 text-xs">ok</span>
+                          )}
                         </div>
                       </TableCell>
                     )}
-                    <TableCell className="text-right font-mono">
-                      {renderDelta(delta)}
-                    </TableCell>
+                    <TableCell className="text-right font-mono">{renderDelta(delta)}</TableCell>
                   </TableRow>
                 );
               })}
@@ -231,16 +325,26 @@ function DashboardContent({ data }: { data: BenchmarkData }) {
           </Table>
         </div>
 
+        {/* Charts Row */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <DifficultyChart 
-            models={filteredModels} 
-            skill={skillFilter === "all" ? "posit_skill" : skillFilter} 
+          <DifficultyChart
+            models={filteredModels}
+            skill={skillFilter === "all" ? "posit_skill" : skillFilter}
           />
-          <PackageChart 
-            model={selectedModel} 
-            skill={skillFilter} 
-          />
+          <PackageChart model={selectedModel} skill={skillFilter} />
         </div>
+
+        {/* Paired Delta Comparison */}
+        {pairedDeltas.length > 0 && (
+          <div className="grid grid-cols-1 gap-6">
+            <DeltaComparison
+              pairedDeltas={pairedDeltas}
+              title="Support Profile A/B Comparison"
+              description="Paired delta analysis showing the impact of different support profiles"
+              dimension="support"
+            />
+          </div>
+        )}
       </main>
 
       <Footer />

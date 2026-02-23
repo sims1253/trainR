@@ -13,15 +13,24 @@ Support Modes:
 - collection_selective: Selectively pick skills based on task
 """
 
+import logging
 from datetime import datetime, timezone
 from enum import Enum
 from functools import cached_property
 from hashlib import sha256
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import yaml
 from pydantic import BaseModel, Field, field_validator, model_validator
+
+if TYPE_CHECKING:
+    from bench.eval.skill_policy import (
+        SelectionResult,
+        SkillSelectionPolicy,
+    )
+
+logger = logging.getLogger(__name__)
 
 
 class SupportMode(str, Enum):
@@ -215,6 +224,53 @@ class SupportFingerprint(BaseModel):
         return f"{self.mode}:{self.config_hash[:8]}"
 
 
+class SelectionMetadata(BaseModel):
+    """Metadata about skill selection for COLLECTION_SELECTIVE mode."""
+
+    selected_skills: list[str] = Field(
+        default_factory=list,
+        description="List of selected skill IDs",
+    )
+    selection_policy: str = Field(
+        default="",
+        description="Name of the selection policy used",
+    )
+    selection_rationale: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description="Rationale for each skill selection",
+    )
+    config_hash: str = Field(
+        default="",
+        description="Hash of selection configuration",
+    )
+    seed: int | None = Field(
+        default=None,
+        description="Seed used for deterministic selection",
+    )
+
+    @classmethod
+    def from_selection_result(cls, result: SelectionResult) -> "SelectionMetadata":
+        """Create SelectionMetadata from a SelectionResult.
+
+        Args:
+            result: SelectionResult from skill policy
+
+        Returns:
+            SelectionMetadata instance
+        """
+        return cls(
+            selected_skills=result.get_ordered_skills(),
+            selection_policy=result.selection_policy,
+            selection_rationale=[r.to_dict() for r in result.selection_rationale],
+            config_hash=result.config_hash,
+            seed=result.seed,
+        )
+
+    def is_reproducible(self) -> bool:
+        """Check if selection is reproducible (has seed)."""
+        return self.seed is not None
+
+
 class ComposedSupportArtifact(BaseModel):
     """Persisted artifact of composed support configuration."""
 
@@ -231,6 +287,10 @@ class ComposedSupportArtifact(BaseModel):
     composition_metadata: dict[str, Any] = Field(
         default_factory=dict,
         description="Metadata about composition",
+    )
+    selection_metadata: SelectionMetadata | None = Field(
+        default=None,
+        description="Selection metadata for COLLECTION_SELECTIVE mode",
     )
     created_at: str = Field(
         default_factory=lambda: datetime.now(timezone.utc).isoformat(),
@@ -341,18 +401,143 @@ class SupportProfile(BaseModel):
         """Get skills ordered by priority (descending)."""
         return sorted(self.skills, key=lambda s: (-s.priority, s.get_identifier()))
 
-    def compose(self, base_path: Path | None = None) -> ComposedSupportArtifact:
+    def get_selection_policy(self, policies_path: Path | None = None) -> "SkillSelectionPolicy":
+        """Get the skill selection policy for this profile.
+
+        Args:
+            policies_path: Optional path to policies config file
+
+        Returns:
+            Configured SkillSelectionPolicy instance
+        """
+        # Lazy import to avoid circular dependency
+        from bench.eval.skill_policy import (
+            HeuristicPolicy,
+            load_policy_from_config,
+            load_policy_from_yaml,
+        )
+
+        # Check if policy is specified in selection_criteria
+        policy_name = self.selection_criteria.get("policy", "heuristic_balanced")
+
+        # Try to load from config file
+        if policies_path is None:
+            policies_path = Path("configs/profiles/support/selective_policies.yaml")
+
+        try:
+            return load_policy_from_yaml(policies_path, policy_name)
+        except (FileNotFoundError, KeyError) as e:
+            logger.warning(f"Could not load policy '{policy_name}': {e}. Using default.")
+            # Fall back to inline config or default
+            policy_config = self.selection_criteria.get("policy_config", {})
+            if policy_config:
+                return load_policy_from_config(policy_config)
+            return HeuristicPolicy()
+
+    def select_skills_for_task(
+        self,
+        task_context: dict[str, Any],
+        base_path: Path | None = None,
+        policies_path: Path | None = None,
+    ) -> tuple[list[SkillReference], "SelectionMetadata"]:
+        """Select skills based on task context for COLLECTION_SELECTIVE mode.
+
+        Args:
+            task_context: Task information including instruction, context, etc.
+            base_path: Base path for resolving skill paths
+            policies_path: Optional path to policies config file
+
+        Returns:
+            Tuple of (selected skill references, selection metadata)
+        """
+        # Lazy import to avoid circular dependency
+        from bench.eval.skill_policy import SelectionResult, discover_skills
+
+        # Discover available skills from collection path
+        skills_dir = Path(self.collection_path) if self.collection_path else Path("skills")
+        if base_path and not skills_dir.is_absolute():
+            skills_dir = base_path / skills_dir
+
+        available_skills = discover_skills(skills_dir)
+
+        # Get selection policy
+        policy = self.get_selection_policy(policies_path)
+
+        # Perform selection
+        result: SelectionResult = policy.select(task_context, available_skills)
+
+        # Map selected skill IDs to SkillReferences
+        skill_id_to_ref: dict[str, SkillReference] = {s.get_identifier(): s for s in self.skills}
+
+        selected_refs: list[SkillReference] = []
+        for skill_id in result.get_ordered_skills():
+            if skill_id in skill_id_to_ref:
+                selected_refs.append(skill_id_to_ref[skill_id])
+            else:
+                # Create reference from discovered skill
+                for meta in available_skills:
+                    if meta.skill_id == skill_id:
+                        selected_refs.append(
+                            SkillReference(
+                                name=meta.name,
+                                path=meta.path,
+                                priority=meta.priority,
+                                enabled=True,
+                            )
+                        )
+                        break
+
+        metadata = SelectionMetadata.from_selection_result(result)
+
+        logger.info(
+            f"Selected {len(selected_refs)} skills using '{result.selection_policy}' policy: "
+            f"{[s.get_identifier() for s in selected_refs]}"
+        )
+
+        return selected_refs, metadata
+
+    def compose(
+        self,
+        base_path: Path | None = None,
+        task_context: dict[str, Any] | None = None,
+    ) -> ComposedSupportArtifact:
         """
         Compose the support artifact from this profile.
 
         Args:
             base_path: Base path for resolving relative paths
+            task_context: Optional task context for COLLECTION_SELECTIVE mode
 
         Returns:
             ComposedSupportArtifact with all composed elements
         """
-        skill_contents = self.load_skill_contents(base_path)
+        selection_metadata: SelectionMetadata | None = None
         ordered_skills = self.get_ordered_skills()
+
+        # For COLLECTION_SELECTIVE mode, select skills based on task context
+        if self.mode == SupportMode.COLLECTION_SELECTIVE:
+            if task_context is None:
+                # Default task context if none provided
+                task_context = self.selection_criteria.get("default_task_context", {})
+                logger.warning(
+                    "COLLECTION_SELECTIVE mode requires task_context. "
+                    "Using default from selection_criteria."
+                )
+
+            selected_skills, selection_metadata = self.select_skills_for_task(
+                task_context=task_context,
+                base_path=base_path,
+            )
+            ordered_skills = selected_skills
+            self.skills = selected_skills  # Update for fingerprint computation
+
+        skill_contents: dict[str, str] = {}
+        for skill in ordered_skills:
+            if not skill.enabled:
+                continue
+            content = skill.load_content(base_path)
+            if content:
+                skill_contents[skill.get_identifier()] = content
 
         # Compose system prompt based on mode
         system_prompt: str | None = None
@@ -376,24 +561,54 @@ class SupportProfile(BaseModel):
         # Compute fingerprint with loaded contents
         fingerprint = SupportFingerprint.compute(
             mode=self.mode,
-            skills=self.skills,
+            skills=ordered_skills,
             agent_config=self.agent,
             system_config=self.system_prompt,
             loaded_contents=skill_contents,
         )
+
+        composition_metadata = {
+            "mode": self.mode.value,
+            "skill_count": len(ordered_skills),
+            "agent_enabled": self.agent.enabled,
+            "system_enabled": self.system_prompt.enabled,
+        }
+
+        # Add selection info to metadata for COLLECTION_SELECTIVE
+        if selection_metadata:
+            composition_metadata["selection_reproducible"] = selection_metadata.is_reproducible()
 
         return ComposedSupportArtifact(
             fingerprint=fingerprint,
             system_prompt=system_prompt,
             skills_content=skill_contents,
             agent_instructions=agent_instructions,
-            composition_metadata={
-                "mode": self.mode.value,
-                "skill_count": len(ordered_skills),
-                "agent_enabled": self.agent.enabled,
-                "system_enabled": self.system_prompt.enabled,
-            },
+            composition_metadata=composition_metadata,
+            selection_metadata=selection_metadata,
         )
+
+    def compose_with_task(
+        self,
+        task_context: dict[str, Any],
+        base_path: Path | None = None,
+    ) -> ComposedSupportArtifact:
+        """Compose support artifact with explicit task context.
+
+        This is the preferred method for COLLECTION_SELECTIVE mode.
+
+        Args:
+            task_context: Task information including:
+                - instruction: Task instruction text
+                - context: Additional context
+                - source_package: Source package name
+                - task_id: Optional task identifier
+                - difficulty: Optional difficulty level
+            base_path: Base path for resolving relative paths
+
+        Returns:
+            ComposedSupportArtifact with selected skills and selection metadata
+        """
+        return self.compose(base_path=base_path, task_context=task_context)
 
     def _compose_system_prompt(
         self,

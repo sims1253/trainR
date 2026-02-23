@@ -8,6 +8,12 @@ from typing import Any
 
 from config import get_llm_config
 
+from bench.eval.telemetry import (
+    TelemetryCollector,
+    ToolErrorType,
+    classify_error_type,
+)
+
 from .models import EvaluationResult, FailureCategory, TestResult, TrajectoryRecord
 from .pi_runner import DockerPiRunner, DockerPiRunnerConfig
 
@@ -81,6 +87,9 @@ class EvaluationSandbox:
         Returns:
             EvaluationResult with score and details.
         """
+        # Initialize telemetry collector
+        telemetry = TelemetryCollector()
+
         # Resolve model from llm.yaml config
         if model is None:
             model = get_llm_config().task_agent
@@ -89,6 +98,12 @@ class EvaluationSandbox:
         # Provider-aware API key check
         env_var, api_key = get_required_api_key(model)
         if env_var and not api_key:
+            telemetry.record_error(
+                "config_check",
+                ToolErrorType.PERMISSION_DENIED,
+                f"{env_var} not set in environment",
+            )
+            telemetry_fields = telemetry.get_result_fields()
             return EvaluationResult(
                 task_id=task.task_id,
                 success=False,
@@ -96,50 +111,76 @@ class EvaluationSandbox:
                 error_message=f"{env_var} not set in environment (required for model: {model})",
                 failure_category=FailureCategory.ENVIRONMENT_ERROR,
                 execution_time=time.time() - start_time,
+                tool_call_counts=telemetry_fields["tool_call_counts"],
+                tool_errors=telemetry_fields["tool_errors"],
+                tool_total_time_ms=telemetry_fields["tool_total_time_ms"],
             )
 
-        # Determine package path
-        if package_dir is None:
-            # Try source_package first, then derive from source.repo
-            source_package = getattr(task, "source_package", None)
-            if source_package is None:
-                # Try to get from source.repo (format: "owner/repo")
-                source = getattr(task, "source", {})
-                if isinstance(source, dict):
-                    repo = source.get("repo", "")
-                else:
-                    repo = getattr(source, "repo", "")
-                source_package = repo.split("/")[-1] if "/" in str(repo) else str(repo)
+        # Track package resolution
+        with telemetry.time_call("package_resolution") as ctx:
+            # Determine package path
+            if package_dir is None:
+                # Try source_package first, then derive from source.repo
+                source_package = getattr(task, "source_package", None)
+                if source_package is None:
+                    # Try to get from source.repo (format: "owner/repo")
+                    source = getattr(task, "source", {})
+                    if isinstance(source, dict):
+                        repo = source.get("repo", "")
+                    else:
+                        repo = getattr(source, "repo", "")
+                    source_package = repo.split("/")[-1] if "/" in str(repo) else str(repo)
 
-            package_dir = Path(f"packages/{source_package}")
+                package_dir = Path(f"packages/{source_package}")
 
-        if not package_dir.exists():
-            return EvaluationResult(
-                task_id=task.task_id,
-                success=False,
-                score=0.0,
-                error_message=f"Package directory not found: {package_dir}",
-                failure_category=FailureCategory.PACKAGE_NOT_FOUND,
-                execution_time=time.time() - start_time,
+            if not package_dir.exists():
+                ctx.failure(ToolErrorType.NOT_FOUND)
+                telemetry_fields = telemetry.get_result_fields()
+                return EvaluationResult(
+                    task_id=task.task_id,
+                    success=False,
+                    score=0.0,
+                    error_message=f"Package directory not found: {package_dir}",
+                    failure_category=FailureCategory.PACKAGE_NOT_FOUND,
+                    execution_time=time.time() - start_time,
+                    tool_call_counts=telemetry_fields["tool_call_counts"],
+                    tool_errors=telemetry_fields["tool_errors"],
+                    tool_total_time_ms=telemetry_fields["tool_total_time_ms"],
+                )
+            ctx.success()
+
+        # Run evaluation in Docker with telemetry
+        with telemetry.time_call("docker_evaluation") as ctx:
+            result = self.runner.run_evaluation(
+                skill_content=skill_prompt,
+                task_instruction=task.instruction,
+                task_context=task.context,
+                package_dir=package_dir,
+                model=model,
+                task=task,  # Pass task for repo/commit info
             )
 
-        # Run evaluation in Docker
-        result = self.runner.run_evaluation(
-            skill_content=skill_prompt,
-            task_instruction=task.instruction,
-            task_context=task.context,
-            package_dir=package_dir,
-            model=model,
-            task=task,  # Pass task for repo/commit info
-        )
+            # Check for errors in the result
+            if result.get("error"):
+                error_msg = result.get("error", "")
+                error_type = classify_error_type(error_msg)
+                ctx.failure(error_type)
+            else:
+                ctx.success()
 
-        # Parse results
-        test_results = self._parse_test_results(result)
+        # Track test parsing
+        with telemetry.time_call("test_parsing") as ctx:
+            test_results = self._parse_test_results(result)
+            ctx.success()
+
         success = result.get("success", False)
 
         failure_category = None
         if not success:
             failure_category = self._classify_failure(result)
+
+        # Get telemetry fields
+        telemetry_fields = telemetry.get_result_fields()
 
         return EvaluationResult(
             task_id=task.task_id,
@@ -150,6 +191,9 @@ class EvaluationSandbox:
             failure_category=failure_category,
             execution_time=time.time() - start_time,
             token_usage=result.get("token_usage", {}),
+            tool_call_counts=telemetry_fields["tool_call_counts"],
+            tool_errors=telemetry_fields["tool_errors"],
+            tool_total_time_ms=telemetry_fields["tool_total_time_ms"],
         )
 
     def _parse_test_results(self, result: dict) -> list[TestResult]:

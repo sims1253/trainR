@@ -52,6 +52,10 @@ class EvaluationResult:
     failure_category: FailureCategory | None = None
     execution_time: float = 0.0
     token_usage: dict[str, int] = field(default_factory=dict)
+    # Telemetry fields
+    tool_call_counts: dict[str, int] = field(default_factory=dict)
+    tool_errors: dict[str, int] = field(default_factory=dict)
+    tool_total_time_ms: dict[str, float] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -67,6 +71,9 @@ class EvaluationResult:
             "failure_category": str(self.failure_category) if self.failure_category else None,
             "execution_time": self.execution_time,
             "token_usage": self.token_usage,
+            "tool_call_counts": self.tool_call_counts,
+            "tool_errors": self.tool_errors,
+            "tool_total_time_ms": self.tool_total_time_ms,
         }
 
 

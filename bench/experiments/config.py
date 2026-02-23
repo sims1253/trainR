@@ -208,6 +208,39 @@ class DeterminismConfig(BaseModel):
     )
 
 
+class PairingConfig(BaseModel):
+    """Configuration for paired experiment comparisons.
+
+    Paired experiments run the same task/model/tool/seed with different
+    support profiles to enable fair comparisons of support effectiveness.
+    """
+
+    enabled: bool = Field(
+        default=False,
+        description="Enable paired experiment mode",
+    )
+    dimensions: list[str] = Field(
+        default_factory=lambda: ["support"],
+        description="Dimensions to pair on (currently only 'support' is supported)",
+    )
+    control_profile: str = Field(
+        default="",
+        description="Control support profile name or path",
+    )
+    treatment_profiles: list[str] = Field(
+        default_factory=list,
+        description="Treatment support profile names or paths to compare against control",
+    )
+
+    def is_active(self) -> bool:
+        """Check if pairing is enabled and properly configured."""
+        return self.enabled and bool(self.control_profile) and bool(self.treatment_profiles)
+
+    def get_all_profiles(self) -> list[str]:
+        """Get all profiles (control first, then treatments)."""
+        return [self.control_profile] + list(self.treatment_profiles)
+
+
 class ExperimentConfig(BaseModel):
     """
     Complete experiment configuration.
@@ -258,6 +291,10 @@ class ExperimentConfig(BaseModel):
     determinism: DeterminismConfig = Field(
         default_factory=DeterminismConfig,
         description="Determinism settings",
+    )
+    pairing: PairingConfig = Field(
+        default_factory=PairingConfig,
+        description="Paired experiment configuration",
     )
 
     # Additional settings
@@ -316,6 +353,7 @@ class ExperimentConfig(BaseModel):
             retry=RetryConfig(**retry_data),
             output=OutputConfig(**data.get("output", {})),
             determinism=DeterminismConfig(**data.get("determinism", {})),
+            pairing=PairingConfig(**data.get("pairing", {})),
             settings=data.get("settings", {}),
         )
 

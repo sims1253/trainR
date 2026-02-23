@@ -18,6 +18,46 @@ export type VisualizerDataVersion = typeof VISUALIZER_DATA_VERSION;
 // Core Data Types
 // ============================================================================
 
+// ============================================================================
+// Support/Tool Dimension Types
+// ============================================================================
+
+/**
+ * Support modes for agent/tool support configurations
+ */
+export type SupportModeV1 =
+  | "none"
+  | "system_only"
+  | "agents_only"
+  | "system_plus_agents"
+  | "single_skill"
+  | "collection_forced"
+  | "collection_selective";
+
+/**
+ * Tool version identifiers
+ */
+export type ToolVersionV1 = "v1" | "patch_v1" | "patch_v2" | "patch_v3" | "custom" | string;
+
+/**
+ * Support profile identifier
+ */
+export interface SupportProfileRefV1 {
+  profile_id: string;
+  mode: SupportModeV1;
+  name?: string;
+}
+
+/**
+ * Tool profile identifier
+ */
+export interface ToolProfileRefV1 {
+  tool_id: string;
+  version: ToolVersionV1;
+  name?: string;
+  variant?: string;
+}
+
 /**
  * Overall result statistics for a skill evaluation
  */
@@ -41,6 +81,33 @@ export interface DifficultyBreakdownV1 {
  * Package-level pass rate mapping
  */
 export type PackageBreakdownV1 = Record<string, number>;
+
+/**
+ * Task split types for filtering
+ */
+export type TaskSplitV1 = "train" | "dev" | "test";
+
+/**
+ * Paired delta result for A/B comparison
+ */
+export interface PairedDeltaV1 {
+  /** Identifier for the A profile */
+  profile_a: string;
+  /** Identifier for the B profile */
+  profile_b: string;
+  /** Delta in pass rate (B - A) */
+  delta_pass_rate: number;
+  /** Delta in cost (B - A), optional */
+  delta_cost?: number;
+  /** Delta in latency (B - A), optional */
+  delta_latency_ms?: number;
+  /** Number of paired samples */
+  sample_count: number;
+  /** Statistical significance (p-value), optional */
+  p_value?: number;
+  /** Model this delta applies to */
+  model_name?: string;
+}
 
 /**
  * Skill-level results containing overall, difficulty, and package breakdowns
@@ -72,6 +139,10 @@ export interface ModelResultV1 {
   display_name: string;
   provider: string;
   results: ModelSkillResultsV1;
+  /** Support profile this result was generated with (optional) */
+  support_profile?: SupportProfileRefV1;
+  /** Tool profile this result was generated with (optional) */
+  tool_profile?: ToolProfileRefV1;
 }
 
 /**
@@ -82,6 +153,16 @@ export interface MetadataV1 {
   total_tasks: number;
   packages: string[];
   runs_included: number;
+  /** Available support profiles in the data */
+  support_profiles?: SupportProfileRefV1[];
+  /** Available tool profiles in the data */
+  tool_profiles?: ToolProfileRefV1[];
+  /** Available task splits */
+  task_splits?: TaskSplitV1[];
+  /** Difficulty levels available */
+  difficulty_levels?: string[];
+  /** Paired delta results for A/B comparisons */
+  paired_deltas?: PairedDeltaV1[];
 }
 
 /**
@@ -317,15 +398,23 @@ function validateModelResult(data: unknown, index: number): ValidationResult<Mod
   const resultsValidation = validateModelSkillResults(data.results, `${path}.results`);
   if (!resultsValidation.ok) return resultsValidation;
 
-  return {
-    ok: true,
-    data: {
-      name: data.name as string,
-      display_name: data.display_name as string,
-      provider: data.provider as string,
-      results: resultsValidation.data,
-    },
+  // Optional profile fields - just pass through if present
+  const result: ModelResultV1 = {
+    name: data.name as string,
+    display_name: data.display_name as string,
+    provider: data.provider as string,
+    results: resultsValidation.data,
   };
+
+  // Add optional profile fields if present
+  if (data.support_profile && isValidObject(data.support_profile)) {
+    result.support_profile = data.support_profile as unknown as SupportProfileRefV1;
+  }
+  if (data.tool_profile && isValidObject(data.tool_profile)) {
+    result.tool_profile = data.tool_profile as unknown as ToolProfileRefV1;
+  }
+
+  return { ok: true, data: result };
 }
 
 /**

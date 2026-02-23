@@ -447,7 +447,7 @@ class ExperimentRunner:
             result_id=f"{run.fingerprint}",
             task_id=run.task.task_id,
             model=run.model.name,
-            profile_id=self.config.skill.get_name(),
+            profile_id=run.support_profile or self.config.skill.get_name(),
             passed=eval_result.success if hasattr(eval_result, "success") else False,
             score=eval_result.score if hasattr(eval_result, "score") else 0.0,
             error_category=error_category,
@@ -465,7 +465,21 @@ class ExperimentRunner:
             else None,
             trajectory_path=trajectory_path,
             repeat_index=run.repeat_index,
-            metadata={"fingerprint": run.fingerprint, "run_index": run.run_index},
+            metadata={
+                "fingerprint": run.fingerprint,
+                "run_index": run.run_index,
+                "support_profile": run.support_profile,
+                "pair_id": run.pair_id,
+                "pair_role": run.pair_role,
+            },
+            # Telemetry fields
+            tool_call_counts=eval_result.tool_call_counts
+            if hasattr(eval_result, "tool_call_counts")
+            else {},
+            tool_errors=eval_result.tool_errors if hasattr(eval_result, "tool_errors") else {},
+            tool_total_time_ms=eval_result.tool_total_time_ms
+            if hasattr(eval_result, "tool_total_time_ms")
+            else {},
         )
 
     def _create_error_result(self, run: ExperimentRun, error_message: str) -> ResultV1:
@@ -474,7 +488,7 @@ class ExperimentRunner:
             result_id=f"{run.fingerprint}",
             task_id=run.task.task_id,
             model=run.model.name,
-            profile_id=self.config.skill.get_name(),
+            profile_id=run.support_profile or self.config.skill.get_name(),
             passed=False,
             score=0.0,
             error_category=ErrorCategoryV1.UNKNOWN,
@@ -484,7 +498,17 @@ class ExperimentRunner:
             token_usage=TokenUsageV1(),
             test_results=[],
             repeat_index=run.repeat_index,
-            metadata={"fingerprint": run.fingerprint, "run_index": run.run_index},
+            metadata={
+                "fingerprint": run.fingerprint,
+                "run_index": run.run_index,
+                "support_profile": run.support_profile,
+                "pair_id": run.pair_id,
+                "pair_role": run.pair_role,
+            },
+            # Empty telemetry for error results
+            tool_call_counts={},
+            tool_errors={},
+            tool_total_time_ms={},
         )
 
     def _get_max_attempts(self) -> int:

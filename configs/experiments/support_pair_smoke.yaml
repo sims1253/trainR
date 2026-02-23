@@ -1,0 +1,72 @@
+# Support Profile Pairing Smoke Test Configuration
+# WP-04B: Paired Support Evaluation
+#
+# This configuration demonstrates paired support profile comparison.
+# Each task/model/seed combination is run with both control and treatment
+# support profiles to enable fair A/B comparison.
+
+# Experiment metadata
+name: "support_pair_smoke"
+description: "Smoke test for paired support profile evaluation"
+schema_version: "1.0"
+
+# Models to evaluate (references configs/llm.yaml)
+models:
+  names:
+    - glm-5
+
+# Task selection
+tasks:
+  selection: "splits"
+  splits:
+    - dev
+  dir: "tasks"
+  max_tasks: 3  # Limit for smoke testing
+
+# Skill configuration - not used when pairing is enabled
+# The support profiles below provide the skill context
+skill:
+  no_skill: true
+
+# Execution settings
+execution:
+  timeout: 300
+  docker_image: "posit-gskill-eval:latest"
+  repeats: 1
+  parallel_workers: 1
+  save_trajectories: true
+  save_traces: false
+
+# Retry configuration
+retry:
+  strategy: "none"
+  max_retries: 0
+
+# Output configuration
+output:
+  dir: "results/experiments"
+  save_intermediate: true
+
+# Determinism settings
+determinism:
+  seed: 42
+  freeze_model_resolution: true
+  freeze_config: true
+
+# Paired support profile configuration
+# This enables fair A/B comparison of support profiles
+pairing:
+  enabled: true
+  dimensions:
+    - "support"  # Currently only "support" dimension is supported
+  control_profile: "none"  # Baseline: no support
+  treatment_profiles:
+    - "system_only"  # Treatment: system prompt with skill context
+
+# Additional settings
+settings:
+  # Output paired delta analysis
+  emit_paired_deltas: true
+  # Statistical significance testing
+  compute_significance: true
+  confidence_level: 0.95

@@ -5,6 +5,16 @@
       "name": "gpt-4o",
       "display_name": "GPT-4o",
       "provider": "openai",
+      "support_profile": {
+        "profile_id": "system_only",
+        "mode": "system_only",
+        "name": "System Prompt Only"
+      },
+      "tool_profile": {
+        "tool_id": "r-cli-v1",
+        "version": "v1",
+        "name": "R CLI"
+      },
       "results": {
         "no_skill": {
           "overall": {
@@ -50,6 +60,16 @@
       "name": "claude-3-5-sonnet",
       "display_name": "Claude 3.5 Sonnet",
       "provider": "anthropic",
+      "support_profile": {
+        "profile_id": "system_only",
+        "mode": "system_only",
+        "name": "System Prompt Only"
+      },
+      "tool_profile": {
+        "tool_id": "r-cli-v1",
+        "version": "v1",
+        "name": "R CLI"
+      },
       "results": {
         "no_skill": {
           "overall": {
@@ -95,6 +115,16 @@
       "name": "glm-4.5",
       "display_name": "GLM-4.5",
       "provider": "opencode",
+      "support_profile": {
+        "profile_id": "system_only",
+        "mode": "system_only",
+        "name": "System Prompt Only"
+      },
+      "tool_profile": {
+        "tool_id": "r-cli-v1",
+        "version": "v1",
+        "name": "R CLI"
+      },
       "results": {
         "no_skill": {
           "overall": {
@@ -146,6 +176,85 @@
       "ggplot2",
       "testthat"
     ],
-    "runs_included": 2
+    "runs_included": 2,
+    "support_profiles": [
+      {
+        "profile_id": "none",
+        "mode": "none",
+        "name": "No Support"
+      },
+      {
+        "profile_id": "system_only",
+        "mode": "system_only",
+        "name": "System Prompt Only"
+      },
+      {
+        "profile_id": "agents_only",
+        "mode": "agents_only",
+        "name": "Agents Only"
+      },
+      {
+        "profile_id": "system_plus_agents",
+        "mode": "system_plus_agents",
+        "name": "System + Agents"
+      }
+    ],
+    "tool_profiles": [
+      {
+        "tool_id": "r-cli-v1",
+        "version": "v1",
+        "name": "R CLI"
+      },
+      {
+        "tool_id": "r-cli-patch-v1",
+        "version": "patch_v1",
+        "name": "R CLI",
+        "variant": "strict"
+      }
+    ],
+    "task_splits": ["train", "dev", "test"],
+    "difficulty_levels": ["easy", "medium", "hard"],
+    "paired_deltas": [
+      {
+        "profile_a": "none",
+        "profile_b": "system_only",
+        "model_name": "GPT-4o",
+        "delta_pass_rate": 0.12,
+        "delta_cost": 0.0015,
+        "delta_latency_ms": 150,
+        "sample_count": 100,
+        "p_value": 0.03
+      },
+      {
+        "profile_a": "none",
+        "profile_b": "system_only",
+        "model_name": "Claude 3.5 Sonnet",
+        "delta_pass_rate": 0.15,
+        "delta_cost": 0.002,
+        "delta_latency_ms": 180,
+        "sample_count": 100,
+        "p_value": 0.01
+      },
+      {
+        "profile_a": "system_only",
+        "profile_b": "agents_only",
+        "model_name": "GPT-4o",
+        "delta_pass_rate": 0.08,
+        "delta_cost": 0.005,
+        "delta_latency_ms": 500,
+        "sample_count": 100,
+        "p_value": 0.08
+      },
+      {
+        "profile_a": "system_only",
+        "profile_b": "system_plus_agents",
+        "model_name": "Claude 3.5 Sonnet",
+        "delta_pass_rate": 0.18,
+        "delta_cost": 0.008,
+        "delta_latency_ms": 750,
+        "sample_count": 100,
+        "p_value": 0.005
+      }
+    ]
   }
 }

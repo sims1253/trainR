@@ -111,6 +111,20 @@ class ResultV1(BaseModel):
     # Additional metadata
     metadata: dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
 
+    # Telemetry fields (tool-level metrics)
+    tool_call_counts: dict[str, int] = Field(
+        default_factory=dict,
+        description="Number of calls per tool (tool_name -> count)",
+    )
+    tool_errors: dict[str, int] = Field(
+        default_factory=dict,
+        description="Error count per tool (tool_name -> error_count)",
+    )
+    tool_total_time_ms: dict[str, float] = Field(
+        default_factory=dict,
+        description="Total time per tool in milliseconds (tool_name -> ms)",
+    )
+
     @field_validator("schema_version")
     @classmethod
     def validate_schema_version(cls, v: str) -> str:

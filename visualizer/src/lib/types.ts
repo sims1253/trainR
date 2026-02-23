@@ -17,6 +17,12 @@ export type {
   MetadataV1,
   SkillTypeV1,
   ValidationResult,
+  SupportModeV1,
+  ToolVersionV1,
+  SupportProfileRefV1,
+  ToolProfileRefV1,
+  TaskSplitV1,
+  PairedDeltaV1,
 } from "./schema";
 
 // Re-export validation functions
