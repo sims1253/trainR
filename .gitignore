@@ -107,7 +107,7 @@ renv.lock
 .docker/
 
 # =============================================================================
-# Node.js / Bun
+# Node.js / Bun / Next.js
 # =============================================================================
 
 # Dependencies
@@ -120,6 +120,27 @@ yarn.lock
 
 # Bun
 .bun/
+
+# Yarn PnP
+.pnp
+.pnp.*
+
+# Next.js
+.next/
+/out/
+
+# Vercel
+.vercel
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# Testing
+/coverage
+
+# Production build
+/build
 
 # =============================================================================
 # Project-specific
@@ -162,9 +183,21 @@ temp/
 # OS files
 .DS_Store
 Thumbs.db
+*.pem
 
 # Claude CLI
 .claude/
 
-# Snapshot files (updated by tests)
-# tests/testthat/_snaps/
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# =============================================================================
+# Exceptions - DO NOT IGNORE
+# =============================================================================
+
+# Visualizer source directories that must be tracked
+!visualizer/src/lib/
+!visualizer/src/data/
