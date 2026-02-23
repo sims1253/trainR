@@ -408,8 +408,10 @@ class DockerPiRunner:
 
     @property
     def workspace_dir(self) -> Path:
-        """Get the workspace directory for Docker mounts."""
-        return Path.cwd()
+        """Base directory for workspaces (uses temp directory)."""
+        temp_dir = Path(tempfile.gettempdir()) / "trainr_workspaces"
+        temp_dir.mkdir(parents=True, exist_ok=True)
+        return temp_dir
 
     def run_evaluation(
         self,
@@ -557,6 +559,8 @@ Write the tests now."""
 
         console.print(f"[dim]Running Docker+Pi batch mode with model: {model}[/dim]")
 
+        import shutil
+
         try:
             # Run container and wait for completion
             result = subprocess.run(
@@ -569,6 +573,14 @@ Write the tests now."""
             execution_time = time.time() - start_time
             stdout = result.stdout
             stderr = result.stderr
+
+            # Clean up unique workspace directory to save disk space
+            try:
+                if unique_workspace.exists():
+                    shutil.rmtree(unique_workspace)
+            except Exception:
+                # Don't fail the run if cleanup fails
+                pass
 
             # Parse JSON events from stdout for token usage
             token_usage = self._parse_token_usage(stdout)
@@ -597,6 +609,12 @@ Write the tests now."""
             }
 
         except subprocess.TimeoutExpired:
+            # Clean up workspace on timeout
+            try:
+                if unique_workspace.exists():
+                    shutil.rmtree(unique_workspace)
+            except Exception:
+                pass
             return {
                 "success": False,
                 "score": 0.0,
@@ -608,6 +626,12 @@ Write the tests now."""
                 "token_usage": {},
             }
         except Exception as e:
+            # Clean up workspace on error
+            try:
+                if unique_workspace.exists():
+                    shutil.rmtree(unique_workspace)
+            except Exception:
+                pass
             return {
                 "success": False,
                 "score": 0.0,
