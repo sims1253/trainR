@@ -25,6 +25,12 @@ export type {
   PairedDeltaV1,
   ProvenanceV1,
   EnvironmentMetadataV1,
+  // Optimization types
+  OptimizationTrajectoryPointV1,
+  OptimizationTrajectoryV1,
+  BestCandidateV1,
+  HoldoutMetricsV1,
+  HoldoutSummaryV1,
 } from "./schema";
 
 // Re-export validation functions

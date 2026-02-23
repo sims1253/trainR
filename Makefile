@@ -2,7 +2,7 @@
 # Three main workflows: benchmark, optimize, mine
 # Uses uv for Python tooling
 
-.PHONY: benchmark benchmark-smoke benchmark-all optimize optimize-test mine mine-all compare test lint validate-contracts
+.PHONY: benchmark benchmark-smoke benchmark-all optimize optimize-test mine mine-all compare test lint validate-contracts ci ci-quick
 
 # =============================================================================
 # 1. BENCHMARK: Evaluate a skill on tasks
@@ -77,6 +77,20 @@ mine-all:
 
 validate-contracts:
 	@uv run python scripts/validate_contracts.py
+
+# =============================================================================
+# CI: Continuous Integration
+# =============================================================================
+
+# Full CI suite (all checks + smoke experiment dry-run)
+ci:
+	@echo "=== CI SMOKE SUITE ==="
+	@bash scripts/ci_smoke.sh
+
+# Quick CI (skip smoke experiment, ~2 min)
+ci-quick:
+	@echo "=== CI SMOKE SUITE (quick) ==="
+	@bash scripts/ci_smoke.sh --quick
 
 compare:
 	@uv run python scripts/compare_results.py --output results/COMPARISON.md

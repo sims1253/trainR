@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "run_id": "opt-run-2026-02-23-001",
+  "best_candidate_id": "cand-best-f1n4l",
+  "holdout_size": 20,
+  "metrics": [
+    {
+      "metric_name": "Pass Rate",
+      "train_value": 0.72,
+      "holdout_value": 0.68,
+      "ci_low": 0.61,
+      "ci_high": 0.75,
+      "std_error": 0.035
+    },
+    {
+      "metric_name": "Easy Tasks",
+      "train_value": 0.92,
+      "holdout_value": 0.88,
+      "ci_low": 0.78,
+      "ci_high": 0.96,
+      "std_error": 0.042
+    },
+    {
+      "metric_name": "Medium Tasks",
+      "train_value": 0.72,
+      "holdout_value": 0.65,
+      "ci_low": 0.52,
+      "ci_high": 0.78,
+      "std_error": 0.058
+    },
+    {
+      "metric_name": "Hard Tasks",
+      "train_value": 0.52,
+      "holdout_value": 0.48,
+      "ci_low": 0.32,
+      "ci_high": 0.64,
+      "std_error": 0.082
+    }
+  ],
+  "holdout_pass_rate": 0.68,
+  "train_pass_rate": 0.72,
+  "generalization_gap": 0.04,
+  "generalization_ok": true,
+  "validated_at": "2026-02-23T19:30:00Z"
+}

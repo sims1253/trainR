@@ -1,8 +1,9 @@
 "use client"
 
 import { ThemeToggle } from "@/components/theme-toggle"
-import { GithubIcon, LayoutDashboardIcon } from "lucide-react"
+import { GithubIcon, LayoutDashboardIcon, TrendingUpIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import Link from "next/link"
 
 export function Header() {
   return (
@@ -13,13 +14,27 @@ export function Header() {
             <LayoutDashboardIcon className="w-8 h-8 text-primary" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">📊 trainR Benchmark</h1>
+            <h1 className="text-2xl font-bold tracking-tight">trainR Benchmark</h1>
             <p className="text-sm text-muted-foreground">
               AI Model Performance on R Package Testing Tasks
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <nav className="flex items-center gap-1 mr-2">
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/" className="gap-2">
+                <LayoutDashboardIcon className="w-4 h-4" />
+                Dashboard
+              </Link>
+            </Button>
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/optimization" className="gap-2">
+                <TrendingUpIcon className="w-4 h-4" />
+                Optimization
+              </Link>
+            </Button>
+          </nav>
           <ThemeToggle />
           <Button variant="outline" size="icon" asChild>
             <a 

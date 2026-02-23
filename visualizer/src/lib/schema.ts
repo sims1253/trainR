@@ -222,6 +222,112 @@ export interface VisualizerDataV1 {
 }
 
 // ============================================================================
+// Optimization Types
+// ============================================================================
+
+/**
+ * Single trajectory point in the optimization process
+ */
+export interface OptimizationTrajectoryPointV1 {
+  /** Iteration number (0-indexed) */
+  iteration: number;
+  /** Candidate identifier */
+  candidate_id: string;
+  /** Score achieved by this candidate */
+  score: number;
+  /** Timestamp of evaluation (ISO 8601) */
+  timestamp?: string;
+  /** Additional metrics (optional) */
+  metrics?: Record<string, number>;
+}
+
+/**
+ * Optimization trajectory data showing progress over iterations
+ */
+export interface OptimizationTrajectoryV1 {
+  /** Schema version */
+  schema_version: number;
+  /** Optimization run identifier */
+  run_id: string;
+  /** Model being optimized */
+  model_name: string;
+  /** Seed profile that optimization started from */
+  seed_profile: SupportProfileRefV1;
+  /** Trajectory points */
+  trajectory: OptimizationTrajectoryPointV1[];
+  /** Best candidate ID */
+  best_candidate_id: string;
+  /** Total iterations run */
+  total_iterations: number;
+  /** Optimization start time */
+  started_at: string;
+  /** Optimization end time */
+  completed_at?: string;
+}
+
+/**
+ * Best candidate from optimization
+ */
+export interface BestCandidateV1 {
+  /** Candidate identifier */
+  candidate_id: string;
+  /** Profile configuration */
+  profile: SupportProfileRefV1;
+  /** Final score on validation set */
+  score: number;
+  /** Delta improvement over seed */
+  delta_vs_seed: number;
+  /** Candidate content/configuration */
+  content?: Record<string, unknown>;
+  /** When this candidate was found (iteration number) */
+  found_at_iteration: number;
+}
+
+/**
+ * Holdout validation metrics
+ */
+export interface HoldoutMetricsV1 {
+  /** Metric name */
+  metric_name: string;
+  /** Value on training set */
+  train_value: number;
+  /** Value on holdout set */
+  holdout_value: number;
+  /** Confidence interval low (95%) */
+  ci_low?: number;
+  /** Confidence interval high (95%) */
+  ci_high?: number;
+  /** Standard error */
+  std_error?: number;
+}
+
+/**
+ * Holdout validation summary
+ */
+export interface HoldoutSummaryV1 {
+  /** Schema version */
+  schema_version: number;
+  /** Run identifier */
+  run_id: string;
+  /** Best candidate being validated */
+  best_candidate_id: string;
+  /** Holdout set size */
+  holdout_size: number;
+  /** Metrics comparison */
+  metrics: HoldoutMetricsV1[];
+  /** Overall holdout pass rate */
+  holdout_pass_rate: number;
+  /** Train pass rate for comparison */
+  train_pass_rate: number;
+  /** Generalization gap (train - holdout) */
+  generalization_gap: number;
+  /** Whether generalization is acceptable (gap < threshold) */
+  generalization_ok: boolean;
+  /** Timestamp of validation */
+  validated_at: string;
+}
+
+// ============================================================================
 // Validation Types
 // ============================================================================
 

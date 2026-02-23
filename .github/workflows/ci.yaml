@@ -1,0 +1,166 @@
+# =============================================================================
+# CI Workflow for trainR
+# =============================================================================
+# Runs on: push to main/develop, pull requests
+# 
+# Jobs:
+#   1. ci-smoke - Comprehensive smoke test suite
+#
+# Steps:
+#   - Install dependencies (uv, bun)
+#   - Run pytest (quick mode)
+#   - Run ruff linting
+#   - Run ty type checking
+#   - Validate config contracts
+#   - Validate schemas
+#   - Run smoke experiment (dry-run)
+# =============================================================================
+
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+# Cancel in-progress runs on the same branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Python version
+  PYTHON_VERSION: "3.12"
+  # UV version
+  UV_VERSION: "0.5.x"
+
+jobs:
+  ci-smoke:
+    name: CI Smoke Suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      # -----------------------------------------------------------------------
+      # Checkout
+      # -----------------------------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      # -----------------------------------------------------------------------
+      # Setup Python with uv
+      # -----------------------------------------------------------------------
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: ${{ env.UV_VERSION }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      # -----------------------------------------------------------------------
+      # Install dependencies
+      # -----------------------------------------------------------------------
+      - name: Install Python dependencies
+        run: uv sync --dev
+
+      # -----------------------------------------------------------------------
+      # Run CI Smoke Suite
+      # -----------------------------------------------------------------------
+      - name: Run pytest (quick mode)
+        run: uv run pytest tests/ -v --tb=short -x
+
+      - name: Run ruff linting
+        run: uv run ruff check .
+
+      - name: Run ruff format check
+        run: uv run ruff format . --check
+
+      - name: Run ty type checking
+        run: uv run ty check .
+        continue-on-error: true  # Type errors are warnings, not blockers
+
+      - name: Validate config contracts
+        run: uv run python scripts/validate_contracts.py
+
+      # -----------------------------------------------------------------------
+      # Schema Validation
+      # -----------------------------------------------------------------------
+      - name: Validate schemas
+        run: |
+          uv run python -c "
+          import sys
+          import json
+          from pathlib import Path
+
+          # Import schema validators
+          sys.path.insert(0, str(Path('.')))
+          from bench.schema.v1 import ManifestV1, ResultV1
+
+          errors = []
+
+          # Check for existing manifests
+          results_dir = Path('results')
+          if results_dir.exists():
+              for manifest_file in results_dir.glob('**/manifest.json'):
+                  try:
+                      data = json.loads(manifest_file.read_text())
+                      ManifestV1.model_validate(data)
+                      print(f'Valid: {manifest_file}')
+                  except Exception as e:
+                      errors.append(f'{manifest_file}: {e}')
+
+              # Check for results files
+              for results_file in results_dir.glob('**/results.jsonl'):
+                  try:
+                      for i, line in enumerate(results_file.read_text().strip().split('\n')):
+                          if line:
+                              data = json.loads(line)
+                              ResultV1.model_validate(data)
+                      print(f'Valid: {results_file}')
+                  except Exception as e:
+                      errors.append(f'{results_file}: {e}')
+
+          if errors:
+              for err in errors:
+                  print(f'ERROR: {err}', file=sys.stderr)
+              sys.exit(1)
+
+          print('Schema validation passed')
+          "
+
+      # -----------------------------------------------------------------------
+      # Smoke Experiment (dry-run only)
+      # -----------------------------------------------------------------------
+      - name: Validate smoke experiment config
+        run: |
+          if [ -f "configs/experiments/r_bench_smoke.yaml" ]; then
+            uv run python scripts/run_experiment.py \
+              --config configs/experiments/r_bench_smoke.yaml \
+              --dry-run
+          else
+            echo "No smoke config found, skipping"
+          fi
+
+      # -----------------------------------------------------------------------
+      # Summary
+      # -----------------------------------------------------------------------
+      - name: CI Summary
+        if: always()
+        run: |
+          echo "## CI Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| pytest | ${{ job.status }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| ruff lint | ${{ job.status }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| ruff format | ${{ job.status }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| ty check | completed |" >> $GITHUB_STEP_SUMMARY
+          echo "| contracts | ${{ job.status }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| schemas | ${{ job.status }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| smoke config | ${{ job.status }} |" >> $GITHUB_STEP_SUMMARY

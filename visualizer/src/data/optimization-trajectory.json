@@ -1,0 +1,192 @@
+{
+  "schema_version": 1,
+  "run_id": "opt-run-2026-02-23-001",
+  "model_name": "gpt-4o",
+  "seed_profile": {
+    "profile_id": "system_only",
+    "mode": "system_only",
+    "name": "System Prompt Only"
+  },
+  "trajectory": [
+    {
+      "iteration": 0,
+      "candidate_id": "cand-seed-001",
+      "score": 0.45,
+      "timestamp": "2026-02-23T18:00:00Z",
+      "metrics": {
+        "pass_rate": 0.45,
+        "avg_latency_ms": 1200,
+        "avg_cost": 0.012
+      }
+    },
+    {
+      "iteration": 1,
+      "candidate_id": "cand-001-a1b2c3",
+      "score": 0.48,
+      "timestamp": "2026-02-23T18:05:00Z",
+      "metrics": {
+        "pass_rate": 0.48,
+        "avg_latency_ms": 1150,
+        "avg_cost": 0.011
+      }
+    },
+    {
+      "iteration": 2,
+      "candidate_id": "cand-002-d4e5f6",
+      "score": 0.52,
+      "timestamp": "2026-02-23T18:10:00Z",
+      "metrics": {
+        "pass_rate": 0.52,
+        "avg_latency_ms": 1180,
+        "avg_cost": 0.013
+      }
+    },
+    {
+      "iteration": 3,
+      "candidate_id": "cand-003-g7h8i9",
+      "score": 0.55,
+      "timestamp": "2026-02-23T18:15:00Z",
+      "metrics": {
+        "pass_rate": 0.55,
+        "avg_latency_ms": 1220,
+        "avg_cost": 0.014
+      }
+    },
+    {
+      "iteration": 4,
+      "candidate_id": "cand-004-j0k1l2",
+      "score": 0.53,
+      "timestamp": "2026-02-23T18:20:00Z",
+      "metrics": {
+        "pass_rate": 0.53,
+        "avg_latency_ms": 1190,
+        "avg_cost": 0.012
+      }
+    },
+    {
+      "iteration": 5,
+      "candidate_id": "cand-005-m3n4o5",
+      "score": 0.58,
+      "timestamp": "2026-02-23T18:25:00Z",
+      "metrics": {
+        "pass_rate": 0.58,
+        "avg_latency_ms": 1250,
+        "avg_cost": 0.015
+      }
+    },
+    {
+      "iteration": 6,
+      "candidate_id": "cand-006-p6q7r8",
+      "score": 0.61,
+      "timestamp": "2026-02-23T18:30:00Z",
+      "metrics": {
+        "pass_rate": 0.61,
+        "avg_latency_ms": 1280,
+        "avg_cost": 0.016
+      }
+    },
+    {
+      "iteration": 7,
+      "candidate_id": "cand-007-s9t0u1",
+      "score": 0.59,
+      "timestamp": "2026-02-23T18:35:00Z",
+      "metrics": {
+        "pass_rate": 0.59,
+        "avg_latency_ms": 1260,
+        "avg_cost": 0.015
+      }
+    },
+    {
+      "iteration": 8,
+      "candidate_id": "cand-008-v2w3x4",
+      "score": 0.64,
+      "timestamp": "2026-02-23T18:40:00Z",
+      "metrics": {
+        "pass_rate": 0.64,
+        "avg_latency_ms": 1320,
+        "avg_cost": 0.018
+      }
+    },
+    {
+      "iteration": 9,
+      "candidate_id": "cand-009-y5z6a7",
+      "score": 0.62,
+      "timestamp": "2026-02-23T18:45:00Z",
+      "metrics": {
+        "pass_rate": 0.62,
+        "avg_latency_ms": 1300,
+        "avg_cost": 0.017
+      }
+    },
+    {
+      "iteration": 10,
+      "candidate_id": "cand-010-b8c9d0",
+      "score": 0.67,
+      "timestamp": "2026-02-23T18:50:00Z",
+      "metrics": {
+        "pass_rate": 0.67,
+        "avg_latency_ms": 1350,
+        "avg_cost": 0.019
+      }
+    },
+    {
+      "iteration": 11,
+      "candidate_id": "cand-011-e1f2g3",
+      "score": 0.65,
+      "timestamp": "2026-02-23T18:55:00Z",
+      "metrics": {
+        "pass_rate": 0.65,
+        "avg_latency_ms": 1330,
+        "avg_cost": 0.018
+      }
+    },
+    {
+      "iteration": 12,
+      "candidate_id": "cand-012-h4i5j6",
+      "score": 0.68,
+      "timestamp": "2026-02-23T19:00:00Z",
+      "metrics": {
+        "pass_rate": 0.68,
+        "avg_latency_ms": 1380,
+        "avg_cost": 0.020
+      }
+    },
+    {
+      "iteration": 13,
+      "candidate_id": "cand-013-k7l8m9",
+      "score": 0.70,
+      "timestamp": "2026-02-23T19:05:00Z",
+      "metrics": {
+        "pass_rate": 0.70,
+        "avg_latency_ms": 1400,
+        "avg_cost": 0.021
+      }
+    },
+    {
+      "iteration": 14,
+      "candidate_id": "cand-014-n0o1p2",
+      "score": 0.69,
+      "timestamp": "2026-02-23T19:10:00Z",
+      "metrics": {
+        "pass_rate": 0.69,
+        "avg_latency_ms": 1390,
+        "avg_cost": 0.020
+      }
+    },
+    {
+      "iteration": 15,
+      "candidate_id": "cand-best-f1n4l",
+      "score": 0.72,
+      "timestamp": "2026-02-23T19:15:00Z",
+      "metrics": {
+        "pass_rate": 0.72,
+        "avg_latency_ms": 1450,
+        "avg_cost": 0.022
+      }
+    }
+  ],
+  "best_candidate_id": "cand-best-f1n4l",
+  "total_iterations": 16,
+  "started_at": "2026-02-23T18:00:00Z",
+  "completed_at": "2026-02-23T19:20:00Z"
+}
