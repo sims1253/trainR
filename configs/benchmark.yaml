@@ -7,7 +7,7 @@
 models:
   - glm-5
   - minimax-m2.5
-  - gpt-5-nano
+  # - gpt-5-nano  # Commented out in llm.yaml
   - gpt-oss-120b
   - step-3.5-flash
   - trinity-large-preview
@@ -46,14 +46,15 @@ judge:
   mode: "ensemble"
   
   # Single judge model (references llm.yaml)
-  single: glm-5-free
+  single: glm-5
   
   # Ensemble configuration (used when mode: "ensemble")
   ensemble:
     judges:
-      - glm-5-free
-      - kimi-k2.5-free
-      - minimax-m2.5-free
+      - glm-5
+      # - kimi-k2.5  # Commented out in llm.yaml
+      - minimax-m2.5
+      - gpt-oss-120b
     voting: "majority"  # "majority" | "average" | "weighted"
 
 # Skill configuration (optional)

@@ -2,7 +2,7 @@
 # Three main workflows: benchmark, optimize, mine
 # Uses uv for Python tooling
 
-.PHONY: benchmark benchmark-smoke benchmark-all optimize optimize-test mine mine-all compare test lint
+.PHONY: benchmark benchmark-smoke benchmark-all optimize optimize-test mine mine-all compare test lint validate-contracts
 
 # =============================================================================
 # 1. BENCHMARK: Evaluate a skill on tasks
@@ -74,6 +74,9 @@ mine-all:
 # =============================================================================
 # UTILITIES
 # =============================================================================
+
+validate-contracts:
+	@uv run python scripts/validate_contracts.py
 
 compare:
 	@uv run python scripts/compare_results.py --output results/COMPARISON.md
