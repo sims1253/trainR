@@ -1,0 +1,42 @@
+# Default Tool Profile Configuration
+# Standard configuration for R package evaluation tools
+
+# Schema version
+schema_version: "1.0"
+
+# Tool identification
+tool_id: "r-eval"
+name: "R Evaluation Tool"
+version: "v1"
+description: "Default R package evaluation tool with standard test runner configuration"
+
+# Tool configuration
+config:
+  parameters:
+    r_version: "4.3"
+    test_framework: "testthat"
+    coverage_enabled: true
+    strict_mode: false
+    timeout_per_test: 60
+  environment:
+    R_LIBS_USER: "/tmp/r_libs"
+    NOT_CRAN: "true"
+  mounts:
+    - "/var/run/docker.sock:/var/run/docker.sock"
+  command: null
+  args:
+    - "--no-multiarch"
+    - "--with-keep.source"
+
+# State
+enabled: true
+
+# Variant tracking
+variant: null
+base_version: null
+
+# Metadata
+tags:
+  - r
+  - default
+  - evaluation

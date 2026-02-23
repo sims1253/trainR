@@ -1,6 +1,12 @@
 #!/usr/bin/env python
 """Run benchmarks in parallel with progress tracking and status display.
 
+DEPRECATED: This script is transitional. Use run_experiment.py instead.
+
+Migration Guide:
+    OLD: uv run python scripts/run_parallel_benchmark.py --models all --tasks "tasks/mined/*.json"
+    NEW: uv run python scripts/run_experiment.py --config configs/experiments/your_config.yaml
+
 This script orchestrates parallel execution of benchmark runs across multiple
 models, respecting provider-level concurrency limits.
 
@@ -34,6 +40,7 @@ import os
 import shutil
 import statistics
 import sys
+import tempfile
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -50,6 +57,174 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import yaml
 
 from config import get_llm_config
+from rich.console import Console
+
+console = Console()
+
+
+# ============================================================================
+# DEPRECATION LAYER
+# ============================================================================
+
+DEPRECATION_WARNING = """
+WARNING: run_parallel_benchmark.py is DEPRECATED and will be removed in a future version.
+
+Use the unified experiment runner instead:
+    uv run python scripts/run_experiment.py --config configs/experiments/your_config.yaml
+
+To create a config file, see: configs/experiments/r_bench_smoke.yaml for an example.
+
+For parallel execution, set 'execution.parallel_workers' in your config.
+"""
+
+
+def print_deprecation_warning(replacement_hint: str | None = None) -> None:
+    """Print deprecation warning with migration guidance."""
+    console.print(f"\n[yellow]{DEPRECATION_WARNING}[/yellow]")
+    if replacement_hint:
+        console.print(f"[cyan]Suggested replacement:[/cyan]\n  {replacement_hint}\n")
+
+
+def translate_args_to_experiment_config(args: argparse.Namespace) -> dict:
+    """Translate legacy run_parallel_benchmark.py args to experiment config format.
+
+    Args:
+        args: Parsed argparse namespace from legacy CLI
+
+    Returns:
+        Dict representation of experiment config
+    """
+    # Resolve task paths
+    import glob
+
+    if args.tasks is None or args.tasks == ["all"]:
+        task_paths = []
+        for task_dir in ["tasks/mined", "tasks/train", "tasks/dev", "tasks/held_out"]:
+            task_paths.extend(glob.glob(f"{task_dir}/*.json"))
+        task_paths = sorted(task_paths)
+    else:
+        task_paths = []
+        for pattern in args.tasks:
+            path = Path(pattern)
+            if path.exists():
+                task_paths.append(str(path))
+            else:
+                matched = glob.glob(pattern)
+                task_paths.extend(matched)
+
+    # Resolve model names
+    model_names = args.models if args.models and "all" not in args.models else []
+    if not model_names or "all" in args.models:
+        # Get all available models
+        llm_config = get_llm_config()
+        model_names = llm_config.list_models()
+
+    # Build output directory
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_dir = args.output.replace("{timestamp}", timestamp)
+
+    return {
+        "name": f"parallel_benchmark_{timestamp}",
+        "description": "Migrated from run_parallel_benchmark.py",
+        "schema_version": "1.0",
+        "models": {"names": model_names},
+        "tasks": {
+            "selection": "files",
+            "files": task_paths[:10]
+            if len(task_paths) > 10
+            else task_paths,  # Limit for config readability
+            "dir": "tasks",
+        },
+        "skill": {"no_skill": True},
+        "execution": {
+            "timeout": args.timeout,
+            "docker_image": "posit-gskill-eval:latest",
+            "repeats": 1,
+            "parallel_workers": args.max_per_provider,
+            "save_trajectories": True,
+            "save_traces": args.verbose,
+        },
+        "output": {"dir": output_dir},
+        "determinism": {"seed": None},
+    }
+
+
+def run_via_unified_runner(args: argparse.Namespace) -> int:
+    """Attempt to run via the unified experiment runner.
+
+    Args:
+        args: Parsed argparse namespace
+
+    Returns:
+        Exit code (0 for success, non-zero for failure)
+    """
+    print_deprecation_warning(
+        "uv run python scripts/run_experiment.py --config <config.yaml>\n"
+        "    # Note: Set execution.parallel_workers in config for parallelism"
+    )
+
+    # Translate args to experiment config
+    exp_config = translate_args_to_experiment_config(args)
+
+    # Write to temporary config file
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+        yaml.dump(exp_config, f)
+        temp_config_path = f.name
+
+    try:
+        console.print(f"[dim]Generated temporary experiment config: {temp_config_path}[/dim]")
+        console.print("[dim]Running via unified experiment runner...[/dim]\n")
+
+        # Import and run the unified runner
+        from run_experiment import main as run_experiment_main
+
+        # Monkey-patch sys.argv to pass our config
+        original_argv = sys.argv
+        sys.argv = [
+            "run_experiment.py",
+            "--config",
+            temp_config_path,
+        ]
+        if args.verbose:
+            sys.argv.append("--verbose")
+
+        try:
+            run_experiment_main()
+            return 0
+        except SystemExit as e:
+            code = e.code
+            return code if isinstance(code, int) else 0
+        finally:
+            sys.argv = original_argv
+
+    finally:
+        # Clean up temp file
+        try:
+            os.unlink(temp_config_path)
+        except Exception:
+            pass
+
+
+def get_migration_command(args: argparse.Namespace) -> str:
+    """Generate a migration command suggestion based on args."""
+    parts = ["uv run python scripts/run_experiment.py --config <your_config.yaml>"]
+
+    parts.append("\n# Config file should include:")
+    if args.models and "all" not in args.models:
+        parts.append(f"#   models.names: {args.models}")
+    if args.max_per_provider:
+        parts.append(f"#   execution.parallel_workers: {args.max_per_provider}")
+    if args.timeout:
+        parts.append(f"#   execution.timeout: {args.timeout}")
+    if args.output:
+        parts.append(f"#   output.dir: {args.output}")
+
+    return "\n".join(parts)
+
+
+# ============================================================================
+# ORIGINAL IMPLEMENTATION (with deprecation hooks)
+# ============================================================================
 
 
 class ProgressDisplay:
@@ -117,7 +292,7 @@ class ProgressDisplay:
         empty_count = width - filled_count
         return self.FILLED * filled_count + self.EMPTY * empty_count
 
-    def _format_worker_line(self, worker: WorkerInfo, max_width: int) -> str:
+    def _format_worker_line(self, worker: "WorkerInfo", max_width: int) -> str:
         """Format a single worker line with truncation."""
         elapsed = worker.format_elapsed()
         # Format: "provider/model → task_name (elapsed)"
@@ -497,7 +672,8 @@ def filter_models(
         Filtered models grouped by provider
     """
     if not model_filter or "all" in model_filter:
-        return models_by_provider
+        # Return a copy to avoid modifying the original
+        return {k: list(v) for k, v in models_by_provider.items()}
 
     filtered: dict[str, list[dict]] = {}
 
@@ -1270,31 +1446,38 @@ async def main_async(args: argparse.Namespace) -> int:
     return 0
 
 
-def main() -> int:
-    """Main entry point."""
+def build_arg_parser() -> argparse.ArgumentParser:
+    """Build the argument parser for run_parallel_benchmark.py."""
     parser = argparse.ArgumentParser(
-        description="Run benchmarks in parallel with progress tracking",
+        description="[DEPRECATED] Run benchmarks in parallel. Use run_experiment.py instead.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
+DEPRECATION NOTICE:
+    This script is deprecated. Please use the unified experiment runner:
+    
+    uv run python scripts/run_experiment.py --config configs/experiments/your_config.yaml
+
+    For parallel execution, set 'execution.parallel_workers' in your config.
+
 Examples:
-  # Run all models on all tasks (default)
-  uv run python scripts/run_parallel_benchmark.py --models all
+    # Run all models on all tasks (default)
+    uv run python scripts/run_parallel_benchmark.py --models all
 
-  # Run specific models on all tasks
-  uv run python scripts/run_parallel_benchmark.py --models glm-5-free minimax-m2.5-free
+    # Run specific models on all tasks
+    uv run python scripts/run_parallel_benchmark.py --models glm-5-free minimax-m2.5-free
 
-  # Run specific tasks
-  uv run python scripts/run_parallel_benchmark.py \\
-      --tasks tasks/mined/tidyverse_readr_1615.json \\
-      --models all
+    # Run specific tasks
+    uv run python scripts/run_parallel_benchmark.py \\
+        --tasks tasks/mined/tidyverse_readr_1615.json \\
+        --models all
 
-  # Custom concurrency and output
-  uv run python scripts/run_parallel_benchmark.py \\
-      --tasks "tasks/mined/*.json" \\
-      --models all \\
-      --max-per-provider 3 \\
-      --output results/my_benchmark
-""",
+    # Custom concurrency and output
+    uv run python scripts/run_parallel_benchmark.py \\
+        --tasks "tasks/mined/*.json" \\
+        --models all \\
+        --max-per-provider 3 \\
+        --output results/my_benchmark
+        """,
     )
 
     parser.add_argument(
@@ -1345,7 +1528,28 @@ Examples:
         help="Timeout in seconds per benchmark run (default: 900 = 15 min)",
     )
 
+    # Migration option
+    parser.add_argument(
+        "--use-unified-runner",
+        action="store_true",
+        help="Route through the unified run_experiment.py (experimental)",
+    )
+
+    return parser
+
+
+def main() -> int:
+    """Main entry point."""
+    parser = build_arg_parser()
     args = parser.parse_args()
+
+    # Always show deprecation warning
+    migration_cmd = get_migration_command(args)
+    print_deprecation_warning(migration_cmd)
+
+    # If explicitly requested, use unified runner
+    if args.use_unified_runner:
+        return run_via_unified_runner(args)
 
     # Run async main
     return asyncio.run(main_async(args))

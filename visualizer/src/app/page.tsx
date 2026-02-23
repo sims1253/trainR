@@ -53,7 +53,7 @@ function DataError({ error }: { error: string }) {
                 To fix this issue, regenerate the benchmark data:
               </p>
               <code className="block p-2 bg-muted rounded text-sm">
-                uv run python scripts/aggregate_results.py
+                uv run python scripts/export_visualizer_data.py --sample
               </code>
             </div>
           </div>

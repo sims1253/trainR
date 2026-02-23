@@ -1,6 +1,12 @@
 #!/usr/bin/env python
 """Run benchmark: evaluate task set across multiple models.
 
+DEPRECATED: This script is transitional. Use run_experiment.py instead.
+
+Migration Guide:
+    OLD: uv run python scripts/run_benchmark.py --config configs/benchmark.yaml
+    NEW: uv run python scripts/run_experiment.py --config configs/experiments/your_config.yaml
+
 Quick test example:
     uv run python scripts/run_benchmark.py --task tasks/mined/tidyverse_readr_1615.json --worker-model glm-5-free --debug
 """
@@ -10,6 +16,7 @@ import json
 import logging
 import os
 import sys
+import tempfile
 import time
 from datetime import datetime
 from pathlib import Path
@@ -30,6 +37,187 @@ from task_generator import TaskGenerator
 
 console = Console()
 logger = logging.getLogger(__name__)
+
+
+# ============================================================================
+# DEPRECATION LAYER
+# ============================================================================
+
+DEPRECATION_WARNING = """
+WARNING: run_benchmark.py is DEPRECATED and will be removed in a future version.
+
+Use the unified experiment runner instead:
+    uv run python scripts/run_experiment.py --config configs/experiments/your_config.yaml
+
+To create a config file, see: configs/experiments/r_bench_smoke.yaml for an example.
+"""
+
+
+def print_deprecation_warning(replacement_hint: str | None = None) -> None:
+    """Print deprecation warning with migration guidance."""
+    console.print(f"\n[yellow]{DEPRECATION_WARNING}[/yellow]")
+    if replacement_hint:
+        console.print(f"[cyan]Suggested replacement:[/cyan]\n  {replacement_hint}\n")
+
+
+def translate_args_to_experiment_config(args: argparse.Namespace) -> dict:
+    """Translate legacy run_benchmark.py args to experiment config format.
+
+    Args:
+        args: Parsed argparse namespace from legacy CLI
+
+    Returns:
+        Dict representation of experiment config
+    """
+    # Load legacy config to extract model/task info
+    config_path = Path(args.config)
+    legacy_config = {}
+    if config_path.exists():
+        with open(config_path) as f:
+            legacy_config = yaml.safe_load(f) or {}
+
+    # Extract model names
+    model_names = []
+    if args.worker_model:
+        model_names = [args.worker_model]
+    elif isinstance(legacy_config.get("models"), list):
+        for m in legacy_config["models"]:
+            if isinstance(m, str):
+                model_names.append(m)
+            elif isinstance(m, dict) and m.get("name"):
+                model_names.append(m["name"])
+
+    # Build task selection
+    tasks_config = {"dir": args.tasks_dir}
+    if args.task:
+        task_path = Path(args.task)
+        if task_path.exists():
+            tasks_config["selection"] = "files"
+            tasks_config["files"] = [str(task_path)]
+        else:
+            tasks_config["selection"] = "task_id"
+            tasks_config["task_id"] = args.task
+    else:
+        task_cfg = legacy_config.get("tasks", {})
+        tasks_config["selection"] = task_cfg.get("selection", "splits")
+        if tasks_config["selection"] == "splits":
+            tasks_config["splits"] = task_cfg.get("splits", ["dev", "held_out"])
+        elif tasks_config["selection"] == "files":
+            tasks_config["files"] = task_cfg.get("files", [])
+
+    # Build skill config
+    skill_cfg = {}
+    if args.skill:
+        skill_cfg["path"] = args.skill
+    elif legacy_config.get("skill"):
+        skill_cfg["path"] = legacy_config["skill"]
+    else:
+        skill_cfg["no_skill"] = True
+
+    # Build execution config
+    settings = legacy_config.get("settings", {})
+    execution_cfg = {
+        "timeout": settings.get("timeout", 600),
+        "docker_image": settings.get("docker_image", "posit-gskill-eval:latest"),
+        "repeats": settings.get("repeats", 1),
+        "parallel_workers": 1,
+        "save_trajectories": settings.get("save_trajectories", True),
+        "save_traces": args.debug or settings.get("save_all_traces", False),
+    }
+
+    # Build output config
+    output_dir = args.output_dir or settings.get("results_dir", "results/benchmarks")
+
+    return {
+        "name": f"legacy_benchmark_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+        "description": "Migrated from run_benchmark.py",
+        "schema_version": "1.0",
+        "models": {"names": model_names},
+        "tasks": tasks_config,
+        "skill": skill_cfg,
+        "execution": execution_cfg,
+        "output": {"dir": output_dir},
+        "determinism": {"seed": None},
+    }
+
+
+def run_via_unified_runner(args: argparse.Namespace) -> int:
+    """Attempt to run via the unified experiment runner.
+
+    Args:
+        args: Parsed argparse namespace
+
+    Returns:
+        Exit code (0 for success, non-zero for failure)
+    """
+    print_deprecation_warning(f"uv run python scripts/run_experiment.py --config <config.yaml>")
+
+    # Translate args to experiment config
+    exp_config = translate_args_to_experiment_config(args)
+
+    # Write to temporary config file
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+        yaml.dump(exp_config, f)
+        temp_config_path = f.name
+
+    try:
+        console.print(f"[dim]Generated temporary experiment config: {temp_config_path}[/dim]")
+        console.print("[dim]Running via unified experiment runner...[/dim]\n")
+
+        # Import and run the unified runner
+        from run_experiment import (
+            main as run_experiment_main,
+            validate_config,
+            print_config_summary,
+            run_with_progress,
+        )
+        from bench.experiments import ExperimentRunner
+
+        # Monkey-patch sys.argv to pass our config
+        original_argv = sys.argv
+        sys.argv = [
+            "run_experiment.py",
+            "--config",
+            temp_config_path,
+        ]
+        if args.verbose:
+            sys.argv.append("--verbose")
+
+        try:
+            run_experiment_main()
+            return 0
+        except SystemExit as e:
+            code = e.code
+            return code if isinstance(code, int) else 0
+        finally:
+            sys.argv = original_argv
+
+    finally:
+        # Clean up temp file
+        try:
+            os.unlink(temp_config_path)
+        except Exception:
+            pass
+
+
+def get_migration_command(args: argparse.Namespace) -> str:
+    """Generate a migration command suggestion based on args."""
+    parts = ["uv run python scripts/run_experiment.py"]
+    parts.append("--config <your_config.yaml>")
+
+    if args.output_dir:
+        parts.append(f"--output-dir {args.output_dir}")
+    if args.worker_model:
+        parts.append(f"# models.names: [{args.worker_model}]")
+    if args.task:
+        parts.append(f"# tasks.selection: files, tasks.files: [{args.task}]")
+
+    return "\n    ".join(parts)
+
+
+# ============================================================================
+# ORIGINAL IMPLEMENTATION (with deprecation hooks)
+# ============================================================================
 
 
 def resolve_model(model_name: str) -> dict:
@@ -442,8 +630,25 @@ def print_summary(run: BenchmarkRun) -> None:
     console.print(table)
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description="Run benchmark across models")
+def build_arg_parser() -> argparse.ArgumentParser:
+    """Build the argument parser for run_benchmark.py."""
+    parser = argparse.ArgumentParser(
+        description="[DEPRECATED] Run benchmark across models. Use run_experiment.py instead.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+DEPRECATION NOTICE:
+    This script is deprecated. Please use the unified experiment runner:
+    
+    uv run python scripts/run_experiment.py --config configs/experiments/your_config.yaml
+
+Examples:
+    # Quick test with single task and model
+    uv run python scripts/run_benchmark.py --task tasks/mined/tidyverse_readr_1615.json --worker-model glm-5-free --debug
+
+    # Run with config file
+    uv run python scripts/run_benchmark.py --config configs/benchmark.yaml
+        """,
+    )
     parser.add_argument(
         "--config",
         default="configs/benchmark.yaml",
@@ -490,8 +695,30 @@ def main() -> None:
         help="Enable debug mode with full trace logging",
     )
 
+    # Migration option
+    parser.add_argument(
+        "--use-unified-runner",
+        action="store_true",
+        help="Route through the unified run_experiment.py (experimental)",
+    )
+
+    return parser
+
+
+def main() -> None:
+    parser = build_arg_parser()
     args = parser.parse_args()
 
+    # Always show deprecation warning
+    migration_cmd = get_migration_command(args)
+    print_deprecation_warning(migration_cmd)
+
+    # If explicitly requested, use unified runner
+    if args.use_unified_runner:
+        exit_code = run_via_unified_runner(args)
+        sys.exit(exit_code)
+
+    # Otherwise, continue with legacy implementation
     logging.basicConfig(
         level=logging.DEBUG if args.verbose or args.debug else logging.INFO,
         format="%(message)s",

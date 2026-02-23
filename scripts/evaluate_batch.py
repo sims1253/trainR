@@ -1,10 +1,18 @@
-"""Run batch evaluations with parallel execution and YAML configuration."""
+"""Run batch evaluations with parallel execution and YAML configuration.
+
+DEPRECATED: This script is transitional. Use run_experiment.py instead.
+
+Migration Guide:
+    OLD: uv run python scripts/evaluate_batch.py --config configs/evaluation.yaml
+    NEW: uv run python scripts/run_experiment.py --config configs/experiments/your_config.yaml
+"""
 
 import argparse
 import json
 import logging
 import os
 import sys
+import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
@@ -12,6 +20,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+import yaml
 from rich.console import Console
 from rich.panel import Panel
 from rich.progress import BarColumn, Progress, SpinnerColumn, TaskProgressColumn, TextColumn
@@ -24,6 +33,173 @@ from task_generator import TaskGenerator
 
 console = Console()
 logger = logging.getLogger(__name__)
+
+
+# ============================================================================
+# DEPRECATION LAYER
+# ============================================================================
+
+DEPRECATION_WARNING = """
+WARNING: evaluate_batch.py is DEPRECATED and will be removed in a future version.
+
+Use the unified experiment runner instead:
+    uv run python scripts/run_experiment.py --config configs/experiments/your_config.yaml
+
+To create a config file, see: configs/experiments/r_bench_smoke.yaml for an example.
+"""
+
+
+def print_deprecation_warning(replacement_hint: str | None = None) -> None:
+    """Print deprecation warning with migration guidance."""
+    console.print(f"\n[yellow]{DEPRECATION_WARNING}[/yellow]")
+    if replacement_hint:
+        console.print(f"[cyan]Suggested replacement:[/cyan]\n  {replacement_hint}\n")
+
+
+def translate_args_to_experiment_config(
+    args: argparse.Namespace, legacy_config: EvaluationConfig
+) -> dict:
+    """Translate legacy evaluate_batch.py args to experiment config format.
+
+    Args:
+        args: Parsed argparse namespace from legacy CLI
+        legacy_config: Loaded EvaluationConfig from the legacy config file
+
+    Returns:
+        Dict representation of experiment config
+    """
+    # Build model names list
+    model_names = []
+    if args.model:
+        model_names = [args.model]
+    else:
+        model_names = legacy_config.model.get_models()
+
+    # Build task selection
+    tasks_config = {
+        "dir": legacy_config.tasks.dir,
+        "selection": "splits",
+        "splits": args.splits.split(",") if args.splits else legacy_config.tasks.splits,
+    }
+
+    # Build skill config
+    skill_cfg = {}
+    if args.no_skill or legacy_config.skill.no_skill:
+        skill_cfg["no_skill"] = True
+    elif legacy_config.skill.path:
+        skill_cfg["path"] = legacy_config.skill.path
+
+    # Build output config
+    output_dir = args.output or legacy_config.output.dir
+
+    return {
+        "name": f"batch_eval_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+        "description": "Migrated from evaluate_batch.py",
+        "schema_version": "1.0",
+        "models": {"names": model_names},
+        "tasks": tasks_config,
+        "skill": skill_cfg,
+        "execution": {
+            "timeout": legacy_config.execution.timeout,
+            "docker_image": legacy_config.execution.docker_image,
+            "repeats": 1,
+            "parallel_workers": args.workers if args.workers else legacy_config.workers.count,
+            "save_trajectories": legacy_config.output.save_trajectories,
+            "save_traces": args.verbose,
+        },
+        "output": {"dir": str(Path(output_dir).parent) if output_dir else "results/experiments"},
+        "determinism": {"seed": None},
+    }
+
+
+def run_via_unified_runner(args: argparse.Namespace) -> int:
+    """Attempt to run via the unified experiment runner.
+
+    Args:
+        args: Parsed argparse namespace
+
+    Returns:
+        Exit code (0 for success, non-zero for failure)
+    """
+    print_deprecation_warning("uv run python scripts/run_experiment.py --config <config.yaml>")
+
+    # Load legacy config first
+    config_path = Path(args.config)
+    if not config_path.exists():
+        console.print(f"[red]Config file not found: {config_path}[/red]")
+        return 1
+
+    cli_overrides = {
+        "workers": args.workers,
+        "model": args.model,
+        "no_skill": args.no_skill,
+        "splits": args.splits.split(",") if args.splits else None,
+        "max_tasks": args.max_tasks,
+    }
+
+    legacy_config = load_config(config_path, cli_overrides)
+
+    # Translate args to experiment config
+    exp_config = translate_args_to_experiment_config(args, legacy_config)
+
+    # Write to temporary config file
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+        yaml.dump(exp_config, f)
+        temp_config_path = f.name
+
+    try:
+        console.print(f"[dim]Generated temporary experiment config: {temp_config_path}[/dim]")
+        console.print("[dim]Running via unified experiment runner...[/dim]\n")
+
+        # Import and run the unified runner
+        from run_experiment import main as run_experiment_main
+
+        # Monkey-patch sys.argv to pass our config
+        original_argv = sys.argv
+        sys.argv = [
+            "run_experiment.py",
+            "--config",
+            temp_config_path,
+        ]
+        if args.verbose:
+            sys.argv.append("--verbose")
+
+        try:
+            run_experiment_main()
+            return 0
+        except SystemExit as e:
+            code = e.code
+            return code if isinstance(code, int) else 0
+        finally:
+            sys.argv = original_argv
+
+    finally:
+        # Clean up temp file
+        try:
+            os.unlink(temp_config_path)
+        except Exception:
+            pass
+
+
+def get_migration_command(args: argparse.Namespace) -> str:
+    """Generate a migration command suggestion based on args."""
+    parts = ["uv run python scripts/run_experiment.py --config <your_config.yaml>"]
+
+    if args.workers:
+        parts.append(f"# execution.parallel_workers: {args.workers}")
+    if args.model:
+        parts.append(f"# models.names: [{args.model}]")
+    if args.no_skill:
+        parts.append("# skill.no_skill: true")
+    if args.splits:
+        parts.append(f"# tasks.splits: [{args.splits}]")
+
+    return "\n    ".join(parts)
+
+
+# ============================================================================
+# ORIGINAL IMPLEMENTATION (with deprecation hooks)
+# ============================================================================
 
 
 def get_required_api_key_for_model(model: str) -> tuple[str | None, str | None]:
@@ -298,8 +474,28 @@ def print_summary(output: dict) -> None:
     console.print(table)
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description="Run batch evaluations with parallel execution")
+def build_arg_parser() -> argparse.ArgumentParser:
+    """Build the argument parser for evaluate_batch.py."""
+    parser = argparse.ArgumentParser(
+        description="[DEPRECATED] Run batch evaluations. Use run_experiment.py instead.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+DEPRECATION NOTICE:
+    This script is deprecated. Please use the unified experiment runner:
+    
+    uv run python scripts/run_experiment.py --config configs/experiments/your_config.yaml
+
+Examples:
+    # Run with config file
+    uv run python scripts/evaluate_batch.py --config configs/evaluation.yaml
+
+    # Override model and workers
+    uv run python scripts/evaluate_batch.py --config configs/evaluation.yaml --model glm-5-free --workers 4
+
+    # Run without skill (baseline)
+    uv run python scripts/evaluate_batch.py --config configs/evaluation.yaml --no-skill
+        """,
+    )
     parser.add_argument(
         "--config",
         "-c",
@@ -342,13 +538,36 @@ def main() -> None:
         help="Override output file path",
     )
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
+
+    # Migration option
+    parser.add_argument(
+        "--use-unified-runner",
+        action="store_true",
+        help="Route through the unified run_experiment.py (experimental)",
+    )
+
+    return parser
+
+
+def main() -> None:
+    parser = build_arg_parser()
     args = parser.parse_args()
+
+    # Always show deprecation warning
+    migration_cmd = get_migration_command(args)
+    print_deprecation_warning(migration_cmd)
 
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
         format="%(message)s",
     )
 
+    # If explicitly requested, use unified runner
+    if args.use_unified_runner:
+        exit_code = run_via_unified_runner(args)
+        sys.exit(exit_code)
+
+    # Otherwise, continue with legacy implementation
     # Load config first to determine which model(s) will be used
     config_path = Path(args.config)
     if not config_path.exists():

@@ -2,51 +2,150 @@
   "visualizer_data_version": 1,
   "models": [
     {
-      "name": "sample-model",
-      "display_name": "Sample Model",
-      "provider": "example",
+      "name": "gpt-4o",
+      "display_name": "GPT-4o",
+      "provider": "openai",
       "results": {
         "no_skill": {
           "overall": {
-            "pass_rate": 0.5,
-            "total": 10,
-            "passed": 5,
-            "failed": 5
+            "pass_rate": 0.45,
+            "total": 100,
+            "passed": 45,
+            "failed": 55
           },
           "by_difficulty": {
-            "easy": 0.8,
-            "medium": 0.5,
+            "easy": 0.75,
+            "medium": 0.4,
             "hard": 0.2
           },
           "by_package": {
-            "cli": 0.6,
-            "dplyr": 0.4
+            "dplyr": 0.5,
+            "ggplot2": 0.4,
+            "testthat": 0.45,
+            "cli": 0.5
           }
         },
         "posit_skill": {
           "overall": {
-            "pass_rate": 0.7,
-            "total": 10,
-            "passed": 7,
-            "failed": 3
+            "pass_rate": 0.68,
+            "total": 100,
+            "passed": 68,
+            "failed": 32
           },
           "by_difficulty": {
             "easy": 0.9,
-            "medium": 0.7,
+            "medium": 0.65,
             "hard": 0.5
           },
           "by_package": {
-            "cli": 0.8,
-            "dplyr": 0.6
+            "dplyr": 0.72,
+            "ggplot2": 0.65,
+            "testthat": 0.68,
+            "cli": 0.7
+          }
+        }
+      }
+    },
+    {
+      "name": "claude-3-5-sonnet",
+      "display_name": "Claude 3.5 Sonnet",
+      "provider": "anthropic",
+      "results": {
+        "no_skill": {
+          "overall": {
+            "pass_rate": 0.5,
+            "total": 100,
+            "passed": 50,
+            "failed": 50
+          },
+          "by_difficulty": {
+            "easy": 0.8,
+            "medium": 0.45,
+            "hard": 0.25
+          },
+          "by_package": {
+            "dplyr": 0.55,
+            "ggplot2": 0.45,
+            "testthat": 0.5,
+            "cli": 0.55
+          }
+        },
+        "posit_skill": {
+          "overall": {
+            "pass_rate": 0.75,
+            "total": 100,
+            "passed": 75,
+            "failed": 25
+          },
+          "by_difficulty": {
+            "easy": 0.95,
+            "medium": 0.72,
+            "hard": 0.58
+          },
+          "by_package": {
+            "dplyr": 0.78,
+            "ggplot2": 0.72,
+            "testthat": 0.75,
+            "cli": 0.77
+          }
+        }
+      }
+    },
+    {
+      "name": "glm-4.5",
+      "display_name": "GLM-4.5",
+      "provider": "opencode",
+      "results": {
+        "no_skill": {
+          "overall": {
+            "pass_rate": 0.35,
+            "total": 100,
+            "passed": 35,
+            "failed": 65
+          },
+          "by_difficulty": {
+            "easy": 0.6,
+            "medium": 0.3,
+            "hard": 0.15
+          },
+          "by_package": {
+            "dplyr": 0.38,
+            "ggplot2": 0.32,
+            "testthat": 0.35,
+            "cli": 0.38
+          }
+        },
+        "posit_skill": {
+          "overall": {
+            "pass_rate": 0.55,
+            "total": 100,
+            "passed": 55,
+            "failed": 45
+          },
+          "by_difficulty": {
+            "easy": 0.78,
+            "medium": 0.52,
+            "hard": 0.35
+          },
+          "by_package": {
+            "dplyr": 0.58,
+            "ggplot2": 0.52,
+            "testthat": 0.55,
+            "cli": 0.58
           }
         }
       }
     }
   ],
   "metadata": {
-    "last_updated": "2026-02-23T00:00:00Z",
-    "total_tasks": 10,
-    "packages": ["cli", "dplyr"],
-    "runs_included": 1
+    "last_updated": "2026-02-23T20:57:44Z",
+    "total_tasks": 100,
+    "packages": [
+      "cli",
+      "dplyr",
+      "ggplot2",
+      "testthat"
+    ],
+    "runs_included": 2
   }
 }

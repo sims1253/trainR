@@ -1,0 +1,43 @@
+# Python Tool Profile Configuration
+# Standard configuration for Python package evaluation
+
+# Schema version
+schema_version: "1.0"
+
+# Tool identification
+tool_id: "python-eval"
+name: "Python Evaluation Tool"
+version: "v1"
+description: "Default Python package evaluation tool with pytest configuration"
+
+# Tool configuration
+config:
+  parameters:
+    python_version: "3.11"
+    test_framework: "pytest"
+    coverage_enabled: true
+    strict_mode: false
+    timeout_per_test: 60
+  environment:
+    PYTHONDONTWRITEBYTECODE: "1"
+    PYTHONUNBUFFERED: "1"
+  mounts:
+    - "/var/run/docker.sock:/var/run/docker.sock"
+  command: null
+  args:
+    - "-v"
+    - "--tb=short"
+
+# State
+enabled: true
+
+# Variant tracking
+variant: null
+base_version: null
+
+# Metadata
+tags:
+  - python
+  - default
+  - evaluation
+  - pytest
