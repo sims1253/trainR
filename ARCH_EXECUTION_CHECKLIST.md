@@ -46,10 +46,10 @@ Items are ordered by dependency -- B-01 through B-04 define the contracts that B
 
 Phase gate: **B-06 complete** (`PiSdkHarness` is implemented).
 
-- [ ] C-01: Implement minimal unversioned JSON IPC contract for Python <-> TS Pi SDK worker.
-- [ ] C-02: Implement TS worker for Pi SDK adapter path.
-- [ ] C-03: Add cross-language contract smoke test for request/response shape.
-- [ ] C-04: Ensure raw TS adapter events are returned for audit/debug.
+- [x] C-01: Implement minimal unversioned JSON IPC contract for Python <-> TS Pi SDK worker.
+- [x] C-02: Implement TS worker for Pi SDK adapter path.
+- [x] C-03: Add cross-language contract smoke test for request/response shape.
+- [x] C-04: Ensure raw TS adapter events are returned for audit/debug.
 - [ ] C-05: `[DEFERRED]` Add versioned JSON IPC schema and compatibility matrix tests.
 - [ ] C-06: `[DEFERRED]` Enforce strict bidirectional schema validation across adapter versions.
 
@@ -57,31 +57,31 @@ Phase gate: **B-06 complete** (`PiSdkHarness` is implemented).
 
 Phase gate: **B-04 and B-06 complete** (harness contracts stabilized).
 
-- [ ] D-01: Create central provider resolver module (model -> provider -> env aliases -> runtime identifier).
-- [ ] D-02: Remove duplicate provider/env mapping tables from scattered modules. *Depends: D-01.*
-- [ ] D-03: Normalize key naming and aliases (including ZAI alias handling). *Depends: D-01.*
-- [ ] D-04: Add startup preflight validation for model/provider/key requirements. *Depends: D-01..D-03.*
-- [ ] D-05: Introduce `AuthPolicy` values (`env`, `mounted_auth_file`).
-- [ ] D-06: Implement credential resolver chain honoring auth policy. *Depends: D-05.*
-- [ ] D-07: Support explicit read-only auth file mounts (opt-in only). *Depends: D-06.*
-- [ ] D-08: Add redaction for token values and credential file paths in logs. *Depends: D-06.*
-- [ ] D-09: Record auth source and policy in manifest metadata. *Depends: D-06.*
-- [ ] D-10: Add negative tests for missing key and mismatched model/provider configs. *Depends: D-04.*
+- [x] D-01: Create central provider resolver module (model -> provider -> env aliases -> runtime identifier).
+- [x] D-02: Remove duplicate provider/env mapping tables from scattered modules. *Depends: D-01.*
+- [x] D-03: Normalize key naming and aliases (including ZAI alias handling). *Depends: D-01.*
+- [x] D-04: Add startup preflight validation for model/provider/key requirements. *Depends: D-01..D-03.*
+- [x] D-05: Introduce `AuthPolicy` values (`env`, `mounted_auth_file`).
+- [x] D-06: Implement credential resolver chain honoring auth policy. *Depends: D-05.*
+- [x] D-07: Support explicit read-only auth file mounts (opt-in only). *Depends: D-06.*
+- [x] D-08: Add redaction for token values and credential file paths in logs. *Depends: D-06.*
+- [x] D-09: Record auth source and policy in manifest metadata. *Depends: D-06.*
+- [x] D-10: Add negative tests for missing key and mismatched model/provider configs. *Depends: D-04.*
 
 ## E) Sandboxing Hardening
 
 Phase gate: **A complete** (independent of B; can run in parallel with B).
 
-- [ ] E-01: Centralize Docker command construction in one module.
-- [ ] E-02: Add sandbox profiles (`strict`, `networked`, `developer`). *Depends: E-01.*
-- [ ] E-03: Make `strict` default for benchmarks/CI. *Depends: E-02.*
-- [ ] E-04: Enforce non-root execution for benchmark container paths. *Depends: E-01.*
-- [ ] E-05: Add filesystem hardening flags where compatible (`read-only`, temp writable dirs). *Depends: E-01.*
-- [ ] E-06: Add resource limits (CPU/memory/pids) with configurable defaults. *Depends: E-01.*
-- [ ] E-07: Add explicit network behavior per profile. *Depends: E-02.*
-- [ ] E-08: Ensure no business logic path assembles raw `docker run` flags. *Depends: E-01.*
-- [ ] E-09: Persist active sandbox profile/flags into manifest. *Depends: E-02.*
-- [ ] E-10: Add tests asserting profile -> Docker flags mapping. *Depends: E-02.*
+- [x] E-01: Centralize Docker command construction in one module.
+- [x] E-02: Add sandbox profiles (`strict`, `networked`, `developer`). *Depends: E-01.*
+- [x] E-03: Make `strict` default for benchmarks/CI. *Depends: E-02.*
+- [x] E-04: Enforce non-root execution for benchmark container paths. *Depends: E-01.*
+- [x] E-05: Add filesystem hardening flags where compatible (`read-only`, temp writable dirs). *Depends: E-01.*
+- [x] E-06: Add resource limits (CPU/memory/pids) with configurable defaults. *Depends: E-01.*
+- [x] E-07: Add explicit network behavior per profile. *Depends: E-02.*
+- [x] E-08: Ensure no business logic path assembles raw `docker run` flags. *Depends: E-01.*
+- [x] E-09: Persist active sandbox profile/flags into manifest. *Depends: E-02.*
+- [x] E-10: Add tests asserting profile -> Docker flags mapping. *Depends: E-02.*
 
 ## F) Unified Telemetry
 
@@ -117,7 +117,7 @@ Phase gate: **A complete** (schema fields must land before runtime wiring).
 
 - [x] H-01: Extend experiment config schema with `execution.harness`.
 - [x] H-02: Add `execution.sandbox_profile`.
-- [ ] H-03: Add `execution.auth_policy` + optional auth mounts. *Depends: D-05.*
+- [x] H-03: Add `execution.auth_policy` + optional auth mounts. *Depends: D-05.*
 - [ ] H-04: Add schema validation for new fields. *Depends: H-01..H-03.*
 - [ ] H-05: Remove backward-compat translation paths from runtime code. *Depends: H-04.*
 - [ ] H-06: Add one-time config migration script (`scripts/migrate_config.py`) with sensible defaults. *Depends: H-01..H-03.*

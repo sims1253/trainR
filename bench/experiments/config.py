@@ -18,6 +18,7 @@ from typing import Any, Literal
 import yaml
 from pydantic import BaseModel, Field, field_validator
 
+from bench.provider import AuthPolicy
 from bench.sandbox import SandboxProfile
 
 
@@ -187,6 +188,10 @@ class ExecutionConfig(BaseModel):
         default=False,
         description="Save LLM request/response traces",
     )
+    auth_policy: AuthPolicy = Field(
+        default=AuthPolicy.ENV,
+        description="Authentication policy: env or mounted_file",
+    )
 
     @field_validator("sandbox_profile", mode="before")
     @classmethod
@@ -201,6 +206,20 @@ class ExecutionConfig(BaseModel):
                 allowed = [p.value for p in SandboxProfile]
                 raise ValueError(f"Invalid sandbox_profile: {v}. Must be one of: {allowed}")
         raise ValueError(f"Invalid sandbox_profile type: {type(v)}")
+
+    @field_validator("auth_policy", mode="before")
+    @classmethod
+    def validate_auth_policy(cls, v: str | AuthPolicy) -> AuthPolicy:
+        """Validate and convert auth_policy to AuthPolicy enum."""
+        if isinstance(v, AuthPolicy):
+            return v
+        if isinstance(v, str):
+            try:
+                return AuthPolicy(v.lower())
+            except ValueError:
+                allowed = [p.value for p in AuthPolicy]
+                raise ValueError(f"Invalid auth_policy: {v}. Must be one of: {allowed}")
+        raise ValueError(f"Invalid auth_policy type: {type(v)}")
 
 
 class RetryConfig(BaseModel):

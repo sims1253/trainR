@@ -11,13 +11,16 @@ import subprocess
 import tempfile
 import time
 import warnings
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 # Load environment variables from .env file
 from dotenv import load_dotenv
 from rich.console import Console
+
+if TYPE_CHECKING:
+    from bench.sandbox import SandboxProfile
 
 load_dotenv()
 
@@ -71,11 +74,20 @@ class DockerPiRunnerConfig:
     docker_image: str = "posit-gskill-eval:latest"
     # API keys to pass to container (only if set in environment)
     api_keys: list[str] | None = None
+    # Sandbox profile for security settings (string: "strict", "networked", or "developer")
+    sandbox_profile: str = "networked"
 
     def __post_init__(self):
         if self.api_keys is None:
             # Default: forward all known API keys if set
             self.api_keys = _get_all_provider_api_keys()
+        # Validate sandbox profile
+        valid_profiles = ("strict", "networked", "developer")
+        if self.sandbox_profile not in valid_profiles:
+            raise ValueError(
+                f"Invalid sandbox_profile '{self.sandbox_profile}'. "
+                f"Must be one of: {valid_profiles}"
+            )
 
 
 class DockerPiRunner:
@@ -284,20 +296,29 @@ Write the tests now."""
         unique_workspace = self.workspace_dir / f"{task_name}_{safe_model_name}"
         unique_workspace.mkdir(parents=True, exist_ok=True)
 
-        # Build docker run command (no -i needed for batch mode)
-        docker_cmd = ["docker", "run", "--rm"]
-        for key, value in env_vars.items():
-            docker_cmd.extend(["-e", f"{key}={value}"])
-        docker_cmd.extend(
-            [
-                "-v",
-                f"{unique_workspace}:/workspace",
-            ]
+        # Build docker run command using sandbox policy
+        from bench.sandbox import DockerCommandBuilder, SandboxPolicy, SandboxProfile
+
+        profile = SandboxProfile(self.config.sandbox_profile)
+        policy = SandboxPolicy.from_profile(profile)
+        builder = DockerCommandBuilder(policy)
+
+        # Prepare volumes as (source, destination, mode) tuples
+        volumes = [
+            (str(unique_workspace), "/workspace", "rw"),
+        ]
+
+        # Build the docker command
+        # Note: container uses its default entrypoint, so command is empty
+        docker_cmd = builder.build_run_command(
+            image=self.config.docker_image,
+            command=[],  # Container uses default entrypoint
+            env_vars=env_vars,
+            volumes=volumes,
         )
 
-        docker_cmd.append(self.config.docker_image)
-
         console.print(f"[dim]Running Docker+Pi batch mode with model: {model}[/dim]")
+        console.print(f"[dim]Sandbox profile: {self.config.sandbox_profile}[/dim]")
 
         import shutil
 

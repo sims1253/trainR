@@ -12,7 +12,6 @@ import asyncio
 import contextlib
 import json
 import logging
-import os
 import random
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -100,9 +99,13 @@ class ExperimentRunner:
         - Generates experiment matrix
         - Creates initial manifest
         - Validates environment
+        - Runs provider preflight validation
 
         Returns:
             Path to output directory
+
+        Raises:
+            RuntimeError: If harness or credential validation fails
         """
         # Set random seed for determinism
         if self.config.determinism.seed is not None:
@@ -121,7 +124,7 @@ class ExperimentRunner:
         # Create initial manifest
         self.manifest = self._create_manifest()
 
-        # Validate API keys for selected models
+        # Validate provider credentials (preflight)
         self._validate_api_keys()
 
         # Validate harness environment
@@ -146,6 +149,8 @@ class ExperimentRunner:
         import platform
         import subprocess
         import sys
+
+        from bench.provider import get_provider_resolver
 
         # Get git info
         git_sha = "unknown"
@@ -203,6 +208,17 @@ class ExperimentRunner:
             skill_name=self.config.skill.get_name(),
         )
 
+        # Get unique models and resolve providers
+        models_used = list(set(run.model.name for run in self.matrix.runs)) if self.matrix else []
+        resolver = get_provider_resolver()
+        providers_metadata = {}
+        for model in models_used:
+            try:
+                provider = resolver.resolve_provider(model)
+                providers_metadata[model] = provider
+            except KeyError:
+                providers_metadata[model] = "unknown"
+
         manifest = ManifestV1(
             run_id=self.config.generate_run_id(),
             run_name=self.config.name,
@@ -215,6 +231,14 @@ class ExperimentRunner:
             git_branch=git_branch,
             git_dirty=git_dirty,
             config=self._get_config_snapshot(),
+            metadata={
+                "execution": {
+                    "harness": self.harness_name,
+                    "sandbox_profile": self.config.execution.sandbox_profile.value,
+                    "auth_policy": self.config.execution.auth_policy.value,
+                },
+                "providers": providers_metadata,
+            },
         )
 
         return manifest
@@ -242,19 +266,40 @@ class ExperimentRunner:
         }
 
     def _validate_api_keys(self) -> None:
-        """Validate that required API keys are set."""
+        """Validate provider credentials using preflight validation.
+
+        Raises:
+            RuntimeError: If credential validation fails
+        """
         if not self.matrix:
             return
 
-        missing_keys = []
-        for model_spec in self.matrix.models:
-            if model_spec.api_key_env and not os.environ.get(model_spec.api_key_env):
-                missing_keys.append((model_spec.name, model_spec.api_key_env))
+        from bench.provider import run_preflight, AuthPolicy
 
-        if missing_keys:
-            for model_name, key_name in missing_keys:
-                logger.error(f"Missing API key: {key_name} (required for model: {model_name})")
-            raise ValueError(f"Missing required API keys: {[k for _, k in missing_keys]}")
+        # Get all unique models from the matrix
+        models = list(set(run.model.name for run in self.matrix.runs))
+
+        # Determine auth policy from config
+        auth_policy = AuthPolicy.ENV  # Default
+        if hasattr(self.config.execution, "auth_policy"):
+            auth_policy = AuthPolicy(self.config.execution.auth_policy)
+
+        # Run preflight validation
+        preflight_result = run_preflight(
+            models=models,
+            auth_policy=auth_policy,
+            strict=True,  # Fail on missing credentials
+        )
+
+        if not preflight_result.is_valid:
+            error_msg = "Preflight validation failed:\n" + "\n".join(
+                f"  - {e}" for e in preflight_result.errors
+            )
+            raise RuntimeError(error_msg)
+
+        # Log warnings
+        for warning in preflight_result.warnings:
+            logger.warning(f"Preflight warning: {warning}")
 
     def _save_matrix(self) -> None:
         """Save the experiment matrix to a file."""

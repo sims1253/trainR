@@ -58,6 +58,7 @@ class PiDockerHarness(AgentHarness):
         )
         docker_image = getattr(self.config, "docker_image", "posit-gskill-eval:latest")
         api_keys = getattr(self.config, "api_keys", None)
+        sandbox_profile = getattr(self.config, "sandbox_profile", "networked")
 
         runner_config = DockerPiRunnerConfig(
             model=model,
@@ -65,6 +66,7 @@ class PiDockerHarness(AgentHarness):
             timeout=int(self.config.timeout),
             docker_image=docker_image,
             api_keys=api_keys,
+            sandbox_profile=sandbox_profile,
         )
         self._runner = DockerPiRunner(runner_config)
 
