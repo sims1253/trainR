@@ -60,17 +60,18 @@ ls tasks/train/ tasks/dev/ tasks/held_out/
 ### 4. Run Baselines
 
 ```bash
-# Run baseline evaluation with default config
+# Run baseline evaluation with canonical runner
 make benchmark
 
-# Run with a specific model
-make benchmark MODEL=openai/gpt-oss-120b
-
-# Quick smoke test (1 task, verifies pipeline works)
+# Quick smoke test (verifies pipeline works)
 make benchmark-smoke
 
-# Compare results
-uv run python scripts/compare_results.py
+# Run with a specific experiment config
+uv run python scripts/run_experiment.py --config configs/experiments/r_bench_smoke.yaml
+
+# Run with custom output directory and seed
+uv run python scripts/run_experiment.py --config configs/experiments/r_bench_smoke.yaml \
+    --output-dir results/my_run --seed 42
 ```
 
 ### 5. Run Optimization
@@ -114,41 +115,38 @@ uv run python scripts/mine_prs.py --repos-file configs/repos_to_mine.yaml
 
 ```
 trainR/
-├── task_generator/      # Generate tasks from R packages
-│   ├── ast_parser.py    # R code parsing (tree-sitter)
-│   ├── templates.py     # Task templates (7 types)
-│   ├── quality_gate.py  # Quality scoring
-│   └── mined_task.py    # PR mining schemas
+├── bench/                # Canonical benchmark infrastructure
+│   ├── runner.py         # Canonical execution API
+│   ├── experiments/      # Experiment runner and config
+│   ├── schema/v1/        # Canonical schemas (task, manifest, results)
+│   ├── dataset/          # Dataset management
+│   ├── eval/             # Evaluation utilities
+│   ├── optimize/         # GEPA optimization
+│   └── reports/          # Result reporting
 │
-├── evaluation/          # Evaluate skills on tasks
-│   ├── pi_runner.py     # DockerPiRunner (pi CLI)
-│   ├── sandbox.py       # EvaluationSandbox
-│   └── models.py        # Result types
+├── evaluation/           # Docker-based evaluation
+│   ├── pi_runner.py      # DockerPiRunner
+│   └── sandbox.py        # EvaluationSandbox
 │
-├── optimization/        # GEPA integration
-│   ├── adapter.py       # SkillEvaluator
-│   └── config.py        # OptimizationConfig
+├── scripts/              # CLI tools
+│   ├── run_experiment.py # CANONICAL benchmark runner
+│   ├── run_optimize.py   # Optimization runner
+│   ├── generate_tasks.py # Task generation
+│   └── mine_prs.py       # PR mining
 │
-├── scripts/             # CLI tools
-│   ├── generate_tasks.py
-│   ├── evaluate_batch.py
-│   ├── mine_prs.py
-│   └── compare_results.py
+├── configs/              # YAML configs
+│   └── experiments/      # Experiment configs (*.yaml)
 │
-├── configs/             # YAML configs
-│   ├── baseline_*.yaml  # Baseline configs per model
-│   └── repos_to_mine.yaml
+├── tasks/                # Generated tasks (60/20/20 split)
+│   ├── train/            # 83 tasks
+│   ├── dev/              # 28 tasks
+│   └── held_out/         # 27 tasks
 │
-├── tasks/               # Generated tasks (60/20/20 split)
-│   ├── train/           # 83 tasks
-│   ├── dev/             # 28 tasks
-│   └── held_out/        # 27 tasks
-│
-├── skills/              # Skill definitions
-├── tests/               # pytest suite
-├── packages/            # Cloned R packages
-├── PACKAGES.md          # Package documentation
-└── PLAN.md              # Project roadmap
+├── skills/               # Skill definitions
+├── tests/                # pytest suite
+├── packages/             # Cloned R packages
+├── PACKAGES.md           # Package documentation
+└── PLAN.md               # Project roadmap
 ```
 
 ## Commands
@@ -160,14 +158,17 @@ make docker-build       # Build evaluation Docker image
 # Tasks
 make generate-tasks     # Generate from package (PACKAGES=dplyr)
 
-# Evaluation
-make benchmark          # Run evaluation with default config
-make benchmark-smoke    # Quick test (1 task, verifies pipeline)
-make benchmark-all      # Run full benchmark
+# Benchmark (canonical runner)
+make benchmark          # Run: scripts/run_experiment.py --config configs/experiments/r_bench_smoke.yaml
+make benchmark-smoke    # Quick smoke test (verifies pipeline)
+
+# Direct experiment runner
+uv run python scripts/run_experiment.py --config configs/experiments/r_bench_smoke.yaml
+uv run python scripts/run_experiment.py --config configs/experiments/support_pair_smoke.yaml
 
 # Optimization
 make optimize-test      # Quick test (3 calls)
-make optimize-fresh     # Full optimization
+make optimize-fresh     # Full optimization (uses scripts/run_optimize.py)
 
 # Testing & Linting
 make test               # Run tests
@@ -179,6 +180,42 @@ uv run ty check .       # Type checking
 uv run python scripts/mine_prs.py --repo tidyverse/dplyr
 ./scripts/scheduled_mine.sh  # Scheduled mining
 ```
+
+## Supported Entrypoints
+
+All benchmark execution must go through the canonical runner API:
+
+| Entrypoint | Type | Use Case |
+|------------|------|----------|
+| `bench.runner.run()` | Library API | Python code, notebooks, tests |
+| `scripts/run_experiment.py` | CLI | Shell commands, CI pipelines |
+
+Both entrypoints delegate to the same execution path, ensuring consistent behavior.
+
+```python
+# Library API example
+from bench.runner import run
+
+manifest = run("configs/experiments/smoke.yaml")
+print(f"Pass rate: {manifest.summary.pass_rate:.1%}")
+
+# With overrides
+manifest = run("config.yaml", output_dir="results/custom", seed=42, workers=2)
+```
+
+```bash
+# CLI equivalent
+uv run python scripts/run_experiment.py --config config.yaml \
+    --output-dir results/custom --seed 42 --workers 2
+```
+
+**Important**: Do not create new entrypoints that bypass the canonical runner.
+All execution paths must delegate to `bench.runner.run()` to ensure:
+
+- Consistent artifact generation (manifest.json, results.jsonl, summary.json)
+- Unified telemetry and logging
+- Proper sandbox and credential handling
+- Reproducible fingerprinting and configuration snapshots
 
 ## Architecture
 

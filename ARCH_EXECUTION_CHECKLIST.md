@@ -1,109 +1,154 @@
-# Architecture Remediation - Execution Checklist
+# Architecture Remediation - Execution Checklist (Greenfield)
 
 Reference: `ARCH_REMEDIATION_PLAN.md`
 
-## A) Canonical Runner Consolidation
+## How to read this checklist
 
-- [ ] A-01: Confirm `scripts/run_experiment.py` is the only canonical benchmark executor.
-- [ ] A-02: Convert `scripts/run_benchmark.py` to wrapper-only (arg/config translation + call canonical runner).
-- [ ] A-03: Convert `scripts/evaluate_batch.py` to wrapper-only.
-- [ ] A-04: Convert `scripts/mini_benchmark.py` to wrapper-only or replace with canonical config invocation.
-- [ ] A-05: Rewire `posit_gskill evaluate` to canonical runner API (remove legacy runtime path dependency).
-- [ ] A-06: Ensure wrappers emit clear deprecation warning + replacement command.
-- [ ] A-07: Remove duplicated Docker/provider execution logic from legacy scripts.
-- [ ] A-08: Add regression test asserting wrappers delegate to canonical path.
+- Items within each section are ordered by dependency. Complete them top-to-bottom.
+- Cross-section dependencies are noted with `Depends:` annotations.
+- Items marked `[DEFERRED]` are not scheduled for the current phase.
+
+---
+
+## A) Canonical Runner Enforcement
+
+Phase gate: None (start here).
+
+- [x] A-00: Add `bench/runner.py` with `run()` as the canonical library API.
+- [x] A-01: Confirm `scripts/run_experiment.py` delegates to `bench.runner.run()` as the canonical API.
+- [x] A-02: Remove or hard-fail legacy executors (`run_benchmark.py`, `evaluate_batch.py`, `mini_benchmark.py`) with canonical pointer.
+- [x] A-03: Rewire `posit_gskill evaluate` to canonical runner API.
+- [x] A-04: Remove duplicated benchmark/evaluation business logic outside canonical core.
+- [x] A-05: Add regression tests asserting all supported entrypoints delegate to canonical path.
+- [x] A-06: Add guard test confirming no bypass path executes direct Docker/provider logic.
+- [x] A-07: Remove dead code, orphaned test fixtures, and obsolete config files left behind by legacy paths.
+- [x] A-08: Run dead-code scan and confirm no legacy artifacts remain.
 
 ## B) Harness Adapter Layer
+
+Phase gate: **A complete** (all A items checked).
+
+Items are ordered by dependency -- B-01 through B-04 define the contracts that B-05 through B-11 consume.
 
 - [ ] B-01: Create `bench/harness/` module.
 - [ ] B-02: Define `HarnessRequest` and `HarnessResult` typed contracts.
 - [ ] B-03: Define `AgentHarness` protocol/interface.
-- [ ] B-04: Refactor evaluation path to use injected harness, not direct Pi runner calls.
-- [ ] B-05: Implement `PiSdkHarness` adapter.
-- [ ] B-06: Implement `PiCliHarness` adapter as fallback.
-- [ ] B-07: Add `CliHarnessBase` for Codex/Claude/Gemini-style adapters.
-- [ ] B-08: Add harness selector in experiment config (`execution.harness`).
-- [ ] B-09: Add harness capability metadata (json mode, tool use, usage support).
-- [ ] B-10: Add integration tests proving harness can be swapped via config only.
+- [ ] B-04: Add `HarnessRegistry`/`HarnessFactory` for config-driven selection.
+- [ ] B-05: Refactor runner to use injected harness (no direct Pi runner calls). *Depends: B-01..B-04.*
+- [ ] B-06: Implement `PiSdkHarness` adapter (primary). *Depends: B-01..B-04.*
+- [ ] B-07: Implement `PiCliHarness` adapter (fallback). *Depends: B-01..B-04.*
+- [ ] B-08: Add `CliHarnessBase` for Codex/Claude/Gemini adapters. *Depends: B-01..B-04.*
+- [ ] B-09: Wire harness selector in runtime (`execution.harness`). *Depends: B-04, H-01.*
+- [ ] B-10: Add harness capability metadata (json mode, tools, usage support). *Depends: B-03.*
+- [ ] B-11: Add integration tests proving harness swap via config only. *Depends: B-05, B-06, B-07.*
 
-## C) Provider Resolution + Credential Policy
+## C) Polyglot Boundary (Python Control Plane, TS Edge)
 
-- [ ] C-01: Create central provider resolver module (model -> provider -> env var -> runtime identifier).
-- [ ] C-02: Remove duplicate provider/env mapping tables from scattered modules.
-- [ ] C-03: Fix key naming consistency (including ZAI aliases where required).
-- [ ] C-04: Add startup preflight validation for model/provider/key requirements.
-- [ ] C-05: Introduce `AuthPolicy` values (`env`, `mounted_auth_file`).
-- [ ] C-06: Implement credential resolver chain honoring policy.
-- [ ] C-07: Support explicit read-only auth file mounts (opt-in only).
-- [ ] C-08: Add redaction for token values and credential file paths in logs.
-- [ ] C-09: Record auth source and policy in manifest metadata.
-- [ ] C-10: Add negative tests for missing key and mismatched model/provider configs.
+Phase gate: **B-06 complete** (`PiSdkHarness` is implemented).
 
-## D) Sandboxing Hardening
+- [ ] C-01: Implement minimal unversioned JSON IPC contract for Python <-> TS Pi SDK worker.
+- [ ] C-02: Implement TS worker for Pi SDK adapter path.
+- [ ] C-03: Add cross-language contract smoke test for request/response shape.
+- [ ] C-04: Ensure raw TS adapter events are returned for audit/debug.
+- [ ] C-05: `[DEFERRED]` Add versioned JSON IPC schema and compatibility matrix tests.
+- [ ] C-06: `[DEFERRED]` Enforce strict bidirectional schema validation across adapter versions.
 
-- [ ] D-01: Centralize Docker command construction in one module.
-- [ ] D-02: Add sandbox profiles (`strict`, `networked`, `developer`).
-- [ ] D-03: Make `strict` default for benchmarks/CI.
-- [ ] D-04: Enforce non-root execution in all benchmark container paths.
-- [ ] D-05: Add filesystem hardening flags where compatible (`read-only`, temp writable dirs).
-- [ ] D-06: Add resource limits (CPU/memory/pids) with configurable defaults.
-- [ ] D-07: Add explicit network mode behavior per profile.
-- [ ] D-08: Ensure no benchmark path assembles raw `docker run` flags outside central builder.
-- [ ] D-09: Persist active sandbox profile/flags into manifest.
-- [ ] D-10: Add tests asserting profile -> Docker flags mapping.
+## D) Provider Resolution + Credential Policy
 
-## E) Unified Telemetry
+Phase gate: **B-04 and B-06 complete** (harness contracts stabilized).
 
-- [ ] E-01: Define canonical telemetry schema for token/cost/turn/tool metrics.
-- [ ] E-02: Map Pi SDK/CLI native usage events into canonical schema.
-- [ ] E-03: Preserve raw adapter events for audit/debug.
-- [ ] E-04: Ensure unknown usage fields are represented as unknown/null, not forced zero.
-- [ ] E-05: Add optional cost estimation layer with provider pricing table.
-- [ ] E-06: Surface normalized telemetry in result artifacts + summary.
-- [ ] E-07: Add telemetry contract tests for each harness adapter.
+- [ ] D-01: Create central provider resolver module (model -> provider -> env aliases -> runtime identifier).
+- [ ] D-02: Remove duplicate provider/env mapping tables from scattered modules. *Depends: D-01.*
+- [ ] D-03: Normalize key naming and aliases (including ZAI alias handling). *Depends: D-01.*
+- [ ] D-04: Add startup preflight validation for model/provider/key requirements. *Depends: D-01..D-03.*
+- [ ] D-05: Introduce `AuthPolicy` values (`env`, `mounted_auth_file`).
+- [ ] D-06: Implement credential resolver chain honoring auth policy. *Depends: D-05.*
+- [ ] D-07: Support explicit read-only auth file mounts (opt-in only). *Depends: D-06.*
+- [ ] D-08: Add redaction for token values and credential file paths in logs. *Depends: D-06.*
+- [ ] D-09: Record auth source and policy in manifest metadata. *Depends: D-06.*
+- [ ] D-10: Add negative tests for missing key and mismatched model/provider configs. *Depends: D-04.*
 
-## F) CI + Integration Reliability
+## E) Sandboxing Hardening
 
-- [ ] F-01: Split CI into `fast`, `integration-local`, `integration-provider`, `visualizer`.
-- [ ] F-02: Keep `fast` for lint/type/unit/schema/contracts only.
-- [ ] F-03: Add `integration-local` test using Docker + mocked/stubbed model output.
-- [ ] F-04: Add env-gated provider smoke test (1 task x 1 model x selected harness).
-- [ ] F-05: Add optimization smoke integration test (1-2 iterations + checkpoint/resume/budget stop).
-- [ ] F-06: Add synthetic task generation smoke test.
-- [ ] F-07: Add PR-mined task pipeline smoke test (fixture-driven).
-- [ ] F-08: Update `ci-quick` docs/output to clearly state covered vs skipped checks.
-- [ ] F-09: Add failure triage hints in CI output by layer (resolver/harness/sandbox/pipeline).
+Phase gate: **A complete** (independent of B; can run in parallel with B).
 
-## G) Config/Schema Migration
+- [ ] E-01: Centralize Docker command construction in one module.
+- [ ] E-02: Add sandbox profiles (`strict`, `networked`, `developer`). *Depends: E-01.*
+- [ ] E-03: Make `strict` default for benchmarks/CI. *Depends: E-02.*
+- [ ] E-04: Enforce non-root execution for benchmark container paths. *Depends: E-01.*
+- [ ] E-05: Add filesystem hardening flags where compatible (`read-only`, temp writable dirs). *Depends: E-01.*
+- [ ] E-06: Add resource limits (CPU/memory/pids) with configurable defaults. *Depends: E-01.*
+- [ ] E-07: Add explicit network behavior per profile. *Depends: E-02.*
+- [ ] E-08: Ensure no business logic path assembles raw `docker run` flags. *Depends: E-01.*
+- [ ] E-09: Persist active sandbox profile/flags into manifest. *Depends: E-02.*
+- [ ] E-10: Add tests asserting profile -> Docker flags mapping. *Depends: E-02.*
 
-- [ ] G-01: Extend experiment config schema with `execution.harness`.
-- [ ] G-02: Add `execution.sandbox_profile`.
-- [ ] G-03: Add `execution.auth_policy` + optional auth mount list.
-- [ ] G-04: Add schema validation for new fields.
-- [ ] G-05: Provide backward-compatible translation for legacy configs.
-- [ ] G-06: Add migration tests from legacy script args/configs to canonical schema.
+## F) Unified Telemetry
 
-## H) Additional Harness Integrations (Optional Wave)
+Phase gate: **B-02 (HarnessResult contract) defined.**
 
-- [ ] H-01: Implement Codex CLI adapter on top of `CliHarnessBase`.
-- [ ] H-02: Implement Claude Code adapter on top of `CliHarnessBase`.
-- [ ] H-03: Implement Gemini CLI adapter on top of `CliHarnessBase`.
-- [ ] H-04: Implement SWE-agent adapter (if needed).
-- [ ] H-05: Add adapter contract/integration tests for each enabled harness.
-- [ ] H-06: Document harness capability matrix and known limitations.
+- [ ] F-01: Define canonical telemetry schema for token/cost/turn/tool metrics.
+- [ ] F-02: Map Pi SDK/CLI native usage events into canonical schema. *Depends: F-01, B-06.*
+- [ ] F-03: Preserve raw adapter events for audit/debug. *Depends: F-01.*
+- [ ] F-04: Ensure unknown usage fields are `null`/unknown, not forced zero. *Depends: F-01.*
+- [ ] F-05: Add optional cost estimation layer with provider pricing table. *Depends: F-01.*
+- [ ] F-06: Surface normalized telemetry in result artifacts and summaries. *Depends: F-01..F-04.*
+- [ ] F-07: Add telemetry contract tests for each harness adapter. *Depends: F-01.*
+- [ ] F-08: Version the telemetry schema; add schema compatibility test in visualizer CI job. *Depends: F-01.*
 
-## I) Documentation + Guardrails
+## G) CI + Integration Reliability
 
-- [ ] I-01: Update README to show canonical commands only.
-- [ ] I-02: Add architecture doc for harness/provider/sandbox layering.
-- [ ] I-03: Add security doc for credential policies and OAuth mount caveats.
-- [ ] I-04: Add reproducibility doc defining what metadata must be captured.
-- [ ] I-05: Add contributor guide for implementing new harness adapters.
+Phase gate: **B, C, D, E complete and F-01 defined.**
 
-## J) Final Verification Gate
+- [ ] G-00: Set up test fixtures, mock provider stubs, and CI secrets management. *(prerequisite for G-03..G-07)*
+- [ ] G-01: Split CI into `fast`, `integration-local`, `integration-provider`, `visualizer` (TanStack Start + Bun + Vite).
+- [ ] G-02: Keep `fast` for lint/type/unit/schema/contracts only.
+- [ ] G-03: Add `integration-local` test using Docker + stubbed model output. *Depends: G-00, G-01.*
+- [ ] G-04: Add env-gated provider smoke test (1 task x 1 model x selected harness). *Depends: G-00, G-01.*
+- [ ] G-05: Add optimization smoke integration test (1-2 iterations + checkpoint/resume/budget stop). *Depends: G-00, G-01.*
+- [ ] G-06: Add synthetic task generation smoke test. *Depends: G-00, G-01.*
+- [ ] G-07: Add PR-mined task pipeline smoke test (fixture-driven). *Depends: G-00, G-01.*
+- [ ] G-08: Update `ci-quick` docs/output with explicit covered vs skipped checks.
+- [ ] G-09: Add failure triage hints in CI output by layer (resolver/harness/sandbox/pipeline).
 
-- [ ] J-01: Run full CI suite with new architecture.
-- [ ] J-02: Run one real provider smoke benchmark and verify end-to-end artifacts.
-- [ ] J-03: Run one mini optimization and verify checkpoint/resume/budget behavior.
-- [ ] J-04: Verify visualizer consumes updated artifacts without contract breaks.
-- [ ] J-05: Confirm no legacy code path bypasses canonical runner.
+## H) Config/Schema Cutover
+
+Phase gate: **A complete** (schema fields must land before runtime wiring).
+
+- [ ] H-01: Extend experiment config schema with `execution.harness`.
+- [ ] H-02: Add `execution.sandbox_profile`.
+- [ ] H-03: Add `execution.auth_policy` + optional auth mounts. *Depends: D-05.*
+- [ ] H-04: Add schema validation for new fields. *Depends: H-01..H-03.*
+- [ ] H-05: Remove backward-compat translation paths from runtime code. *Depends: H-04.*
+- [ ] H-06: Add one-time config migration script (`scripts/migrate_config.py`) with sensible defaults. *Depends: H-01..H-03.*
+
+## I) Additional Harness Integrations
+
+Phase gate: **G complete; J-02 and J-05 published.**
+
+- [ ] I-01: Implement Codex CLI adapter on top of `CliHarnessBase`.
+- [ ] I-02: Implement Claude Code adapter on top of `CliHarnessBase`.
+- [ ] I-03: Implement Gemini CLI adapter on top of `CliHarnessBase`.
+- [ ] I-04: Implement SWE-agent adapter (if needed).
+- [ ] I-05: Add adapter contract/integration tests for each enabled harness. *Depends: I-01..I-04.*
+- [ ] I-06: Document harness capability matrix and known limitations. *Depends: I-01..I-04.*
+
+## J) Documentation + Guardrails
+
+J-01 through J-02 and J-05 are **prerequisites for Phase I** and should be written during or immediately after Phase B. The remaining items can follow later.
+
+- [x] J-01: Update README to show canonical commands only, including frontend stack (`TanStack Start` + `Bun` + `Vite`). *(write during Phase A)*
+- [ ] J-02: Add architecture doc for harness/provider/sandbox layering. *(write during Phase B)*
+- [ ] J-03: Add security doc for credential policies and auth mount caveats. *(write during Phase D)*
+- [ ] J-04: Add reproducibility doc defining required metadata capture. *(write during Phase E)*
+- [ ] J-05: Add contributor guide for adding new harness adapters. *(write during Phase B; required before Phase I)*
+
+## K) Final Verification Gate
+
+Phase gate: **All prior sections complete** (excluding items explicitly marked `[DEFERRED]`).
+
+- [ ] K-01: Run full CI suite with new architecture.
+- [ ] K-02: Run one real provider smoke benchmark and verify end-to-end artifacts.
+- [ ] K-03: Run one mini optimization and verify checkpoint/resume/budget behavior.
+- [ ] K-04: Verify visualizer consumes updated artifacts without contract breaks.
+- [ ] K-05: Confirm no legacy execution path bypasses canonical runner.

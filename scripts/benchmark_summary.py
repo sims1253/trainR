@@ -11,31 +11,33 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from rich.console import Console
 from rich.table import Table
 
-from benchmark.schema import BenchmarkResult, BenchmarkRun
+from bench.schema.v1 import ResultV1, ManifestV1
 
 console = Console()
 
 
-def load_all_results(base_path: Path) -> list[BenchmarkResult]:
+def load_all_results(base_path: Path) -> list[ResultV1]:
     """Load all benchmark results from all benchmark_results.json files."""
     results = []
     json_files = list(base_path.rglob("benchmark_results.json"))
 
     for json_file in json_files:
         try:
-            run = BenchmarkRun.load(json_file)
-            results.extend(run.results)
+            manifest = ManifestV1.load(str(json_file))
+            results.extend(manifest.results)
         except Exception as e:
             console.print(f"[yellow]Warning: Could not load {json_file}: {e}[/yellow]")
 
     return results
 
 
-def clean_error_category(category: str | None) -> str:
+def clean_error_category(category) -> str:
     """Clean up error category name."""
     if category is None:
         return "PASSED"
-    return category.replace("FailureCategory.", "")
+    # Handle both enum and string, remove any prefix
+    cat_str = category.value if hasattr(category, "value") else str(category)
+    return cat_str.replace("FailureCategory.", "")
 
 
 def get_pass_rate_color(rate: float) -> str:
@@ -47,7 +49,7 @@ def get_pass_rate_color(rate: float) -> str:
     return "red"
 
 
-def generate_summary(results: list[BenchmarkResult]) -> None:
+def generate_summary(results: list[ResultV1]) -> None:
     """Generate and display the benchmark summary."""
     if not results:
         console.print("[red]No results found![/red]")
@@ -55,7 +57,7 @@ def generate_summary(results: list[BenchmarkResult]) -> None:
 
     console.print("\n[bold cyan]Benchmark Summary[/bold cyan]\n")
 
-    results_by_model: dict[str, list[BenchmarkResult]] = defaultdict(list)
+    results_by_model: dict[str, list[ResultV1]] = defaultdict(list)
     for r in results:
         results_by_model[r.model].append(r)
 
@@ -138,7 +140,7 @@ def generate_summary(results: list[BenchmarkResult]) -> None:
         console.print()
         console.rule("[bold]Package Performance (Real Packages)[/bold]")
 
-        package_results: dict[str, list[BenchmarkResult]] = defaultdict(list)
+        package_results: dict[str, list[ResultV1]] = defaultdict(list)
         for r in real_packages:
             package_name = r.task_id.rsplit("_", 1)[0]
             package_results[package_name].append(r)

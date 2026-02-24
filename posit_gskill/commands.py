@@ -1,6 +1,5 @@
 """Command implementations for the CLI."""
 
-import json
 import logging
 import sys
 from datetime import datetime
@@ -112,39 +111,111 @@ def run_generate(args: Any) -> None:
 
 
 def run_evaluate(args: Any) -> None:
-    """Evaluate a skill against tasks."""
-    from evaluation.test_runner import DockerTestRunner
-    from task_generator import TaskGenerator
+    """Evaluate a skill against tasks using the canonical runner API."""
+    import bench.runner
+    from bench.experiments import (
+        ExecutionConfig,
+        ExperimentConfig,
+        ModelsConfig,
+        OutputConfig,
+        SkillConfig,
+        TasksConfig,
+        TaskSelectionMode,
+    )
+    from config import get_llm_config
 
     skill_path = Path(args.skill)
     if not skill_path.exists():
         console.print(f"[red]Skill file not found: {skill_path}[/red]")
         sys.exit(1)
 
-    skill_content = skill_path.read_text()
     tasks_dir = Path(args.tasks_dir)
-
-    generator = TaskGenerator(tasks_dir)
-    tasks = generator.load_all_tasks()
-
-    if not tasks:
-        console.print(f"[red]No tasks found in {tasks_dir}[/red]")
+    if not tasks_dir.exists():
+        console.print(f"[red]Tasks directory not found: {tasks_dir}[/red]")
         sys.exit(1)
 
-    console.print(f"[blue]Evaluating skill against {len(tasks)} tasks...[/blue]")
+    # Resolve default model from llm config
+    llm_config = get_llm_config()
+    default_model = llm_config.get_default_model("task_agent") or "gpt-oss-120b"
 
-    # Run evaluation
-    runner = DockerTestRunner()
-    results = []
-    for task in tasks:
-        package_dir = Path("packages") / task.source_package
-        result = runner.run_evaluation(
-            skill_content=skill_content,
-            task_instruction=task.instruction,
-            task_context=task.context,
-            package_dir=package_dir,
+    # Build ExperimentConfig for this evaluation
+    config = ExperimentConfig(
+        name=f"evaluate_{skill_path.stem}",
+        description=f"Evaluation run for {skill_path.name}",
+        tasks=TasksConfig(
+            selection=TaskSelectionMode.ALL,
+            dir=str(tasks_dir),
+        ),
+        models=ModelsConfig(
+            names=[default_model],
+        ),
+        skill=SkillConfig(
+            path=str(skill_path),
+        ),
+        execution=ExecutionConfig(
+            timeout=600,
+            docker_image="posit-gskill-eval:latest",
+            repeats=1,
+            parallel_workers=1,
+            save_trajectories=True,
+        ),
+        output=OutputConfig(
+            dir="results/evaluate",
+            save_intermediate=True,
+        ),
+    )
+
+    console.print(f"[blue]Evaluating skill: {skill_path.name}[/blue]")
+    console.print(f"[blue]Tasks directory: {tasks_dir}[/blue]")
+    console.print(f"[blue]Model: {default_model}[/blue]")
+    console.print()
+
+    try:
+        # Run evaluation via canonical runner
+        manifest = bench.runner.run(config)
+
+        # Display results
+        console.print("\n[green]Evaluation complete![/green]")
+
+        # Summary
+        console.print(
+            Panel(
+                f"Tasks: {manifest.summary.completed}/{manifest.summary.total_tasks}\n"
+                f"Passed: {manifest.summary.passed}\n"
+                f"Failed: {manifest.summary.failed}\n"
+                f"Pass Rate: {manifest.summary.pass_rate:.1%}\n"
+                f"Avg Score: {manifest.summary.avg_score:.2f}\n"
+                f"Avg Latency: {manifest.summary.avg_latency_s:.1f}s",
+                title="Summary",
+                border_style="green",
+            )
         )
-        results.append({"task_id": task.task_id, "result": result})
 
-    console.print("\n[green]Evaluation complete![/green]")
-    console.print(f"Results: {json.dumps(results, indent=2)}")
+        # Per-task results
+        if manifest.results:
+            console.print("\n[bold]Per-Task Results:[/bold]")
+            for result in manifest.results:
+                status = "[green]PASS[/green]" if result.passed else "[red]FAIL[/red]"
+                score_str = f" (score: {result.score:.2f})" if result.score else ""
+                console.print(f"  {result.task_id}: {status}{score_str}")
+
+        # Output location
+        if manifest.results_path:
+            console.print(f"\n[dim]Results saved to: {manifest.results_path}[/dim]")
+
+    except FileNotFoundError as e:
+        console.print(f"[red]Configuration error: {e}[/red]")
+        sys.exit(1)
+    except ValueError as e:
+        console.print(f"[red]Invalid configuration: {e}[/red]")
+        sys.exit(1)
+    except RuntimeError as e:
+        console.print(f"[red]Evaluation failed: {e}[/red]")
+        sys.exit(1)
+    except Exception as e:
+        console.print(f"[red]Unexpected error: {e}[/red]")
+        if getattr(args, "verbose", False):
+            import traceback
+
+            traceback.print_exc()
+        sys.exit(1)

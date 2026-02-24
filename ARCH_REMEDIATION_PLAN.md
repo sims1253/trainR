@@ -1,41 +1,47 @@
-# Architecture Remediation Plan
+# Architecture Remediation Plan (Greenfield-First)
 
 Status: Proposed  
 Owner: GLM-5 implementation track  
 Scope: Orchestrator benchmark stack, harness adapters, sandboxing, telemetry, CI
 
-## 1) Goals
+## 1) Guiding Constraints
+
+- Treat architecture decisions as greenfield (optimize for final system quality).
+- No backward compatibility requirement with legacy scripts/configs/artifacts.
+- Python is the control plane for orchestration, schema, policy, and evaluation lifecycle.
+- TypeScript is allowed at harness edges when an SDK is TS-native (e.g., Pi SDK).
+
+## 2) Goals
 
 Build a single, extensible benchmark architecture where:
 
 - one canonical execution engine runs all experiments;
-- agent harnesses (Pi SDK/CLI, Codex CLI, Claude Code, Gemini CLI, SWE-agent) are pluggable adapters;
-- sandboxing and credential handling are policy-driven and auditable;
+- harnesses (Pi SDK/CLI, Codex CLI, Claude Code, Gemini CLI, SWE-agent) are pluggable adapters;
+- sandbox and credential handling are policy-driven and auditable;
 - token/cost/tool telemetry is normalized across harnesses/providers;
-- CI validates real integration paths, not only dry-run/config paths.
+- CI validates at least one true end-to-end execution path.
 
-## 2) Non-Goals
+## 3) Non-Goals
 
-- Perfect provider parity in one pass.
-- Migrating every historical result artifact.
-- Full production-grade multi-tenant isolation in this phase.
-
-## 3) Current Gaps (Why This Exists)
-
-- Execution path fragmentation (canonical and legacy scripts both active).
-- Legacy CLI evaluation path wired to outdated runtime contract.
-- Provider/env mapping duplication and inconsistencies (notably ZAI env naming pathing).
-- CI smoke is mostly static/dry-run and misses true end-to-end eval.
-- Sandboxing is basic Docker isolation without centralized hardening policy.
-- No first-class harness abstraction for multi-agent ecosystem support.
+- Supporting every historical script/CLI path.
+- Preserving old config formats beyond a one-time cutover converter.
+- Perfect provider parity in the first release.
+- Full multi-tenant production isolation in this phase.
 
 ## 4) Target Architecture
 
 ### 4.1 Canonical execution
 
-- `scripts/run_experiment.py` is the single canonical entrypoint.
-- All old scripts become thin wrappers that translate args/config only.
-- Core logic lives in `bench/experiments/*` + harness interfaces.
+The goal is a single supported execution path so that every harness, sandbox profile,
+and telemetry hook is guaranteed to fire. A library API (`bench.runner.run()`) is the
+canonical entry point; `scripts/run_experiment.py` is a thin CLI wrapper around it.
+This means future entrypoints (web UI, programmatic tests, notebook usage) get the same
+guarantees without duplicating orchestration logic.
+
+- `bench.runner.run()` is the canonical execution API.
+- `scripts/run_experiment.py` is a CLI wrapper that delegates to it.
+- Core logic lives in `bench/experiments/*`.
+- Any legacy scripts are removed or fail-fast with a canonical command pointer.
 
 ### 4.2 Harness adapter layer
 
@@ -44,227 +50,256 @@ Add `bench/harness/` with:
 - `HarnessRequest`
 - `HarnessResult`
 - `AgentHarness` protocol (`run(request) -> HarnessResult`)
+- `HarnessRegistry` and `HarnessFactory`
 
 Initial adapters:
 
-1. `PiSdkHarness` (preferred primary)
-2. `PiCliHarness` (compat fallback)
+1. `PiSdkHarness` (preferred)
+2. `PiCliHarness` (fallback)
 3. `CliHarnessBase` (Codex/Claude/Gemini wrappers)
 4. optional `SweAgentHarness`
 
-### 4.3 Unified telemetry contract
+### 4.3 Polyglot boundary
 
-Every harness must emit:
+- Keep runner/policy/telemetry in Python.
+- For TS-native SDKs, use a narrow JSON IPC boundary.
+- For `PiSdkHarness`, ship a minimal unversioned JSON boundary first.
+- Promote to a versioned IPC contract once at least two TS-native adapters exist.
+- Contract:
+  - Python sends normalized `HarnessRequest`.
+  - TS worker returns normalized `HarnessResult` + raw events.
+- No provider logic in runner; provider specifics stay in resolver + harness adapter.
+
+### 4.4 Provider and auth policy
+
+Central policy modules:
+
+- `ProviderResolver` (model reference -> provider -> runtime model id -> required env aliases)
+- `AuthPolicy` (`env`, `mounted_auth_file`)
+- `CredentialResolver` chain with explicit source metadata
+
+All runs record provider resolution and auth source in manifest metadata.
+
+### 4.5 Sandboxing policy
+
+Central `SandboxPolicy` with profiles:
+
+- `strict` (default): non-root, readonly FS where possible, dropped caps, resource limits, no network by default
+- `networked`: explicit outbound network allowance
+- `developer`: relaxed local-debug profile
+
+All Docker command construction is centralized in one builder module.
+
+### 4.6 Unified telemetry contract
+
+Every harness emits normalized telemetry:
 
 - prompt/completion/total tokens
-- cache read/write tokens (if available)
-- estimated cost (if pricing map available)
+- cache read/write tokens (nullable)
+- estimated cost (nullable)
 - turns used
 - tool call counts/errors/durations
 - latency breakdown
-- raw adapter events (for audit)
+- raw adapter events for audit
 
-### 4.4 Sandboxing and auth policy
+Unknown fields are represented as `null`/unknown, never synthetic zero.
 
-Central policy objects:
+### 4.7 Frontend stack
 
-- `SandboxPolicy` (strict/networked/developer profiles)
-- `AuthPolicy` (env keys, mounted auth file, future bridge)
-
-All runs record active policy in manifest.
+- Standardize frontend/visualizer work on `TanStack Start` (latest), with `Vite` and `Bun`.
+- Keep frontend contract tests focused on artifact schema compatibility and route/build health.
+- Frontend framework choice must not alter canonical backend artifact schemas.
 
 ## 5) Implementation Phases
 
-## Phase A - Canonical Runner Consolidation
+### Phase dependency graph
 
-### A1. Make one execution path
+```
+Phase A ─────┬──> Phase B ──> Phase C ──> Phase E
+             │                   ^
+             └──> Phase D ───────┘
+                                          Phase E ──> Phase F
+                                            ^
+Documentation (J-01, J-02, J-05) ───────────┘
+```
 
-Tasks:
+- **A** is the foundation; nothing starts before it.
+- **B** (harness abstraction) and **D** (sandbox hardening) are independent of each other and can proceed in parallel after A.
+- **C** (provider/credential) depends on B (harness contracts define what the resolver must supply) but not on D.
+- **E** (CI) depends on B, C, and D all being complete (integration tests exercise the full stack).
+- **F** (ecosystem expansion) depends on E (new adapters need CI coverage) and on key documentation (architecture doc, contributor guide).
+- **Versioned IPC hardening** is deferred — see Section 5.1.
 
-- Route all benchmark execution through canonical runner API.
-- Convert deprecated scripts (`run_benchmark.py`, `evaluate_batch.py`, `mini_benchmark.py`) into wrappers only.
-- Rewire `posit_gskill evaluate` to canonical runner flow.
+### Phase gates
 
-Acceptance criteria:
+Each phase has an explicit entry condition. Do not start a phase until its gate is met.
 
-- No duplicated benchmark/evaluation business logic outside canonical core.
-- Wrapper scripts have no direct Docker/provider logic.
+| Phase | Entry gate |
+|-------|-----------|
+| A | None (start here) |
+| B | A acceptance criteria met; all legacy paths removed or hard-failed |
+| C | B-04 (registry/factory) and B-06 (PiSdkHarness) operational |
+| D | A acceptance criteria met (independent of B) |
+| E | B, C, D acceptance criteria all met |
+| F | E acceptance criteria met; J-02 and J-05 published |
 
-## Phase B - Harness Abstraction and Adapterization
+### 5.1 Deferred hardening: Versioned IPC boundary
 
-### B1. Introduce harness interface
+`PiSdkHarness` still ships with a minimal TS worker and unversioned JSON contract in Phase B.
+Only the hardening layer is deferred:
 
-Tasks:
+- versioned JSON IPC schema,
+- compatibility matrix tests across schema versions,
+- strict bidirectional schema enforcement for multiple TS adapters.
 
-- Add `bench/harness/base.py` with typed contracts.
-- Replace direct Pi calls in evaluation path with injected harness instance.
+Promote this deferred work when a second TS-native adapter is introduced.
 
-Acceptance criteria:
-
-- Harness is selected from config only.
-- Core runner has no provider-specific branches.
-
-### B2. Implement adapters
-
-Tasks:
-
-- Implement `PiSdkHarness` (preferred).
-- Keep `PiCliHarness` as fallback.
-- Add generic CLI adapter foundation for Codex/Claude/Gemini.
-
-Acceptance criteria:
-
-- Same task/model/skill can run by swapping harness ID in config.
-
-## Phase C - Provider Resolution and Credential Integrity
-
-### C1. Single source of truth for provider mapping
-
-Tasks:
-
-- Create central resolver module for:
-  - model reference resolution,
-  - provider prefixing,
-  - required env var mapping.
-- Remove duplicated mapping logic from runner/sandbox/scripts.
-- Fix env var naming consistency (include explicit compatibility aliases where needed).
-
-Acceptance criteria:
-
-- Startup preflight catches missing key/model mismatch before first task.
-- No duplicated provider map tables remain.
-
-### C2. Credential policy
+## Phase A - Canonical Runner Enforcement
 
 Tasks:
 
-- Implement `CredentialResolver` chain:
-  1) env api key (default),
-  2) explicit read-only auth file mount (opt-in),
-  3) reserved future bridge mode.
-- Add log redaction for token/file path leakage.
+- Introduce `bench/runner.py` with `run()` as the canonical library API.
+- Remove or disable non-canonical benchmark execution paths.
+- Ensure all entrypoints call canonical runner API (`bench.runner.run()`).
+- Add tests proving no bypass path exists.
+- Remove dead code, old configs, and obsolete test fixtures left behind by legacy paths.
 
 Acceptance criteria:
 
-- Auth source is explicit in run metadata.
-- Personal OAuth/session mode requires explicit flag and is marked non-reproducible.
+- Only one supported runtime path for benchmark execution.
+- No dead legacy code remains in the tree.
 
-## Phase D - Sandboxing Hardening
+## Phase B - Harness Abstraction + Pi SDK First
 
-### D1. Central Docker run builder
+Depends on: **Phase A complete.**
 
 Tasks:
 
-- Consolidate container invocation flags in one module.
-- Add profile presets:
-  - `strict` (default): non-root, read-only filesystem where possible, reduced caps, resource limits.
-  - `networked`: explicit outbound network allowance.
-  - `developer`: local debug relaxed mode.
+- Implement `bench/harness/base.py` contracts.
+- Refactor runner to inject harness from config (`execution.harness`).
+- Implement `PiSdkHarness` as primary and `PiCliHarness` as fallback.
+- Implement minimal TS worker + unversioned JSON boundary for `PiSdkHarness`.
+- Add a cross-language contract smoke test for Python <-> TS request/response shape.
+- Add `CliHarnessBase` and one additional harness proof adapter.
 
 Acceptance criteria:
 
-- No scattered raw `docker run` construction in business logic paths.
-- Active sandbox profile appears in manifest and summary.
+- Same task/model/skill runs by swapping harness id only.
 
-## Phase E - CI and Integration Reliability
+## Phase C - Provider/Credential Integrity
 
-### E1. Test pyramid upgrades
+Depends on: **B-04 and B-06 operational.**
 
 Tasks:
 
-- Keep unit + contract tests.
-- Add adapter contract tests with fixture events.
-- Add local Docker integration test with stubbed model output.
-- Add env-gated provider smoke (1 task x 1 model x selected harness).
-- Add optimization mini integration test (1-2 iterations, checkpoint/resume/budget stop).
-- Add synthetic + mined pipeline smoke tests.
+- Implement central provider resolver and preflight validation.
+- Remove duplicated provider/env maps from runner/sandbox/scripts.
+- Implement credential resolver chain with redaction and source tracking.
 
 Acceptance criteria:
 
-- CI includes at least one true non-dry end-to-end path.
-- Failures localize by layer (resolver/harness/sandbox/pipeline).
+- Missing key/model mismatch is caught before first task.
+- Auth source and policy are explicit in metadata.
 
-### E2. CI job decomposition
+## Phase D - Sandbox Hardening
+
+Depends on: **Phase A complete** (independent of B).
+
+Tasks:
+
+- Centralize Docker command assembly.
+- Implement strict/networked/developer profiles.
+- Make `strict` default in benchmarks and CI.
+
+Acceptance criteria:
+
+- No raw `docker run` assembly in business logic paths.
+- Active sandbox profile/flags appear in manifest.
+
+## Phase E - CI Reliability
+
+Depends on: **Phases B, C, D all complete.**
+
+Prerequisites (new):
+
+- Test fixtures, mock provider stubs, and CI secrets configuration must be set up before writing integration tests.
 
 Jobs:
 
 - `fast`: lint/type/unit/schema/contracts
 - `integration-local`: docker + harness stub
-- `integration-provider` (scheduled/manual/secrets gated): real provider
-- `visualizer`: bun lint/build/export contract
+- `integration-provider`: scheduled/manual + secrets-gated real provider
+- `visualizer`: TanStack Start (`Bun` + `Vite`) lint/build/schema-compat contract
 
 Acceptance criteria:
 
-- `ci-quick` explicitly documents scope limits.
+- At least one non-dry end-to-end path in CI.
+- Failures localize by layer (resolver/harness/sandbox/pipeline).
 
 ## Phase F - Ecosystem Expansion
 
-### F1. Additional harnesses
+Depends on: **Phase E complete; J-02 (architecture doc) and J-05 (contributor guide) published.**
 
 Tasks:
 
-- Add Codex/Claude/Gemini CLI adapters using common CLI base.
-- Add SWE-agent adapter if required.
-- Optionally add AI SDK-backed adapter where it simplifies provider glue.
+- Add Codex/Claude/Gemini adapters on `CliHarnessBase`.
+- Add SWE-agent adapter if needed.
+- Publish capability matrix per harness.
 
 Acceptance criteria:
 
-- New harness integrations require adapter + tests + config only (no core runner edits).
+- New harness requires adapter + tests + config only; no runner edits.
 
-## 6) Config and Schema Changes
+## 6) Config and Schema (Target)
 
-Additions (illustrative):
+Required execution fields:
 
 - `execution.harness: pi_sdk | pi_cli | codex_cli | claude_cli | gemini_cli | swe_agent`
 - `execution.sandbox_profile: strict | networked | developer`
 - `execution.auth_policy: env | mounted_auth_file`
 - `execution.auth_mounts[]` (path, read_only, purpose)
-- telemetry fields for normalized token/cost/tool metrics
 
-Migration:
+Result/manifest additions:
 
-- Preserve backward compatibility for one cycle via wrapper translation.
-- Emit deprecation warnings with exact replacement commands.
+- normalized telemetry fields
+- provider resolution metadata
+- auth source/policy metadata
+- active sandbox profile/flags
+
+### Config migration path
+
+Existing experiment configs that lack the new `execution.*` fields will fail schema
+validation at startup with a clear error message listing missing fields and example
+values. A one-time offline migration script (`scripts/migrate_config.py`) converts
+old configs by adding sensible defaults (`harness: pi_sdk`, `sandbox_profile: strict`,
+`auth_policy: env`). The script is idempotent and safe to re-run.
 
 ## 7) Risk Register
 
-- OAuth/session-file auth may break due to provider/keychain/device coupling.
-- Tight sandbox defaults may initially reduce compatibility for some agents.
-- Provider SDK/API changes may require adapter-specific maintenance.
-- Cost telemetry may be partially unknown for some providers unless price metadata is maintained.
-
-Mitigations:
-
-- Keep adapter capability matrix.
-- Separate strict and developer profiles.
-- Record unknown metrics explicitly; do not fake zeros.
+| # | Risk | Likelihood | Impact | Mitigation |
+|---|------|-----------|--------|------------|
+| R1 | TS boundary drift between Python contracts and worker payloads | Medium | High | Contract tests for harness JSON payloads; defer full IPC schema until second TS adapter (see 5.1) |
+| R2 | Strict sandbox defaults break harness assumptions | High | Medium | Capability matrix per harness; explicit `strict` vs `developer` profile behavior; integration test per profile |
+| R3 | Provider SDK breaking changes require adapter maintenance | Medium | Medium | Pin SDK versions; adapter-specific CI smoke tests catch regressions early |
+| R4 | Cost telemetry partial without maintained pricing tables | High | Low | Keep unknown telemetry explicit (`null`) rather than inferred; cost estimation is opt-in |
+| R5 | IPC serialization slow under large payloads (many tool calls, long outputs) | Low | Medium | Benchmark IPC round-trip in integration tests; set payload size limits with clear error |
+| R6 | Provider rate-limiting differences cause inconsistent benchmark results | Medium | Medium | Add per-provider retry/backoff config in harness adapter; record rate-limit events in telemetry |
+| R7 | Sandbox profile misconfiguration fails silently (wrong profile applied) | Medium | High | Log active profile + Docker flags at run start; add assertion in manifest that profile matches config |
+| R8 | Telemetry schema evolution breaks downstream consumers (visualizer, reports) | Low | High | Version the telemetry schema; add schema compatibility test in visualizer CI job |
+| R9 | Legacy code removal leaves orphaned test fixtures or config files | High | Low | Add cleanup checklist item (A-07); run dead-code scan after Phase A |
 
 ## 8) Milestones
 
-- M1: Canonical consolidation + provider resolver cleanup.
-- M2: Harness abstraction + Pi SDK adapter operational.
-- M3: Sandbox policy + credential policy shipping.
-- M4: Integration CI (local + provider-gated) passing.
-- M5: Additional harness adapters and optimization/task pipeline smoke coverage.
+- M1: Canonical path enforcement + resolver foundation
+- M2: Harness abstraction + Pi SDK adapter operational
+- M3: Auth/sandbox policy shipping with metadata capture
+- M4: Integration CI (local + provider-gated) passing
+- M5: Additional harnesses + full telemetry normalization
 
-## 9) Definition of Done (Architecture)
+## 9) Definition of Done
 
-- One canonical execution engine in practice.
-- Harnesses pluggable via config without core edits.
-- Provider/auth/sandbox behavior policy-driven and auditable.
-- Telemetry normalized across harnesses/providers.
-- CI includes non-dry end-to-end validation.
-
-## Appendix A - Sandbox Options (Pragmatic Guidance)
-
-For this project, the right sequence is:
-
-1. Harden local Docker policy first (fastest path, lowest migration cost).
-2. Add optional hosted Docker sandbox execution later (if parallel scale or ops burden requires it).
-3. Consider microVM-based isolation only if threat model requires stronger tenant isolation.
-
-Notes:
-
-- Many "agent sandbox" services are orchestration layers around containers.
-- They can improve ops ergonomics, quotas, observability, and remote isolation.
-- They do not remove the need for explicit auth policy, telemetry normalization, and adapter contracts.
+- One supported execution engine.
+- Harnesses are config-pluggable without runner code changes.
+- Provider/auth/sandbox behavior is policy-driven and auditable.
+- Telemetry is normalized across harnesses/providers.
+- CI proves non-dry end-to-end execution.

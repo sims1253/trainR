@@ -8,30 +8,34 @@
 # 1. BENCHMARK: Evaluate a skill on tasks
 # =============================================================================
 
-# Usage: make benchmark [CONFIG=configs/evaluation.yaml] [MODEL=model-name]
-#       make benchmark-smoke  # Quick test with 1 task
-CONFIG ?= configs/evaluation.yaml
-MODEL ?= 
+# Usage: make benchmark [CONFIG=configs/experiments/r_bench_smoke.yaml]
+#       make benchmark-smoke  # Quick test with smoke config
+#       make benchmark-all    # Full benchmark run
+#
+# The canonical runner (run_experiment.py) supports:
+#   --config FILE    Experiment config (required)
+#   --output-dir DIR Override output directory
+#   --seed N         Random seed for reproducibility
+#   --workers N      Number of parallel workers
+#   --validate       Validate config without running
+#   --dry-run        Show experiment matrix without running
+#   --verbose        Enable verbose output
+CONFIG ?= configs/experiments/r_bench_smoke.yaml
 
 benchmark:
-	@echo "=== BENCHMARK: $(CONFIG) $(if $(MODEL),model=$(MODEL),) ==="
-	@uv run python scripts/evaluate_batch.py \
-		--config $(CONFIG) \
-		$(if $(MODEL),--model $(MODEL),)
+	@echo "=== BENCHMARK: $(CONFIG) ==="
+	@uv run python scripts/run_experiment.py --config $(CONFIG)
 
-# Smoke test: 1 model, 1 split, 1 task - for quick pipeline verification
+# Smoke test: Quick pipeline verification with minimal config
 benchmark-smoke:
 	@echo "=== BENCHMARK SMOKE TEST ==="
-	@uv run python scripts/evaluate_batch.py \
-		--config configs/smoke.yaml \
-		--max-tasks 1 \
-		--splits dev \
-		--no-skill
+	@uv run python scripts/run_experiment.py --config configs/experiments/r_bench_smoke.yaml
 
+# Full benchmark: Run with full experiment config
+# Note: Create a full experiment config in configs/experiments/ for production use
 benchmark-all:
 	@echo "=== BENCHMARK ALL MODELS ==="
-	@uv run python scripts/evaluate_batch.py \
-		--config configs/evaluation.yaml
+	@uv run python scripts/run_experiment.py --config $(CONFIG)
 
 # =============================================================================
 # 2. OPTIMIZE: Iteratively improve skill with GEPA
@@ -43,7 +47,7 @@ MAX_CALLS ?= 30
 
 optimize:
 	@echo "=== OPTIMIZE: $(MODELS) ($(MAX_CALLS) calls) ==="
-	@uv run python scripts/run_optimization.py \
+	@uv run python scripts/run_optimize.py \
 		--models "$(MODELS)" \
 		--max-metric-calls $(MAX_CALLS) \
 		--output-dir results/optimization/$(shell date +%Y%m%d_%H%M%S)

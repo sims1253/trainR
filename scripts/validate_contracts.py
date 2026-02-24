@@ -259,8 +259,8 @@ class ConfigValidator:
         if skill and isinstance(skill, str):
             self._validate_file_reference("benchmark.yaml", "skill", skill)
 
-    def validate_evaluation_config(self, filename: str = "evaluation.yaml") -> None:
-        """Validate evaluation.yaml or smoke.yaml structure and model references."""
+    def validate_evaluation_config(self, filename: str = "smoke.yaml") -> None:
+        """Validate evaluation config structure and model references (e.g., smoke.yaml)."""
         config = self.load_yaml(filename)
         if not config:
             return
@@ -418,19 +418,16 @@ class ConfigValidator:
         print()
 
         # Validate in order of dependencies
-        print("  [1/5] Validating llm.yaml...")
+        print("  [1/4] Validating llm.yaml...")
         self.validate_llm_config()
 
-        print("  [2/5] Validating benchmark.yaml...")
+        print("  [2/4] Validating benchmark.yaml...")
         self.validate_benchmark_config()
 
-        print("  [3/5] Validating evaluation.yaml...")
-        self.validate_evaluation_config("evaluation.yaml")
-
-        print("  [4/5] Validating smoke.yaml...")
+        print("  [3/4] Validating smoke.yaml...")
         self.validate_evaluation_config("smoke.yaml")
 
-        print("  [5/5] Validating mining.yaml...")
+        print("  [4/4] Validating mining.yaml...")
         self.validate_mining_config()
 
         print()

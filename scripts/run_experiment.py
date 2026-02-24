@@ -16,19 +16,19 @@ Output artifacts (in output_dir/run_id/):
 """
 
 import argparse
-import json
 import logging
 import sys
 from pathlib import Path
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from rich.console import Console
 from rich.panel import Panel
-from rich.progress import BarColumn, Progress, SpinnerColumn, TaskProgressColumn, TextColumn
 from rich.table import Table
 
-from bench.experiments import ExperimentConfig, ExperimentRunner, load_experiment_config
+import bench.runner
+from bench.experiments import ExperimentConfig, load_experiment_config
 from bench.schema.v1 import ManifestV1
 
 console = Console()
@@ -112,84 +112,6 @@ def print_results_summary(manifest: ManifestV1) -> None:
     )
 
 
-def run_with_progress(runner: ExperimentRunner) -> ManifestV1:
-    """Run experiment with progress display."""
-    # Setup
-    output_dir = runner.setup()
-    matrix = runner.matrix
-
-    if not matrix:
-        raise RuntimeError("Experiment matrix is empty")
-
-    console.print(f"\n[blue]Starting experiment: {len(matrix)} total runs[/blue]")
-    console.print(f"[dim]Output directory: {output_dir}[/dim]")
-
-    # Create progress bar
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        BarColumn(),
-        TaskProgressColumn(),
-        console=console,
-    ) as progress:
-        task = progress.add_task("Running...", total=len(matrix.runs))
-
-        # Run with custom progress callback
-        manifest = run_with_callbacks(
-            runner,
-            on_result=lambda r: progress.advance(task),
-        )
-
-    return manifest
-
-
-def run_with_callbacks(runner: ExperimentRunner, on_result=None) -> ManifestV1:
-    """Run experiment with callbacks for progress updates."""
-    import time
-
-
-    if not runner.matrix or not runner.output_dir or not runner.manifest:
-        raise RuntimeError("Experiment not set up")
-
-    start_time = time.time()
-    results_file = runner.output_dir / "results.jsonl"
-
-    # Execute runs
-    for run in runner.matrix.runs:
-        try:
-            result = runner._execute_run(run)
-        except Exception as e:
-            logger.error(f"Run {run.run_index} failed: {e}")
-            result = runner._create_error_result(run, str(e))
-
-        # Record result
-        runner.results.append(result)
-        runner.manifest.add_result(result)
-
-        # Append to results.jsonl
-        with open(results_file, "a") as f:
-            f.write(json.dumps(result.model_dump(mode="json")) + "\n")
-
-        # Progress callback
-        if on_result:
-            on_result(result)
-
-    # Finalize
-    from datetime import datetime, timezone
-
-    end_time = datetime.now(timezone.utc)
-    runner.manifest.finalize(end_time)
-    runner.manifest.results_path = str(results_file)
-
-    runner._save_manifest()
-    runner._save_summary()
-
-    total_time = time.time() - start_time
-    console.print(f"\n[green]Experiment complete in {total_time:.1f}s[/green]")
-
-    return runner.manifest
-
-
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Run experiments with unified configuration",
@@ -265,57 +187,57 @@ Examples:
     config_path = Path(args.config)
     config = validate_config(config_path)
 
-    # Apply CLI overrides
-    if args.output_dir:
-        config.output.dir = args.output_dir
-    if args.seed is not None:
-        config.determinism.seed = args.seed
-    if args.workers is not None:
-        config.execution.parallel_workers = args.workers
-
-    # Print config summary
+    # Print config summary showing base config
     print_config_summary(config)
 
-    # Validate only
+    # Common override kwargs passed to bench.runner.run() for all modes.
+    # The runner applies these via _apply_overrides on a copy of the config,
+    # ensuring the original is not mutated and all code paths are consistent.
+    run_kwargs: dict[str, Any] = {}
+    if args.output_dir:
+        run_kwargs["output_dir"] = args.output_dir
+    if args.seed is not None:
+        run_kwargs["seed"] = args.seed
+    if args.workers is not None:
+        run_kwargs["workers"] = args.workers
+
+    # Validate only - delegate to runner with validate_only=True
     if args.validate:
+        bench.runner.run(config, validate_only=True, **run_kwargs)
         console.print("[green]Configuration is valid[/green]")
-        sys.exit(0)
+        return
 
-    # Dry run - show matrix without executing
+    # Dry run - delegate to runner with dry_run=True
     if args.dry_run:
-        from bench.experiments import generate_matrix
-
-        matrix = generate_matrix(config)
+        manifest = bench.runner.run(config, dry_run=True, **run_kwargs)
         console.print("\n[blue]Experiment Matrix[/blue]")
-        console.print(f"  Tasks: {len(matrix.tasks)}")
-        console.print(f"  Models: {len(matrix.models)}")
-        console.print(f"  Repeats: {config.execution.repeats}")
-        console.print(f"  Total runs: {len(matrix.runs)}")
+        console.print(f"  Tasks: {manifest.task_count}")
+        console.print(f"  Models: {len(manifest.models)}")
+        console.print(f"  Total runs: {manifest.config.get('total_runs', 'N/A')}")
+        if manifest.config.get("task_ids"):
+            console.print(f"\n[dim]Task IDs: {manifest.config['task_ids'][:5]}...[/dim]")
+        console.print(f"[dim]Models: {manifest.models}[/dim]")
+        return
 
-        if matrix.tasks:
-            console.print(
-                f"\n[dim]Task IDs: {[t.task_id for t in matrix.tasks[:5]]}{'...' if len(matrix.tasks) > 5 else ''}[/dim]"
-            )
-        if matrix.models:
-            console.print(f"[dim]Models: {[m.name for m in matrix.models]}[/dim]")
-
-        sys.exit(0)
-
-    # Run experiment
+    # Run experiment - delegate to canonical bench.runner.run()
     try:
-        runner = ExperimentRunner(config)
-        manifest = run_with_progress(runner)
+        manifest = bench.runner.run(
+            config,
+            verbose=args.verbose,
+            **run_kwargs,
+        )
 
         # Print results
         print_results_summary(manifest)
 
-        # Print output location
-        output_dir = runner.output_dir
-        console.print("\n[dim]Output artifacts:[/dim]")
-        console.print(f"[dim]  - {output_dir}/manifest.json[/dim]")
-        console.print(f"[dim]  - {output_dir}/results.jsonl[/dim]")
-        console.print(f"[dim]  - {output_dir}/summary.json[/dim]")
-        console.print(f"[dim]  - {output_dir}/matrix.json[/dim]")
+        # Print output location (derive from results_path)
+        output_dir = Path(manifest.results_path).parent if manifest.results_path else None
+        if output_dir:
+            console.print("\n[dim]Output artifacts:[/dim]")
+            console.print(f"[dim]  - {output_dir}/manifest.json[/dim]")
+            console.print(f"[dim]  - {output_dir}/results.jsonl[/dim]")
+            console.print(f"[dim]  - {output_dir}/summary.json[/dim]")
+            console.print(f"[dim]  - {output_dir}/matrix.json[/dim]")
 
     except KeyboardInterrupt:
         console.print("\n[yellow]Experiment interrupted by user[/yellow]")

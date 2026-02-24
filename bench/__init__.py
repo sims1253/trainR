@@ -3,9 +3,15 @@
 This package provides:
 - Schema definitions (TaskV1, ResultV1, ManifestV1, ProfileV1)
 - Experiment runner (ExperimentConfig, ExperimentRunner)
+- Canonical execution API (bench.runner.run)
 - Validation utilities
+
+The canonical entry point for benchmark execution is bench.runner.run():
+    from bench import run
+    manifest = run("configs/experiments/smoke.yaml")
 """
 
+from bench.runner import run
 from bench.schema.v1 import (
     ManifestV1,
     ProfileV1,
@@ -18,13 +24,15 @@ from bench.schema.v1 import (
     validate_task,
 )
 
-# Lazy import for experiments to avoid circular imports
 __all__ = [
+    # Canonical execution API
+    "run",
+    # Schema types
     "ManifestV1",
     "ProfileV1",
     "ResultV1",
-    # Schema
     "TaskV1",
+    # Schema utilities
     "load_json_schema",
     "validate_manifest",
     "validate_profile",

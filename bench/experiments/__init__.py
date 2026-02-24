@@ -1,16 +1,16 @@
 """Unified experiment runner for benchmark evaluation.
 
-This module provides the canonical entry point for running experiments:
-- ExperimentConfig: Configuration schema
-- ExperimentRunner: Main execution engine
-- ExperimentMatrix: Pre-computed experiment plan
-- ToolABMatrix: A/B tool comparison matrix
+This module provides configuration and matrix generation for experiments.
+For execution, use the canonical runner API:
 
-Usage:
-    from bench.experiments import ExperimentConfig, run_experiment
+    from bench.runner import run
 
     config = ExperimentConfig.from_yaml("configs/experiments/smoke.yaml")
-    manifest = run_experiment(config)
+    manifest = run(config)
+
+Internal APIs (not for direct use):
+    - ExperimentRunner: Internal execution engine
+    - run_experiment: Internal convenience function
 """
 
 from bench.experiments.config import (
@@ -42,6 +42,7 @@ from bench.experiments.matrix import (
 )
 from bench.experiments.runner import ExperimentRunner, run_experiment
 
+# Internal: Use bench.runner.run() as the canonical API
 __all__ = [
     "DeterminismConfig",
     "ExecutionConfig",
@@ -50,8 +51,6 @@ __all__ = [
     # Matrix
     "ExperimentMatrix",
     "ExperimentRun",
-    # Runner
-    "ExperimentRunner",
     "ModelSpec",
     "ModelsConfig",
     "OutputConfig",
@@ -71,5 +70,4 @@ __all__ = [
     "generate_matrix",
     "generate_tool_ab_matrix",
     "load_experiment_config",
-    "run_experiment",
 ]

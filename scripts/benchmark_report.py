@@ -10,22 +10,22 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from rich.console import Console
 
-from benchmark.schema import BenchmarkRun
+from bench.schema.v1 import ManifestV1
 
 console = Console()
 
 
 def generate_report(results_path: Path, output_path: Path | None = None) -> str:
     """Generate a markdown benchmark report."""
-    run = BenchmarkRun.load(results_path)
+    manifest = ManifestV1.load(str(results_path))
 
     lines = []
-    lines.append(f"# Benchmark Report: {run.run_id}")
+    lines.append(f"# Benchmark Report: {manifest.run_id}")
     lines.append("")
-    lines.append(f"- **Date:** {run.timestamp}")
-    lines.append(f"- **Git SHA:** {run.git_sha}")
-    lines.append(f"- **Skill:** {run.skill_version}")
-    lines.append(f"- **Tasks:** {run.task_count}")
+    lines.append(f"- **Date:** {manifest.timestamp}")
+    lines.append(f"- **Git SHA:** {manifest.git_sha}")
+    lines.append(f"- **Skill:** {manifest.skill_version}")
+    lines.append(f"- **Tasks:** {manifest.task_count}")
     lines.append("")
 
     # Overall results table
@@ -34,10 +34,12 @@ def generate_report(results_path: Path, output_path: Path | None = None) -> str:
     lines.append("| Model | Pass Rate | Avg Latency (s) | Tasks Evaluated |")
     lines.append("|-------|-----------|-----------------|-----------------|")
 
-    for model in run.models:
-        model_results = [r for r in run.results if r.model == model]
-        pass_rate = run.pass_rate(model)
-        avg_lat = run.avg_latency(model)
+    for model in manifest.models:
+        model_results = [r for r in manifest.results if r.model == model]
+        passed = sum(1 for r in model_results if r.passed)
+        total = len(model_results)
+        pass_rate = passed / total if total > 0 else 0.0
+        avg_lat = sum(r.latency_s for r in model_results) / total if total > 0 else 0.0
         lines.append(f"| {model} | {pass_rate:.1%} | {avg_lat:.1f} | {len(model_results)} |")
 
     lines.append("")
@@ -46,8 +48,8 @@ def generate_report(results_path: Path, output_path: Path | None = None) -> str:
     lines.append("## Failure Analysis")
     lines.append("")
 
-    for model in run.models:
-        model_results = [r for r in run.results if r.model == model]
+    for model in manifest.models:
+        model_results = [r for r in manifest.results if r.model == model]
         failures = [r for r in model_results if not r.passed]
 
         if not failures:
@@ -58,8 +60,17 @@ def generate_report(results_path: Path, output_path: Path | None = None) -> str:
         lines.append(f"### {model}: {len(failures)} failures")
         lines.append("")
 
-        # Count error categories
-        categories = Counter(r.error_category or "unknown" for r in failures)
+        # Count error categories - handle both enum and string
+        def get_error_cat(r):
+            if r.error_category is None:
+                return "unknown"
+            return (
+                r.error_category.value
+                if hasattr(r.error_category, "value")
+                else str(r.error_category)
+            )
+
+        categories = Counter(get_error_cat(r) for r in failures)
         lines.append("| Error Category | Count |")
         lines.append("|----------------|-------|")
         for cat, count in categories.most_common():
@@ -67,23 +78,23 @@ def generate_report(results_path: Path, output_path: Path | None = None) -> str:
         lines.append("")
 
     # Per-task comparison (if multiple models)
-    if len(run.models) > 1:
+    if len(manifest.models) > 1:
         lines.append("## Per-Task Comparison")
         lines.append("")
 
         # Get unique task IDs
-        task_ids = sorted({r.task_id for r in run.results})
+        task_ids = sorted({r.task_id for r in manifest.results})
 
-        header = "| Task ID |" + " | ".join(run.models) + " |"
-        separator = "|---------|" + " | ".join(["---"] * len(run.models)) + " |"
+        header = "| Task ID |" + " | ".join(manifest.models) + " |"
+        separator = "|---------|" + " | ".join(["---"] * len(manifest.models)) + " |"
         lines.append(header)
         lines.append(separator)
 
         for tid in task_ids:
             row = f"| {tid} |"
-            for model in run.models:
+            for model in manifest.models:
                 result = next(
-                    (r for r in run.results if r.task_id == tid and r.model == model),
+                    (r for r in manifest.results if r.task_id == tid and r.model == model),
                     None,
                 )
                 if result is None:

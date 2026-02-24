@@ -1,41 +1,38 @@
 #!/usr/bin/env python3
-"""Mini benchmark to test all models on a single task."""
-import subprocess
+"""DEPRECATED: This script has been removed.
 
-import yaml
+This legacy executor is no longer supported. Multi-model testing must go through
+the canonical runner API with a config file specifying multiple models.
 
-# Load models
-with open('configs/llm.yaml') as f:
-    config = yaml.safe_load(f)
+Migration:
+    # Old:
+    uv run python scripts/mini_benchmark.py
+    (tested all models on a single task: tasks/mined/tidyverse_readr_1615.json)
 
-models = list(config.get('models', {}).keys())
-task = "tasks/mined/tidyverse_readr_1615.json"
+    # New:
+    # Create a config file with multiple models in models.names, then:
+    uv run python scripts/run_experiment.py --config configs/experiments/multi_model.yaml
 
-print(f"Testing {len(models)} models on {task}")
-print("=" * 60)
+For help with the canonical runner:
+    uv run python scripts/run_experiment.py --help
 
-results = []
-for model in models:
-    print(f"\n[{model}]")
-    cmd = [
-        "uv", "run", "python", "scripts/run_benchmark.py",
-        "--task", task,
-        "--worker-model", model
-    ]
-    try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
-        # Parse output for key metrics
-        output = result.stdout + result.stderr
-        lines = output.split('\n')
-        for line in lines:
-            if 'Input Tokens:' in line or 'Output Tokens:' in line or 'Pass Rate:' in line or 'Latency:' in line:
-                print(f"  {line.strip()}")
-        if result.returncode != 0:
-            print(f"  ERROR: {result.stderr[:200] if result.stderr else 'unknown'}")
-    except subprocess.TimeoutExpired:
-        print("  TIMEOUT after 600s")
-    except Exception as e:
-        print(f"  ERROR: {e}")
+See ARCH_REMEDIATION_PLAN.md for architecture details.
+"""
 
-print("\n" + "=" * 60)
-print("Mini benchmark complete!")
+import sys
+
+
+def main():
+    print(
+        "ERROR: This script is deprecated and has been removed.\n"
+        "Use the canonical runner instead:\n"
+        "  uv run python scripts/run_experiment.py --config <config.yaml>\n"
+        "For multi-model testing, specify multiple models in your config file.\n"
+        "For help: uv run python scripts/run_experiment.py --help",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
