@@ -116,7 +116,7 @@ Phase gate: **B, C, D, E complete and F-01 defined.**
 Phase gate: **A complete** (schema fields must land before runtime wiring).
 
 - [x] H-01: Extend experiment config schema with `execution.harness`.
-- [ ] H-02: Add `execution.sandbox_profile`.
+- [x] H-02: Add `execution.sandbox_profile`.
 - [ ] H-03: Add `execution.auth_policy` + optional auth mounts. *Depends: D-05.*
 - [ ] H-04: Add schema validation for new fields. *Depends: H-01..H-03.*
 - [ ] H-05: Remove backward-compat translation paths from runtime code. *Depends: H-04.*

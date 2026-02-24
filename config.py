@@ -7,6 +7,7 @@ LiteLLM providers: https://docs.litellm.ai/docs/providers
 """
 
 import os
+import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -211,6 +212,21 @@ class LLMConfig:
 
     def _get_api_key_env(self, provider: str) -> str | None:
         """Get the API key environment variable name for a provider."""
+        # Try central resolver first
+        try:
+            from bench.provider import resolve_api_key_env
+
+            return resolve_api_key_env(provider)
+        except (ImportError, KeyError):
+            pass
+
+        # Fallback to local mapping (deprecated)
+        warnings.warn(
+            f"Using fallback mapping in config._get_api_key_env(). "
+            f"Prefer bench.provider.resolve_api_key_env() for provider '{provider}'.",
+            DeprecationWarning,
+            stacklevel=3,
+        )
         mapping = {
             "openrouter": "OPENROUTER_API_KEY",
             "zai": "Z_AI_API_KEY",
@@ -232,6 +248,21 @@ class LLMConfig:
 
     def _get_litellm_prefix(self, provider: str) -> str:
         """Get the LiteLLM prefix for a provider."""
+        # Try central resolver first
+        try:
+            from bench.provider import resolve_litellm_prefix
+
+            return resolve_litellm_prefix(provider)
+        except (ImportError, KeyError):
+            pass
+
+        # Fallback to local mapping (deprecated)
+        warnings.warn(
+            f"Using fallback mapping in config._get_litellm_prefix(). "
+            f"Prefer bench.provider.resolve_litellm_prefix() for provider '{provider}'.",
+            DeprecationWarning,
+            stacklevel=3,
+        )
         mapping: dict[str, str] = {
             "openrouter": "openrouter/",
             "zai": "zai/",
@@ -302,6 +333,31 @@ def reload_config() -> LLMConfig:
 
 def list_available_providers() -> list[str]:
     """List providers with API keys set."""
+    # Try central resolver first
+    try:
+        from bench.provider import get_provider_resolver
+
+        resolver = get_provider_resolver()
+        available = []
+        for provider_name in resolver.providers:
+            key_name = resolver.get_api_key_env(provider_name)
+            key = os.environ.get(key_name)
+            # Gemini fallback
+            if provider_name == "gemini" and not key:
+                key = os.environ.get("GOOGLE_API_KEY")
+            if key and provider_name not in available:
+                available.append(provider_name)
+        return available
+    except (ImportError, FileNotFoundError, KeyError):
+        pass
+
+    # Fallback to local mapping (deprecated)
+    warnings.warn(
+        "Using fallback mapping in list_available_providers(). "
+        "Prefer bench.provider for provider resolution.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     provider_keys = {
         "openrouter": "OPENROUTER_API_KEY",
         "zai": "Z_AI_API_KEY",

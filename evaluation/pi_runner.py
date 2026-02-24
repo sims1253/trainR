@@ -10,6 +10,7 @@ import os
 import subprocess
 import tempfile
 import time
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -21,6 +22,43 @@ from rich.console import Console
 load_dotenv()
 
 console = Console()
+
+
+def _get_all_provider_api_keys() -> list[str]:
+    """Get list of all known provider API key environment variables.
+
+    Uses the central resolver if available, falls back to hardcoded list.
+    """
+    try:
+        from bench.provider.resolver import PROVIDER_API_KEY_MAP, get_provider_resolver
+
+        resolver = get_provider_resolver()
+        keys = set()
+        # Add keys from resolver
+        for provider_name in resolver.providers:
+            try:
+                keys.add(resolver.get_api_key_env(provider_name))
+            except KeyError:
+                pass
+        # Also include canonical keys
+        keys.update(PROVIDER_API_KEY_MAP.values())
+        return list(keys)
+    except (ImportError, FileNotFoundError):
+        pass
+
+    # Fallback to hardcoded list (deprecated)
+    warnings.warn(
+        "Using fallback API key list in pi_runner. Prefer bench.provider for provider resolution.",
+        DeprecationWarning,
+        stacklevel=3,
+    )
+    return [
+        "OPENROUTER_API_KEY",
+        "Z_AI_API_KEY",
+        "KIMI_API_KEY",
+        "GEMINI_API_KEY",
+        "OPENCODE_API_KEY",
+    ]
 
 
 @dataclass
@@ -37,13 +75,7 @@ class DockerPiRunnerConfig:
     def __post_init__(self):
         if self.api_keys is None:
             # Default: forward all known API keys if set
-            self.api_keys = [
-                "OPENROUTER_API_KEY",
-                "ZAI_API_KEY",
-                "KIMI_API_KEY",
-                "GEMINI_API_KEY",
-                "OPENCODE_API_KEY",
-            ]
+            self.api_keys = _get_all_provider_api_keys()
 
 
 class DockerPiRunner:
@@ -191,20 +223,46 @@ Write the tests now."""
         }
 
         # Add API keys based on provider
-        if provider == "opencode":
-            # opencode.ai uses OPENCODE_API_KEY
-            api_key = os.environ.get("OPENCODE_API_KEY")
+        # Use central resolver for API key lookup
+        def _get_api_key_for_provider(provider_name: str) -> str | None:
+            """Get API key for a provider using resolver with fallback."""
+            try:
+                from bench.provider import resolve_api_key_env
+
+                key_name = resolve_api_key_env(provider_name)
+                return os.environ.get(key_name)
+            except (ImportError, KeyError):
+                # Fallback to direct env var lookup
+                fallback_keys = {
+                    "opencode": "OPENCODE_API_KEY",
+                    "openrouter": "OPENROUTER_API_KEY",
+                    "openai": "OPENAI_API_KEY",
+                    "zai": "Z_AI_API_KEY",
+                    "gemini": "GEMINI_API_KEY",
+                    "anthropic": "ANTHROPIC_API_KEY",
+                }
+                key_name = fallback_keys.get(provider_name)
+                if key_name:
+                    return os.environ.get(key_name)
+            return None
+
+        if provider:
+            api_key = _get_api_key_for_provider(provider)
             if api_key:
-                env_vars["OPENCODE_API_KEY"] = api_key
-            # Pi handles opencode base URL internally
-        elif provider == "openrouter":
-            api_key = os.environ.get("OPENROUTER_API_KEY")
-            if api_key:
-                env_vars["OPENROUTER_API_KEY"] = api_key
-        elif provider == "openai":
-            api_key = os.environ.get("OPENAI_API_KEY")
-            if api_key:
-                env_vars["OPENAI_API_KEY"] = api_key
+                try:
+                    from bench.provider import resolve_api_key_env
+
+                    key_name = resolve_api_key_env(provider)
+                    env_vars[key_name] = api_key
+                except (ImportError, KeyError):
+                    # Fallback: use provider-specific env var names
+                    fallback_key_names = {
+                        "opencode": "OPENCODE_API_KEY",
+                        "openrouter": "OPENROUTER_API_KEY",
+                        "openai": "OPENAI_API_KEY",
+                    }
+                    if provider in fallback_key_names:
+                        env_vars[fallback_key_names[provider]] = api_key
         elif pi_model.startswith("openrouter/"):
             # Fallback for models not in llm.yaml
             api_key = os.environ.get("OPENROUTER_API_KEY")

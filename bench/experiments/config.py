@@ -18,6 +18,8 @@ from typing import Any, Literal
 import yaml
 from pydantic import BaseModel, Field, field_validator
 
+from bench.sandbox import SandboxProfile
+
 
 # Known harness types for execution
 HarnessType = Literal[
@@ -138,6 +140,10 @@ class ExecutionConfig(BaseModel):
             - claude_cli: Anthropic Claude CLI
             - gemini_cli: Google Gemini CLI
             - swe_agent: SWE-agent execution
+        sandbox_profile: Security sandbox profile for execution.
+            - strict: Non-root, readonly FS, no network (default for CI/benchmarks)
+            - networked: Explicit outbound network access
+            - developer: Relaxed local-debug settings
         timeout: Maximum time per task in seconds
         docker_image: Docker image for evaluation containers
         repeats: Number of times to repeat each task
@@ -149,6 +155,10 @@ class ExecutionConfig(BaseModel):
     harness: HarnessType = Field(
         default="pi_docker",
         description="Harness name: pi_docker, pi_sdk, pi_cli, codex_cli, claude_cli, gemini_cli, swe_agent",
+    )
+    sandbox_profile: SandboxProfile = Field(
+        default=SandboxProfile.STRICT,
+        description="Sandbox security profile: strict, networked, or developer",
     )
     timeout: int = Field(
         default=600,
@@ -177,6 +187,20 @@ class ExecutionConfig(BaseModel):
         default=False,
         description="Save LLM request/response traces",
     )
+
+    @field_validator("sandbox_profile", mode="before")
+    @classmethod
+    def validate_sandbox_profile(cls, v: str | SandboxProfile) -> SandboxProfile:
+        """Validate and convert sandbox_profile to SandboxProfile enum."""
+        if isinstance(v, SandboxProfile):
+            return v
+        if isinstance(v, str):
+            try:
+                return SandboxProfile(v.lower())
+            except ValueError:
+                allowed = [p.value for p in SandboxProfile]
+                raise ValueError(f"Invalid sandbox_profile: {v}. Must be one of: {allowed}")
+        raise ValueError(f"Invalid sandbox_profile type: {type(v)}")
 
 
 class RetryConfig(BaseModel):

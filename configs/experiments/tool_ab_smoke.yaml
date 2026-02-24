@@ -30,6 +30,7 @@ skill:
 # Execution settings
 execution:
   harness: "pi_docker"
+  sandbox_profile: "strict"
   timeout: 300
   docker_image: "posit-gskill-eval:latest"
   repeats: 1

@@ -15,6 +15,7 @@ import os
 import re
 import subprocess
 import sys
+import warnings
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -488,19 +489,46 @@ Provide a structured evaluation of this PR as a potential testing task.
             self._litellm_kwargs = {"base_url": base_url} if base_url else {}
 
             # Fallback API key detection for provider prefix format
+            # Use central resolver first, then fallback to direct env var lookup
             if api_key:
                 self.api_key = api_key
-            elif model_name.startswith("opencode/"):
-                self.api_key = os.environ.get("OPENCODE_API_KEY")
-            elif model_name.startswith("zai/"):
-                self.api_key = os.environ.get("Z_AI_API_KEY")
-            elif model_name.startswith("openrouter/"):
-                self.api_key = os.environ.get("OPENROUTER_API_KEY")
             else:
-                self.api_key = config.get_api_key()
+                self.api_key = self._resolve_api_key_for_model(model_name, config)
 
         if not self.api_key:
             print(f"Warning: No API key found for model '{model_name}'. Check llm.yaml config.")
+
+    def _resolve_api_key_for_model(self, model_name: str, config: Any) -> str | None:
+        """Resolve API key for a model using central resolver with fallback."""
+        # Try central resolver first
+        try:
+            from bench.provider import resolve_api_key_env
+
+            # Extract provider from model prefix
+            if "/" in model_name:
+                provider = model_name.split("/", 1)[0]
+                key_name = resolve_api_key_env(provider)
+                key = os.environ.get(key_name)
+                if key:
+                    return key
+        except (ImportError, KeyError):
+            pass
+
+        # Fallback to direct env var lookup (deprecated)
+        warnings.warn(
+            f"Using fallback API key detection in LLMTaskJudge. "
+            f"Prefer bench.provider.resolve_api_key_env() for model '{model_name}'.",
+            DeprecationWarning,
+            stacklevel=3,
+        )
+        if model_name.startswith("opencode/"):
+            return os.environ.get("OPENCODE_API_KEY")
+        elif model_name.startswith("zai/"):
+            return os.environ.get("Z_AI_API_KEY")
+        elif model_name.startswith("openrouter/"):
+            return os.environ.get("OPENROUTER_API_KEY")
+        else:
+            return config.get_api_key()
 
     def _call_openai(
         self, messages: list[dict[str, Any]], response_format: type[BaseModel]

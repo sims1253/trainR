@@ -12,6 +12,10 @@ set -e
 # - TASK_CONTENT: The task instruction (base64 encoded)
 # - PACKAGE_PATH: Path to the R package to test (default: /workspace/packages/cli)
 # - PI_MODEL: Model to use (required - get from llm.yaml)
+#
+# NOTE: The canonical provider-to-API-key mappings are defined in:
+#       bench/provider/resolver.py::PROVIDER_API_KEY_MAP
+#       This script mirrors those mappings for Docker environments.
 
 # Configuration
 PACKAGE_PATH="${PACKAGE_PATH:-/workspace/packages/cli}"

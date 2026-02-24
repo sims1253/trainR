@@ -3,6 +3,7 @@
 import logging
 import os
 import time
+import warnings
 from pathlib import Path
 from typing import Any
 
@@ -39,19 +40,36 @@ def get_required_api_key(model: str) -> tuple[str | None, str | None]:
     except ValueError:
         pass
 
-    # Fallback: infer from LiteLLM prefix in model string
-    provider_key_mapping = {
-        "openrouter/": "OPENROUTER_API_KEY",
-        "opencode/": "OPENCODE_API_KEY",
-        "zai/": "Z_AI_API_KEY",
-        "openai/": "OPENAI_API_KEY",
-        "anthropic/": "ANTHROPIC_API_KEY",
-        "gemini/": "GEMINI_API_KEY",
-    }
-
-    for prefix, key_name in provider_key_mapping.items():
+    # Try central resolver for provider prefix
+    for prefix in ["openrouter/", "opencode/", "zai/", "openai/", "anthropic/", "gemini/"]:
         if model.startswith(prefix):
-            return key_name, os.environ.get(key_name)
+            provider = prefix.rstrip("/")
+            try:
+                from bench.provider import resolve_api_key_env
+
+                key_name = resolve_api_key_env(provider)
+                return key_name, os.environ.get(key_name)
+            except (ImportError, KeyError):
+                pass
+
+            # Fallback to local mapping (deprecated)
+            warnings.warn(
+                f"Using fallback mapping in get_required_api_key(). "
+                f"Prefer bench.provider.resolve_api_key_env() for provider '{provider}'.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            provider_key_mapping = {
+                "openrouter/": "OPENROUTER_API_KEY",
+                "opencode/": "OPENCODE_API_KEY",
+                "zai/": "Z_AI_API_KEY",
+                "openai/": "OPENAI_API_KEY",
+                "anthropic/": "ANTHROPIC_API_KEY",
+                "gemini/": "GEMINI_API_KEY",
+            }
+            key_name = provider_key_mapping.get(prefix)
+            if key_name:
+                return key_name, os.environ.get(key_name)
 
     # No provider prefix - assume no key required or will be handled by LiteLLM
     return None, None
