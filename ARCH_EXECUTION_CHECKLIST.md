@@ -40,7 +40,7 @@ Items are ordered by dependency -- B-01 through B-04 define the contracts that B
 - [x] B-08: Add `CliHarnessBase` for Codex/Claude/Gemini adapters. *Depends: B-01..B-04.*
 - [x] B-09: Wire harness selector in runtime (`execution.harness`). *Depends: B-04, H-01.*
 - [x] B-10: Add harness capability metadata (json mode, tools, usage support). *Depends: B-03.* (partially done with config changes)
-- [ ] B-11: Add integration tests proving harness swap via config only. *Depends: B-05, B-06, B-07.*
+- [x] B-11: Add integration tests proving harness swap via config only. *Depends: B-05, B-06, B-07.*
 
 ## C) Polyglot Boundary (Python Control Plane, TS Edge)
 
