@@ -67,7 +67,7 @@ class TestHarnessSwapViaConfig:
         assert config.execution.harness == "pi_docker"
 
         # Can specify other valid harness types
-        for harness_type in ["pi_sdk", "pi_cli", "codex_cli", "claude_cli"]:
+        for harness_type in ["pi_sdk", "pi_cli", "codex_cli", "claude_cli", "gemini_cli"]:
             config = ExperimentConfig(
                 name="test",
                 execution={"harness": harness_type},

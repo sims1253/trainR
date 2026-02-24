@@ -126,12 +126,12 @@ Phase gate: **A complete** (schema fields must land before runtime wiring).
 
 Phase gate: **G complete; J-02 and J-05 published.**
 
-- [ ] I-01: Implement Codex CLI adapter on top of `CliHarnessBase`.
-- [ ] I-02: Implement Claude Code adapter on top of `CliHarnessBase`.
-- [ ] I-03: Implement Gemini CLI adapter on top of `CliHarnessBase`.
-- [ ] I-04: Implement SWE-agent adapter (if needed).
-- [ ] I-05: Add adapter contract/integration tests for each enabled harness. *Depends: I-01..I-04.*
-- [ ] I-06: Document harness capability matrix and known limitations. *Depends: I-01..I-04.*
+- [x] I-01: Implement Codex CLI adapter on top of `CliHarnessBase`.
+- [x] I-02: Implement Claude Code adapter on top of `CliHarnessBase`.
+- [x] I-03: Implement Gemini CLI adapter on top of `CliHarnessBase`.
+- [x] I-04: Implement SWE-agent adapter (if needed). *(Note: Skipped - not needed for current scope)*
+- [x] I-05: Add adapter contract/integration tests for each enabled harness. *Depends: I-01..I-04.*
+- [x] I-06: Document harness capability matrix and known limitations. *Depends: I-01..I-04.*
 
 ## J) Documentation + Guardrails
 

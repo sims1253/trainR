@@ -20,7 +20,13 @@ from .base import (
     AgentHarness,
 )
 from .registry import HarnessRegistry, HarnessFactory, register_harness
-from .adapters import PiDockerHarness
+from .adapters import (
+    PiDockerHarness,
+    CliHarnessBase,
+    CodexCliHarness,
+    ClaudeCliHarness,
+    GeminiCliHarness,
+)
 
 __all__ = [
     # Base types
@@ -38,4 +44,8 @@ __all__ = [
     "register_harness",
     # Adapters
     "PiDockerHarness",
+    "CliHarnessBase",
+    "CodexCliHarness",
+    "ClaudeCliHarness",
+    "GeminiCliHarness",
 ]
