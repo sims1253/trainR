@@ -39,7 +39,6 @@ from bench.schema.v1 import (
     ResultV1,
     TokenUsageV1,
 )
-from evaluation import DockerPiRunnerConfig, EvaluationSandbox
 
 logger = logging.getLogger(__name__)
 
@@ -64,9 +63,11 @@ class ExperimentRunner:
         Args:
             config: Experiment configuration
             harness_name: Override harness name (default: from config.execution.harness).
-                          If None or "default", uses the legacy EvaluationSandbox path.
                           Priority: explicit param > config.execution.harness > "pi_docker".
             output_dir: Override output directory
+
+        Raises:
+            ValueError: If harness is not registered
         """
         self.config = config
         self.output_dir = output_dir or (
@@ -83,6 +84,13 @@ class ExperimentRunner:
             self.harness_name = config.execution.harness
         else:
             self.harness_name = "pi_docker"
+
+        # Validate harness is registered
+        if self.harness_name not in HarnessRegistry.list_available():
+            raise ValueError(
+                f"Harness '{self.harness_name}' is not registered. "
+                f"Available: {HarnessRegistry.list_available()}"
+            )
 
     def setup(self) -> Path:
         """
@@ -115,6 +123,16 @@ class ExperimentRunner:
 
         # Validate API keys for selected models
         self._validate_api_keys()
+
+        # Validate harness environment
+        harness_config = self._build_harness_config()
+        harness = HarnessRegistry.get(self.harness_name, harness_config)
+        is_valid, errors = harness.validate_environment()
+        if not is_valid:
+            raise RuntimeError(
+                f"Harness '{self.harness_name}' environment validation failed:\n"
+                + "\n".join(f"  - {e}" for e in errors)
+            )
 
         # Save initial matrix
         self._save_matrix()
@@ -343,134 +361,31 @@ class ExperimentRunner:
         return self._create_error_result(run, "Max retries exceeded")
 
     def _run_single_evaluation(self, run: ExperimentRun) -> ResultV1:
-        """Run a single evaluation."""
+        """Run a single evaluation using the harness abstraction layer."""
         start_time = time.time()
-
-        # Check if we should use the harness abstraction or legacy path
-        if self.harness_name is None or self.harness_name.lower() == "default":
-            # Use legacy EvaluationSandbox path
-            return self._run_single_evaluation_legacy(run, start_time)
-        else:
-            # Use harness abstraction layer
-            return self._run_single_evaluation_harness(run, start_time)
-
-    def _run_single_evaluation_legacy(self, run: ExperimentRun, start_time: float) -> ResultV1:
-        """Run a single evaluation using the legacy EvaluationSandbox."""
-        # Create task-like object for the sandbox
-        task = self._create_task_object(run)
-
-        # Set up environment for this model
-        env_backup = {}
-        if run.model.api_key_env:
-            # Key should already be validated, but double-check
-            os.environ.get(run.model.api_key_env, "")
-            env_backup[run.model.api_key_env] = os.environ.get(run.model.api_key_env)
-
-        # Get skill content
-        skill_content = self.config.get_skill_content()
-
-        # Create sandbox and run evaluation
-        runner_config = DockerPiRunnerConfig(
-            docker_image=self.config.execution.docker_image,
-            timeout=self.config.execution.timeout,
-        )
-        sandbox = EvaluationSandbox(runner_config=runner_config)
-
-        # Run evaluation
-        eval_result = sandbox.evaluate_task(
-            task=task,
-            skill_prompt=skill_content,
-            model=run.model.litellm_model,
-        )
-
-        latency = time.time() - start_time
-
-        # Convert to ResultV1
-        result = self._convert_result(run, eval_result, latency)
-
-        # Restore environment
-        for key, value in env_backup.items():
-            if value is None:
-                os.environ.pop(key, None)
-            else:
-                os.environ[key] = value
-
-        return result
+        return self._run_single_evaluation_harness(run, start_time)
 
     def _run_single_evaluation_harness(self, run: ExperimentRun, start_time: float) -> ResultV1:
         """Run a single evaluation using the harness abstraction layer."""
-        # Build harness config and get harness from registry
         harness_config = self._build_harness_config()
-
-        # Type narrowing: we only reach this method when harness_name is not None/default
-        assert self.harness_name is not None
         harness = HarnessRegistry.get(self.harness_name, harness_config)
 
-        # Set up harness
-        harness.setup()
-
-        # Build request
-        request = self._build_harness_request(run)
-
-        # Execute (harness.execute is async, so we need to run it)
         try:
-            # Check if we're already in an async context
-            try:
-                asyncio.get_running_loop()
-                # We're in an async context, use create_task
-                import concurrent.futures
+            harness.setup()
+            request = self._build_harness_request(run)
+            result = self._execute_harness(harness, request)
+            return self._convert_harness_result(result, run, time.time() - start_time)
+        finally:
+            harness.teardown()
 
-                with concurrent.futures.ThreadPoolExecutor() as executor:
-                    future = executor.submit(asyncio.run, harness.execute(request))
-                    harness_result = future.result()
-            except RuntimeError:
-                # No running loop, we can use asyncio.run directly
-                harness_result = asyncio.run(harness.execute(request))
-        except Exception as e:
-            logger.error(f"Harness execution failed: {e}")
-            latency = time.time() - start_time
-            return self._create_error_result(run, str(e))
+    def _execute_harness(self, harness: Any, request: HarnessRequest) -> HarnessResult:
+        """Execute harness with simplified async handling."""
+        import inspect
 
-        latency = time.time() - start_time
-
-        # Convert result
-        result = self._convert_harness_result(harness_result, run, latency)
-
-        # Teardown harness
-        harness.teardown()
-
-        return result
-
-    def _create_task_object(self, run: ExperimentRun) -> Any:
-        """Create a task-like object for the sandbox."""
-        # Try to load full task data
-        task_path = Path(run.task.task_path)
-        task_data = {}
-
-        if task_path.exists():
-            with contextlib.suppress(Exception):
-                task_data = json.loads(task_path.read_text())
-
-        # Create a task object with all necessary attributes
-        task = type(
-            "Task",
-            (),
-            {
-                "task_id": run.task.task_id,
-                "instruction": task_data.get("task", {}).get(
-                    "instruction", task_data.get("instruction", "")
-                ),
-                "context": task_data.get("task", {}).get("context", task_data.get("context", "")),
-                "source_package": run.task.source_package or task_data.get("source_package", ""),
-                "split": run.task.split,
-                "difficulty": run.task.difficulty,
-                "task_type": run.task.task_type,
-                # Include all task data for SWE-bench style evaluation
-                **task_data,
-            },
-        )()
-
-        return task
+        if inspect.iscoroutinefunction(harness.execute):
+            return asyncio.run(harness.execute(request))
+        else:
+            return harness.execute(request)
 
     def _build_harness_config(self) -> HarnessConfig:
         """Build HarnessConfig from ExperimentConfig."""
@@ -616,105 +531,6 @@ class ExperimentRunner:
             tool_call_counts=tool_call_counts,
             tool_errors=tool_errors,
             tool_total_time_ms=tool_total_time_ms,
-        )
-
-    def _convert_result(self, run: ExperimentRun, eval_result: Any, latency: float) -> ResultV1:
-        """Convert evaluation result to ResultV1."""
-        # Map error categories
-        from evaluation import FailureCategory
-
-        error_category = None
-        if hasattr(eval_result, "failure_category") and eval_result.failure_category:
-            category_map = {
-                FailureCategory.SYNTAX_ERROR: ErrorCategoryV1.SYNTAX_ERROR,
-                FailureCategory.TEST_FAILURE: ErrorCategoryV1.TEST_FAILURE,
-                FailureCategory.TIMEOUT: ErrorCategoryV1.TIMEOUT,
-                FailureCategory.MISSING_IMPORT: ErrorCategoryV1.MISSING_IMPORT,
-                FailureCategory.WRONG_ASSERTION: ErrorCategoryV1.WRONG_ASSERTION,
-                FailureCategory.INCOMPLETE_SOLUTION: ErrorCategoryV1.INCOMPLETE_SOLUTION,
-                FailureCategory.OVERLY_COMPLEX: ErrorCategoryV1.OVERLY_COMPLEX,
-                FailureCategory.WRONG_FIXTURE_USAGE: ErrorCategoryV1.WRONG_FIXTURE_USAGE,
-                FailureCategory.SNAPSHOT_MISMATCH: ErrorCategoryV1.SNAPSHOT_MISMATCH,
-                FailureCategory.CONFIG_ERROR: ErrorCategoryV1.UNKNOWN,
-                FailureCategory.ENVIRONMENT_ERROR: ErrorCategoryV1.SANDBOX_ERROR,
-                FailureCategory.PACKAGE_NOT_FOUND: ErrorCategoryV1.UNKNOWN,
-            }
-            error_category = category_map.get(eval_result.failure_category, ErrorCategoryV1.UNKNOWN)
-
-        # Convert test results
-        test_results = []
-        if hasattr(eval_result, "test_results"):
-            for tr in eval_result.test_results:
-                test_results.append(
-                    CaseResultV1(
-                        name=tr.name,
-                        passed=tr.passed,
-                        message=tr.message,
-                        execution_time=0.0,
-                    )
-                )
-
-        # Token usage
-        token_usage = TokenUsageV1()
-        if hasattr(eval_result, "token_usage"):
-            tu = eval_result.token_usage
-            token_usage = TokenUsageV1(
-                prompt=tu.get("prompt_tokens", tu.get("input_tokens", 0)),
-                completion=tu.get("completion_tokens", tu.get("output_tokens", 0)),
-                total=tu.get("total_tokens", 0),
-            )
-
-        # Save trajectory if enabled
-        trajectory_path = None
-        if (
-            self.config.execution.save_trajectories
-            and hasattr(eval_result, "generated_code")
-            and eval_result.generated_code
-            and self.output_dir
-        ):
-            traj_dir = self.output_dir / "trajectories" / run.model.name
-            traj_dir.mkdir(parents=True, exist_ok=True)
-            traj_file = traj_dir / f"{run.task.task_id}.txt"
-            traj_file.write_text(eval_result.generated_code)
-            trajectory_path = str(traj_file.relative_to(self.output_dir))
-
-        return ResultV1(
-            result_id=f"{run.fingerprint}",
-            task_id=run.task.task_id,
-            model=run.model.name,
-            profile_id=run.support_profile or self.config.skill.get_name(),
-            passed=eval_result.success if hasattr(eval_result, "success") else False,
-            score=eval_result.score if hasattr(eval_result, "score") else 0.0,
-            error_category=error_category,
-            error_message=eval_result.error_message
-            if hasattr(eval_result, "error_message")
-            else None,
-            latency_s=latency,
-            execution_time=eval_result.execution_time
-            if hasattr(eval_result, "execution_time")
-            else latency,
-            token_usage=token_usage,
-            test_results=test_results,
-            generated_code=eval_result.generated_code
-            if hasattr(eval_result, "generated_code")
-            else None,
-            trajectory_path=trajectory_path,
-            repeat_index=run.repeat_index,
-            metadata={
-                "fingerprint": run.fingerprint,
-                "run_index": run.run_index,
-                "support_profile": run.support_profile,
-                "pair_id": run.pair_id,
-                "pair_role": run.pair_role,
-            },
-            # Telemetry fields
-            tool_call_counts=eval_result.tool_call_counts
-            if hasattr(eval_result, "tool_call_counts")
-            else {},
-            tool_errors=eval_result.tool_errors if hasattr(eval_result, "tool_errors") else {},
-            tool_total_time_ms=eval_result.tool_total_time_ms
-            if hasattr(eval_result, "tool_total_time_ms")
-            else {},
         )
 
     def _create_error_result(self, run: ExperimentRun, error_message: str) -> ResultV1:
