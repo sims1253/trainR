@@ -141,7 +141,7 @@ J-01 through J-02 and J-05 are **prerequisites for Phase I** and should be writt
 - [x] J-02: Add architecture doc for harness/provider/sandbox layering. *(write during Phase B)*
 - [ ] J-03: Add security doc for credential policies and auth mount caveats. *(write during Phase D)*
 - [ ] J-04: Add reproducibility doc defining required metadata capture. *(write during Phase E)*
-- [ ] J-05: Add contributor guide for adding new harness adapters. *(write during Phase B; required before Phase I)*
+- [x] J-05: Add contributor guide for adding new harness adapters. *(write during Phase B; required before Phase I)*
 
 ## K) Final Verification Gate
 
