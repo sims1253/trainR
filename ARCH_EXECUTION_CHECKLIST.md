@@ -147,8 +147,8 @@ J-01 through J-02 and J-05 are **prerequisites for Phase I** and should be writt
 
 Phase gate: **All prior sections complete** (excluding items explicitly marked `[DEFERRED]`).
 
-- [ ] K-01: Run full CI suite with new architecture.
-- [ ] K-02: Run one real provider smoke benchmark and verify end-to-end artifacts.
-- [ ] K-03: Run one mini optimization and verify checkpoint/resume/budget behavior.
-- [ ] K-04: Verify visualizer consumes updated artifacts without contract breaks.
-- [ ] K-05: Confirm no legacy execution path bypasses canonical runner.
+- [x] K-01: Run full CI suite with new architecture.
+- [ ] K-02: Run one real provider smoke benchmark and verify end-to-end artifacts. *(Requires real provider secrets - deferred to CI runs with secrets configured)*
+- [ ] K-03: Run one mini optimization and verify checkpoint/resume/budget behavior. *(Requires real provider secrets - deferred to CI runs with secrets configured)*
+- [x] K-04: Verify visualizer consumes updated artifacts without contract breaks.
+- [x] K-05: Confirm no legacy execution path bypasses canonical runner.
