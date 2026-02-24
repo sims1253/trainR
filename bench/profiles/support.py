@@ -359,10 +359,14 @@ class SupportProfile(BaseModel):
         if self.mode == SupportMode.SINGLE_SKILL:
             if not self.skills:
                 raise ValueError("single_skill mode requires at least one skill reference")
-        elif self.mode in (
-            SupportMode.COLLECTION_FORCED,
-            SupportMode.COLLECTION_SELECTIVE,
-        ) and not self.collection_path:
+        elif (
+            self.mode
+            in (
+                SupportMode.COLLECTION_FORCED,
+                SupportMode.COLLECTION_SELECTIVE,
+            )
+            and not self.collection_path
+        ):
             raise ValueError(f"{self.mode.value} mode requires collection_path")
         return self
 

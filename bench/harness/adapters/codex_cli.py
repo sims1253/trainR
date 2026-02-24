@@ -4,13 +4,11 @@ from __future__ import annotations
 
 import json
 import uuid
-from typing import Any
 
 from ..base import (
-    HarnessConfig,
+    ErrorCategory,
     HarnessRequest,
     HarnessResult,
-    ErrorCategory,
     TestResult,
 )
 from ..registry import register_harness

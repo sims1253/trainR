@@ -10,42 +10,42 @@ Canonical usage:
     result = harness.execute(request)
 """
 
-from .base import (
-    HarnessRequest,
-    HarnessResult,
-    HarnessConfig,
-    TokenUsage,
-    TestResult,
-    ErrorCategory,
-    AgentHarness,
-)
-from .registry import HarnessRegistry, HarnessFactory, register_harness
 from .adapters import (
-    PiDockerHarness,
+    ClaudeCliHarness,
     CliHarnessBase,
     CodexCliHarness,
-    ClaudeCliHarness,
     GeminiCliHarness,
+    PiDockerHarness,
 )
+from .base import (
+    AgentHarness,
+    ErrorCategory,
+    HarnessConfig,
+    HarnessRequest,
+    HarnessResult,
+    TestResult,
+    TokenUsage,
+)
+from .registry import HarnessFactory, HarnessRegistry, register_harness
 
 __all__ = [
+    # Protocol
+    "AgentHarness",
+    "ClaudeCliHarness",
+    "CliHarnessBase",
+    "CodexCliHarness",
+    "ErrorCategory",
+    "GeminiCliHarness",
+    "HarnessConfig",
+    "HarnessFactory",
+    # Registry
+    "HarnessRegistry",
     # Base types
     "HarnessRequest",
     "HarnessResult",
-    "HarnessConfig",
-    "TokenUsage",
-    "TestResult",
-    "ErrorCategory",
-    # Protocol
-    "AgentHarness",
-    # Registry
-    "HarnessRegistry",
-    "HarnessFactory",
-    "register_harness",
     # Adapters
     "PiDockerHarness",
-    "CliHarnessBase",
-    "CodexCliHarness",
-    "ClaudeCliHarness",
-    "GeminiCliHarness",
+    "TestResult",
+    "TokenUsage",
+    "register_harness",
 ]

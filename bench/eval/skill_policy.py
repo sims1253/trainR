@@ -605,7 +605,9 @@ def load_policy_from_config(config: dict[str, Any]) -> SkillSelectionPolicy:
             if isinstance(keyword_weight_raw, (int, float))
             else 0.3,
             tag_weight=float(tag_weight_raw) if isinstance(tag_weight_raw, (int, float)) else 0.3,
-            name_weight=float(name_weight_raw) if isinstance(name_weight_raw, (int, float)) else 0.4,
+            name_weight=float(name_weight_raw)
+            if isinstance(name_weight_raw, (int, float))
+            else 0.4,
         )
     else:
         raise ValueError(f"Unknown policy type: {policy_type}")

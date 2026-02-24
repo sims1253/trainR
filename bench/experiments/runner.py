@@ -22,11 +22,13 @@ from typing import Any
 from bench.experiments.config import ExperimentConfig, RetryStrategy
 from bench.experiments.matrix import ExperimentMatrix, ExperimentRun, generate_matrix
 from bench.harness import (
+    ErrorCategory as HarnessErrorCategory,
+)
+from bench.harness import (
     HarnessConfig,
     HarnessRegistry,
     HarnessRequest,
     HarnessResult,
-    ErrorCategory as HarnessErrorCategory,
 )
 from bench.schema.v1 import (
     CaseResultV1,
@@ -209,7 +211,7 @@ class ExperimentRunner:
         )
 
         # Get unique models and resolve providers
-        models_used = list(set(run.model.name for run in self.matrix.runs)) if self.matrix else []
+        models_used = list({run.model.name for run in self.matrix.runs}) if self.matrix else []
         resolver = get_provider_resolver()
         providers_metadata = {}
         for model in models_used:
@@ -274,10 +276,10 @@ class ExperimentRunner:
         if not self.matrix:
             return
 
-        from bench.provider import run_preflight, AuthPolicy
+        from bench.provider import AuthPolicy, run_preflight
 
         # Get all unique models from the matrix
-        models = list(set(run.model.name for run in self.matrix.runs))
+        models = list({run.model.name for run in self.matrix.runs})
 
         # Determine auth policy from config
         auth_policy = AuthPolicy.ENV  # Default

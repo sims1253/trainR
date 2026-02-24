@@ -167,7 +167,9 @@ def read_canonical_results(input_dir: Path) -> list[dict[str, Any]]:
                 result = json.loads(line)
                 results.append(result)
             except json.JSONDecodeError as e:
-                warnings.warn(f"Invalid JSON at line {line_num} in {results_file}: {e}", stacklevel=2)
+                warnings.warn(
+                    f"Invalid JSON at line {line_num} in {results_file}: {e}", stacklevel=2
+                )
 
     return results
 
@@ -211,9 +213,8 @@ def discover_run_directories(input_dir: Path) -> list[Path]:
 
     # Also check input_dir itself
     if (
-        ((input_dir / MANIFEST_FILE).exists() or (input_dir / RESULTS_FILE).exists())
-        and input_dir not in run_dirs
-    ):
+        (input_dir / MANIFEST_FILE).exists() or (input_dir / RESULTS_FILE).exists()
+    ) and input_dir not in run_dirs:
         run_dirs.append(input_dir)
 
     return sorted(run_dirs)

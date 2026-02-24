@@ -9,6 +9,7 @@ This test module ensures:
 These tests are fast unit tests that mock actual benchmark execution.
 """
 
+import contextlib
 import re
 import subprocess
 import sys
@@ -83,8 +84,8 @@ class TestCanonicalRunnerAPI:
             ModelsConfig,
             OutputConfig,
             SkillConfig,
-            TaskSelectionMode,
             TasksConfig,
+            TaskSelectionMode,
         )
         from bench.runner import run
 
@@ -211,27 +212,27 @@ class TestRunExperimentScriptDelegation:
         mock_manifest.results_path = None
         mock_run.return_value = mock_manifest
 
-        with patch(
-            "sys.argv",
-            [
-                "run_experiment.py",
-                "--config",
-                "test.yaml",
-                "--output-dir",
-                "custom/output",
-                "--seed",
-                "42",
-                "--workers",
-                "4",
-            ],
+        with (
+            patch(
+                "sys.argv",
+                [
+                    "run_experiment.py",
+                    "--config",
+                    "test.yaml",
+                    "--output-dir",
+                    "custom/output",
+                    "--seed",
+                    "42",
+                    "--workers",
+                    "4",
+                ],
+            ),
+            patch.object(Path, "exists", return_value=True),
         ):
-            with patch.object(Path, "exists", return_value=True):
-                from scripts.run_experiment import main
+            from scripts.run_experiment import main
 
-                try:
-                    main()
-                except SystemExit:
-                    pass
+            with contextlib.suppress(SystemExit):
+                main()
 
         # Verify run was called with the overrides
         mock_run.assert_called()
@@ -251,17 +252,17 @@ class TestRunExperimentScriptDelegation:
         mock_config.execution.parallel_workers = 1
         mock_validate.return_value = mock_config
 
-        with patch(
-            "sys.argv",
-            ["run_experiment.py", "--config", "test.yaml", "--validate"],
+        with (
+            patch(
+                "sys.argv",
+                ["run_experiment.py", "--config", "test.yaml", "--validate"],
+            ),
+            patch.object(Path, "exists", return_value=True),
         ):
-            with patch.object(Path, "exists", return_value=True):
-                from scripts.run_experiment import main
+            from scripts.run_experiment import main
 
-                try:
-                    main()
-                except SystemExit:
-                    pass
+            with contextlib.suppress(SystemExit):
+                main()
 
         mock_run.assert_called_once()
         call_kwargs = mock_run.call_args[1]
@@ -283,17 +284,17 @@ class TestRunExperimentScriptDelegation:
         mock_manifest.config = {"total_runs": 5, "task_ids": ["t1", "t2"]}
         mock_run.return_value = mock_manifest
 
-        with patch(
-            "sys.argv",
-            ["run_experiment.py", "--config", "test.yaml", "--dry-run"],
+        with (
+            patch(
+                "sys.argv",
+                ["run_experiment.py", "--config", "test.yaml", "--dry-run"],
+            ),
+            patch.object(Path, "exists", return_value=True),
         ):
-            with patch.object(Path, "exists", return_value=True):
-                from scripts.run_experiment import main
+            from scripts.run_experiment import main
 
-                try:
-                    main()
-                except SystemExit:
-                    pass
+            with contextlib.suppress(SystemExit):
+                main()
 
         mock_run.assert_called_once()
         call_kwargs = mock_run.call_args[1]
@@ -391,7 +392,7 @@ class TestPositGskillEvaluateUsesCanonicalRunner:
     @patch.object(Path, "exists")
     def test_evaluate_calls_canonical_runner(self, mock_exists, mock_get_llm_config, mock_run):
         """Test that run_evaluate() calls bench.runner.run()."""
-        from bench.schema.v1 import ManifestV1, ResultSummaryV1
+        from bench.schema.v1 import ResultSummaryV1
 
         # Setup mocks
         mock_exists.return_value = True
@@ -435,7 +436,7 @@ class TestPositGskillEvaluateUsesCanonicalRunner:
     @patch.object(Path, "exists")
     def test_evaluate_uses_skill_path_from_args(self, mock_exists, mock_get_llm_config, mock_run):
         """Test that run_evaluate() passes skill path to config."""
-        from bench.schema.v1 import ManifestV1, ResultSummaryV1
+        from bench.schema.v1 import ResultSummaryV1
 
         mock_exists.return_value = True
 
@@ -567,8 +568,8 @@ class TestRunnerIntegration:
             ModelsConfig,
             OutputConfig,
             SkillConfig,
-            TaskSelectionMode,
             TasksConfig,
+            TaskSelectionMode,
         )
         from bench.runner import run
         from bench.schema.v1 import ManifestV1
@@ -785,7 +786,7 @@ class TestGuardNoBypassPaths:
             if "from bench.experiments.runner import" in content:
                 # Allow imports that don't include ExperimentRunner
                 if "ExperimentRunner" in content:
-                    assert False, (
+                    raise AssertionError(
                         f"{script.name} should not import ExperimentRunner from "
                         "bench.experiments.runner. Use bench.runner.run() instead."
                     )

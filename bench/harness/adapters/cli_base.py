@@ -7,16 +7,13 @@ import time
 import uuid
 from abc import abstractmethod
 from pathlib import Path
-from typing import Any
 
 from ..base import (
     AgentHarness,
+    ErrorCategory,
     HarnessConfig,
     HarnessRequest,
     HarnessResult,
-    TokenUsage,
-    TestResult,
-    ErrorCategory,
 )
 
 

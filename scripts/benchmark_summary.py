@@ -11,7 +11,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from rich.console import Console
 from rich.table import Table
 
-from bench.schema.v1 import ResultV1, ManifestV1
+from bench.schema.v1 import ManifestV1, ResultV1
 
 console = Console()
 

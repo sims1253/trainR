@@ -7,8 +7,8 @@ before starting execution.
 from dataclasses import dataclass, field
 from typing import Any
 
+from .auth import AuthPolicy, CredentialResolver
 from .resolver import get_provider_resolver
-from .auth import CredentialResolver, AuthPolicy
 
 
 @dataclass

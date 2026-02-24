@@ -11,16 +11,13 @@ import subprocess
 import tempfile
 import time
 import warnings
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 # Load environment variables from .env file
 from dotenv import load_dotenv
 from rich.console import Console
-
-if TYPE_CHECKING:
-    from bench.sandbox import SandboxProfile
 
 load_dotenv()
 
@@ -39,10 +36,8 @@ def _get_all_provider_api_keys() -> list[str]:
         keys = set()
         # Add keys from resolver
         for provider_name in resolver.providers:
-            try:
+            with contextlib.suppress(KeyError):
                 keys.add(resolver.get_api_key_env(provider_name))
-            except KeyError:
-                pass
         # Also include canonical keys
         keys.update(PROVIDER_API_KEY_MAP.values())
         return list(keys)

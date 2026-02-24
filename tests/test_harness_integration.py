@@ -10,21 +10,19 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from typing import Any
-from unittest.mock import MagicMock, patch
 
 import pytest
 
+from bench.experiments import ExperimentConfig
 from bench.harness import (
-    HarnessRegistry,
+    AgentHarness,
     HarnessConfig,
+    HarnessRegistry,
     HarnessRequest,
     HarnessResult,
-    AgentHarness,
     PiDockerHarness,
     register_harness,
 )
-from bench.experiments import ExperimentConfig
 
 
 class MockHarness(AgentHarness):

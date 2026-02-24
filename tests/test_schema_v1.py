@@ -1,6 +1,5 @@
 """Tests for canonical schema v1 models."""
 
-
 import pytest
 from pydantic import ValidationError
 

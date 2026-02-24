@@ -27,7 +27,7 @@ The scripts/run_experiment.py CLI is a thin wrapper that delegates to this modul
 
 import logging
 from pathlib import Path
-from typing import Any, Union
+from typing import Any
 
 from bench.experiments import ExperimentConfig, ExperimentRunner, load_experiment_config
 from bench.experiments.matrix import generate_matrix
@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 
 
 def run(
-    config: Union[str, Path, ExperimentConfig],
+    config: str | Path | ExperimentConfig,
     *,
     output_dir: str | None = None,
     seed: int | None = None,

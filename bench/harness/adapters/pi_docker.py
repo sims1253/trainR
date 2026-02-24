@@ -7,18 +7,19 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+from evaluation.models import FailureCategory
+from evaluation.pi_runner import DockerPiRunner, DockerPiRunnerConfig
+
 from ..base import (
     AgentHarness,
+    ErrorCategory,
     HarnessConfig,
     HarnessRequest,
     HarnessResult,
-    TokenUsage,
     TestResult,
-    ErrorCategory,
+    TokenUsage,
 )
 from ..registry import register_harness
-from evaluation.pi_runner import DockerPiRunner, DockerPiRunnerConfig
-from evaluation.models import FailureCategory
 
 # Mapping from FailureCategory to ErrorCategory
 FAILURE_TO_ERROR_CATEGORY: dict[FailureCategory, ErrorCategory] = {

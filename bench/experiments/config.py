@@ -21,7 +21,6 @@ from pydantic import BaseModel, Field, field_validator
 from bench.provider import AuthPolicy
 from bench.sandbox import SandboxProfile
 
-
 # Known harness types for execution
 HarnessType = Literal[
     "pi_docker",

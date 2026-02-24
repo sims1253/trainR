@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import time
 from contextlib import contextmanager
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from .schema import (
     LatencyBreakdown,
@@ -12,6 +12,9 @@ from .schema import (
     TokenUsage,
     ToolCallMetrics,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 
 class TelemetryCollector:

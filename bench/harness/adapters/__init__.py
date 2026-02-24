@@ -1,15 +1,15 @@
 """Harness adapter implementations."""
 
-from .cli_base import CliHarnessBase
-from .pi_docker import PiDockerHarness
-from .codex_cli import CodexCliHarness
 from .claude_cli import ClaudeCliHarness
+from .cli_base import CliHarnessBase
+from .codex_cli import CodexCliHarness
 from .gemini_cli import GeminiCliHarness
+from .pi_docker import PiDockerHarness
 
 __all__ = [
-    "CliHarnessBase",
-    "PiDockerHarness",
-    "CodexCliHarness",
     "ClaudeCliHarness",
+    "CliHarnessBase",
+    "CodexCliHarness",
     "GeminiCliHarness",
+    "PiDockerHarness",
 ]

@@ -9,7 +9,7 @@ from __future__ import annotations
 import os
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, Field
 
@@ -36,7 +36,7 @@ class ErrorCategory(Enum):
     UNKNOWN = "unknown"
 
     @classmethod
-    def from_exception(cls, exc: Exception) -> "ErrorCategory":
+    def from_exception(cls, exc: Exception) -> ErrorCategory:
         """Classify an exception into an error category.
 
         Args:
@@ -224,7 +224,7 @@ class HarnessResult(BaseModel):
     turns: int = Field(default=0, ge=0, description="Number of conversation turns")
 
     # Unified telemetry (Phase F)
-    telemetry: "TelemetrySchema | None" = Field(default=None, description="Unified telemetry data")
+    telemetry: TelemetrySchema | None = Field(default=None, description="Unified telemetry data")
 
     # Metadata
     model: str | None = Field(default=None, description="Model used for execution")

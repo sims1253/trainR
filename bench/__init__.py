@@ -25,8 +25,6 @@ from bench.schema.v1 import (
 )
 
 __all__ = [
-    # Canonical execution API
-    "run",
     # Schema types
     "ManifestV1",
     "ProfileV1",
@@ -34,6 +32,8 @@ __all__ = [
     "TaskV1",
     # Schema utilities
     "load_json_schema",
+    # Canonical execution API
+    "run",
     "validate_manifest",
     "validate_profile",
     "validate_result",

@@ -7,13 +7,6 @@ This module provides a single source of truth for:
 - Credential validation and redaction
 """
 
-from .resolver import (
-    ProviderResolver,
-    get_provider_resolver,
-    resolve_provider,
-    resolve_api_key_env,
-    resolve_litellm_prefix,
-)
 from .auth import (
     AuthPolicy,
     CredentialResolver,
@@ -21,34 +14,41 @@ from .auth import (
     validate_credentials,
 )
 from .models import (
-    ProviderInfo,
-    ModelInfo,
     CredentialSource,
+    ModelInfo,
+    ProviderInfo,
 )
 from .preflight import (
     PreflightResult,
     run_preflight,
     validate_model_provider_config,
 )
+from .resolver import (
+    ProviderResolver,
+    get_provider_resolver,
+    resolve_api_key_env,
+    resolve_litellm_prefix,
+    resolve_provider,
+)
 
 __all__ = [
-    # Resolver
-    "ProviderResolver",
-    "get_provider_resolver",
-    "resolve_provider",
-    "resolve_api_key_env",
-    "resolve_litellm_prefix",
     # Auth
     "AuthPolicy",
     "CredentialResolver",
-    "get_credentials",
-    "validate_credentials",
-    # Models
-    "ProviderInfo",
-    "ModelInfo",
     "CredentialSource",
+    "ModelInfo",
     # Preflight
     "PreflightResult",
+    # Models
+    "ProviderInfo",
+    # Resolver
+    "ProviderResolver",
+    "get_credentials",
+    "get_provider_resolver",
+    "resolve_api_key_env",
+    "resolve_litellm_prefix",
+    "resolve_provider",
     "run_preflight",
+    "validate_credentials",
     "validate_model_provider_config",
 ]
