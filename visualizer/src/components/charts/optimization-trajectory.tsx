@@ -19,6 +19,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { ClientOnly } from "@/components/client-only";
 import type { OptimizationTrajectoryV1 } from "@/lib/types";
 import { TrendingUpIcon, TargetIcon, MinusIcon } from "lucide-react";
 
@@ -196,93 +197,101 @@ export function OptimizationTrajectory({
 
         {/* Line Chart */}
         <div className="h-[300px] w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart
-              data={chartData}
-              margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis
-                dataKey="iteration"
-                fontSize={12}
-                tickLine={false}
-                axisLine={false}
-                label={{
-                  value: "Iteration",
-                  position: "insideBottom",
-                  offset: -5,
-                  fontSize: 11,
-                  fill: "hsl(var(--muted-foreground))",
-                }}
-              />
-              <YAxis
-                fontSize={12}
-                tickLine={false}
-                axisLine={false}
-                tickFormatter={(value) => `${value.toFixed(0)}%`}
-                domain={[
-                  (dataMin: number) => Math.max(0, dataMin - 5),
-                  (dataMax: number) => Math.min(100, dataMax + 5),
-                ]}
-                label={{
-                  value: "Score",
-                  angle: -90,
-                  position: "insideLeft",
-                  fontSize: 11,
-                  fill: "hsl(var(--muted-foreground))",
-                }}
-              />
-              <Tooltip
-                cursor={{ fill: "hsl(var(--muted) / 0.3)" }}
-                contentStyle={{
-                  borderRadius: "8px",
-                  border: "none",
-                  boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-                  backgroundColor: "hsl(var(--background))",
-                }}
-                formatter={(value, _name, props) => {
-                  const data = props.payload as { isBest: boolean; candidate_id: string };
-                  return [
-                    <>
-                      <span className="font-mono">{Number(value).toFixed(1)}%</span>
-                      {data.isBest && (
-                        <Badge variant="default" className="ml-2 text-xs">
-                          Best
-                        </Badge>
-                      )}
-                    </>,
-                    "Score",
-                  ];
-                }}
-                labelFormatter={(label, payload) => {
-                  if (payload && payload[0]?.payload) {
-                    const data = payload[0].payload as { iteration: number; candidate_id: string };
-                    return `Iteration ${data.iteration} (${data.candidate_id.slice(0, 8)}...)`;
-                  }
-                  return `Iteration ${label}`;
-                }}
-              />
-              <ReferenceLine
-                y={initialScore * 100}
-                stroke="hsl(var(--muted-foreground))"
-                strokeDasharray="5 5"
-                label={{
-                  value: "Seed",
-                  position: "right",
-                  fontSize: 10,
-                  fill: "hsl(var(--muted-foreground))",
-                }}
-              />
-              <Line
-                type="monotone"
-                dataKey="score"
-                stroke="hsl(var(--primary))"
-                strokeWidth={2}
-                dot={<CustomDot />}
-                activeDot={{ r: 6, fill: "hsl(var(--primary))" }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
+          <ClientOnly
+            fallback={
+              <div className="h-full w-full flex items-center justify-center text-muted-foreground">
+                Loading chart...
+              </div>
+            }
+          >
+            <ResponsiveContainer width="100%" height="100%" minWidth={300} minHeight={200}>
+              <LineChart
+                data={chartData}
+                margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis
+                  dataKey="iteration"
+                  fontSize={12}
+                  tickLine={false}
+                  axisLine={false}
+                  label={{
+                    value: "Iteration",
+                    position: "insideBottom",
+                    offset: -5,
+                    fontSize: 11,
+                    fill: "hsl(var(--muted-foreground))",
+                  }}
+                />
+                <YAxis
+                  fontSize={12}
+                  tickLine={false}
+                  axisLine={false}
+                  tickFormatter={(value) => `${value.toFixed(0)}%`}
+                  domain={[
+                    (dataMin: number) => Math.max(0, dataMin - 5),
+                    (dataMax: number) => Math.min(100, dataMax + 5),
+                  ]}
+                  label={{
+                    value: "Score",
+                    angle: -90,
+                    position: "insideLeft",
+                    fontSize: 11,
+                    fill: "hsl(var(--muted-foreground))",
+                  }}
+                />
+                <Tooltip
+                  cursor={{ fill: "hsl(var(--muted) / 0.3)" }}
+                  contentStyle={{
+                    borderRadius: "8px",
+                    border: "none",
+                    boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                    backgroundColor: "hsl(var(--background))",
+                  }}
+                  formatter={(value, _name, props) => {
+                    const data = props.payload as { isBest: boolean; candidate_id: string };
+                    return [
+                      <>
+                        <span className="font-mono">{Number(value).toFixed(1)}%</span>
+                        {data.isBest && (
+                          <Badge variant="default" className="ml-2 text-xs">
+                            Best
+                          </Badge>
+                        )}
+                      </>,
+                      "Score",
+                    ];
+                  }}
+                  labelFormatter={(label, payload) => {
+                    if (payload && payload[0]?.payload) {
+                      const data = payload[0].payload as { iteration: number; candidate_id: string };
+                      return `Iteration ${data.iteration} (${data.candidate_id.slice(0, 8)}...)`;
+                    }
+                    return `Iteration ${label}`;
+                  }}
+                />
+                <ReferenceLine
+                  y={initialScore * 100}
+                  stroke="hsl(var(--muted-foreground))"
+                  strokeDasharray="5 5"
+                  label={{
+                    value: "Seed",
+                    position: "right",
+                    fontSize: 10,
+                    fill: "hsl(var(--muted-foreground))",
+                  }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="score"
+                  stroke="hsl(var(--primary))"
+                  strokeWidth={2}
+                  dot={<CustomDot />}
+                  activeDot={{ r: 6, fill: "hsl(var(--primary))" }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </ClientOnly>
         </div>
 
         {/* Trend Indicator */}

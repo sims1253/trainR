@@ -12,6 +12,7 @@ import {
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { ClientOnly } from "@/components/client-only";
 import type { PairedDeltaV1 } from "@/lib/types";
 import { ArrowUpIcon, ArrowDownIcon, MinusIcon } from "lucide-react";
 
@@ -160,52 +161,60 @@ export function DeltaComparison({
 
         {/* Bar Chart */}
         <div className="h-[250px] w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={chartData}
-              margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis
-                dataKey="name"
-                fontSize={12}
-                tickLine={false}
-                axisLine={false}
-              />
-              <YAxis
-                fontSize={12}
-                tickLine={false}
-                axisLine={false}
-                tickFormatter={(value) => `${value.toFixed(0)}pp`}
-              />
-              <Tooltip
-                cursor={{ fill: "transparent" }}
-                contentStyle={{
-                  borderRadius: "8px",
-                  border: "none",
-                  boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-                }}
-                formatter={(value, name) => {
-                  if (name === "deltaPassRate") return [`${Number(value).toFixed(1)}pp`, "Pass Rate Delta"];
-                  return [value, String(name)];
-                }}
-                labelFormatter={(label, payload) => {
-                  if (payload && payload[0]?.payload) {
-                    const data = payload[0].payload as { name?: string; profileA?: string; profileB?: string };
-                    return `${data.name}: ${data.profileA} vs ${data.profileB}`;
-                  }
-                  return String(label);
-                }}
-              />
-              <ReferenceLine y={0} stroke="#888" strokeDasharray="3 3" />
-              <Bar
-                dataKey="deltaPassRate"
-                name="Pass Rate Delta"
-                fill="#8b5cf6"
-                radius={[4, 4, 0, 0]}
-              />
-            </BarChart>
-          </ResponsiveContainer>
+          <ClientOnly
+            fallback={
+              <div className="h-full w-full flex items-center justify-center text-muted-foreground">
+                Loading chart...
+              </div>
+            }
+          >
+            <ResponsiveContainer width="100%" height="100%" minWidth={300} minHeight={200}>
+              <BarChart
+                data={chartData}
+                margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis
+                  dataKey="name"
+                  fontSize={12}
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <YAxis
+                  fontSize={12}
+                  tickLine={false}
+                  axisLine={false}
+                  tickFormatter={(value) => `${value.toFixed(0)}pp`}
+                />
+                <Tooltip
+                  cursor={{ fill: "transparent" }}
+                  contentStyle={{
+                    borderRadius: "8px",
+                    border: "none",
+                    boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                  }}
+                  formatter={(value, name) => {
+                    if (name === "deltaPassRate") return [`${Number(value).toFixed(1)}pp`, "Pass Rate Delta"];
+                    return [value, String(name)];
+                  }}
+                  labelFormatter={(label, payload) => {
+                    if (payload && payload[0]?.payload) {
+                      const data = payload[0].payload as { name?: string; profileA?: string; profileB?: string };
+                      return `${data.name}: ${data.profileA} vs ${data.profileB}`;
+                    }
+                    return String(label);
+                  }}
+                />
+                <ReferenceLine y={0} stroke="#888" strokeDasharray="3 3" />
+                <Bar
+                  dataKey="deltaPassRate"
+                  name="Pass Rate Delta"
+                  fill="#8b5cf6"
+                  radius={[4, 4, 0, 0]}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </ClientOnly>
         </div>
 
         {/* Detail Table */}

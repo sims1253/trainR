@@ -282,6 +282,20 @@ else
 fi
 
 # =============================================================================
+# Check 7 & 8: Visualizer (optional, only if visualizer/ exists)
+# =============================================================================
+
+if [[ -d "visualizer" ]]; then
+    run_check "visualizer lint" \
+        "cd visualizer && bun run lint"
+    
+    run_check "visualizer build" \
+        "cd visualizer && bun run build"
+else
+    log_warn "visualizer/ directory not found (skipping visualizer checks)"
+fi
+
+# =============================================================================
 # Print Summary
 # =============================================================================
 

@@ -2,7 +2,7 @@
 # Three main workflows: benchmark, optimize, mine
 # Uses uv for Python tooling
 
-.PHONY: benchmark benchmark-smoke benchmark-all optimize optimize-test mine mine-all compare test lint validate-contracts ci ci-quick
+.PHONY: benchmark benchmark-smoke benchmark-all optimize optimize-test mine mine-all compare test lint visualizer-lint visualizer-build validate-contracts ci ci-quick
 
 # =============================================================================
 # 1. BENCHMARK: Evaluate a skill on tasks
@@ -102,6 +102,14 @@ lint:
 	@uv run ruff check . --fix
 	@uv run ruff format .
 	@uv run ty check .
+
+visualizer-lint:
+	@echo "=== VISUALIZER LINT ==="
+	cd visualizer && bun run lint
+
+visualizer-build:
+	@echo "=== VISUALIZER BUILD ==="
+	cd visualizer && bun run build
 
 # =============================================================================
 # SETUP (retained for development)

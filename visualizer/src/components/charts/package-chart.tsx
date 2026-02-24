@@ -11,6 +11,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ClientOnly } from "@/components/client-only";
 import { ModelResult } from "@/lib/types";
 
 interface PackageChartProps {
@@ -51,58 +52,66 @@ export function PackageChart({ model, skill }: PackageChartProps) {
       </CardHeader>
       <CardContent>
         <div className="h-[300px] w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              layout="vertical"
-              data={chartData}
-              margin={{
-                top: 5,
-                right: 30,
-                left: 40,
-                bottom: 5,
-              }}
-            >
-              <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-              <XAxis 
-                type="number"
-                fontSize={12}
-                tickLine={false}
-                axisLine={false}
-                tickFormatter={(value) => `${value}%`}
-                domain={[0, 100]}
-              />
-              <YAxis 
-                dataKey="name" 
-                type="category"
-                fontSize={12}
-                tickLine={false}
-                axisLine={false}
-                width={80}
-              />
-              <Tooltip 
-                cursor={{ fill: 'transparent' }}
-                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                formatter={(value) => value !== undefined ? [`${(value as number).toFixed(1)}%`, ''] : ['', '']}
-              />
-              <Legend />
-              {skillsToShow.includes("no_skill") && (
-                <Bar 
-                  dataKey="no_skill" 
-                  name="No Skill" 
-                  fill="#3b82f6" 
-                  radius={[0, 4, 4, 0]} 
+          <ClientOnly
+            fallback={
+              <div className="h-full w-full flex items-center justify-center text-muted-foreground">
+                Loading chart...
+              </div>
+            }
+          >
+            <ResponsiveContainer width="100%" height="100%" minWidth={300} minHeight={200}>
+              <BarChart
+                layout="vertical"
+                data={chartData}
+                margin={{
+                  top: 5,
+                  right: 30,
+                  left: 40,
+                  bottom: 5,
+                }}
+              >
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                <XAxis 
+                  type="number"
+                  fontSize={12}
+                  tickLine={false}
+                  axisLine={false}
+                  tickFormatter={(value) => `${value}%`}
+                  domain={[0, 100]}
                 />
-              )}
-              {skillsToShow.includes("posit_skill") && (
-                <Bar 
-                  dataKey="posit_skill" 
-                  name="Posit Skill" 
-                  fill="#8b5cf6" 
-                  radius={[0, 4, 4, 0]} 
+                <YAxis 
+                  dataKey="name" 
+                  type="category"
+                  fontSize={12}
+                  tickLine={false}
+                  axisLine={false}
+                  width={80}
                 />
-              )}
-            </BarChart>
-          </ResponsiveContainer>
+                <Tooltip 
+                  cursor={{ fill: 'transparent' }}
+                  contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                  formatter={(value) => value !== undefined ? [`${(value as number).toFixed(1)}%`, ''] : ['', '']}
+                />
+                <Legend />
+                {skillsToShow.includes("no_skill") && (
+                  <Bar 
+                    dataKey="no_skill" 
+                    name="No Skill" 
+                    fill="#3b82f6" 
+                    radius={[0, 4, 4, 0]} 
+                  />
+                )}
+                {skillsToShow.includes("posit_skill") && (
+                  <Bar 
+                    dataKey="posit_skill" 
+                    name="Posit Skill" 
+                    fill="#8b5cf6" 
+                    radius={[0, 4, 4, 0]} 
+                  />
+                )}
+              </BarChart>
+            </ResponsiveContainer>
+          </ClientOnly>
         </div>
       </CardContent>
     </Card>
