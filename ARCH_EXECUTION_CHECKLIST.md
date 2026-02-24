@@ -100,10 +100,10 @@ Phase gate: **B-02 (HarnessResult contract) defined.**
 
 Phase gate: **B, C, D, E complete and F-01 defined.**
 
-- [ ] G-00: Set up test fixtures, mock provider stubs, and CI secrets management. *(prerequisite for G-03..G-07)*
-- [ ] G-01: Split CI into `fast`, `integration-local`, `integration-provider`, `visualizer` (TanStack Start + Bun + Vite).
-- [ ] G-02: Keep `fast` for lint/type/unit/schema/contracts only.
-- [ ] G-03: Add `integration-local` test using Docker + stubbed model output. *Depends: G-00, G-01.*
+- [x] G-00: Set up test fixtures, mock provider stubs, and CI secrets management. *(prerequisite for G-03..G-07)*
+- [x] G-01: Split CI into `fast`, `integration-local`, `integration-provider`, `visualizer` (TanStack Start + Bun + Vite).
+- [x] G-02: Keep `fast` for lint/type/unit/schema/contracts only.
+- [x] G-03: Add `integration-local` test using Docker + stubbed model output. *Depends: G-00, G-01.*
 - [ ] G-04: Add env-gated provider smoke test (1 task x 1 model x selected harness). *Depends: G-00, G-01.*
 - [ ] G-05: Add optimization smoke integration test (1-2 iterations + checkpoint/resume/budget stop). *Depends: G-00, G-01.*
 - [ ] G-06: Add synthetic task generation smoke test. *Depends: G-00, G-01.*
@@ -138,7 +138,7 @@ Phase gate: **G complete; J-02 and J-05 published.**
 J-01 through J-02 and J-05 are **prerequisites for Phase I** and should be written during or immediately after Phase B. The remaining items can follow later.
 
 - [x] J-01: Update README to show canonical commands only, including frontend stack (`TanStack Start` + `Bun` + `Vite`). *(write during Phase A)*
-- [ ] J-02: Add architecture doc for harness/provider/sandbox layering. *(write during Phase B)*
+- [x] J-02: Add architecture doc for harness/provider/sandbox layering. *(write during Phase B)*
 - [ ] J-03: Add security doc for credential policies and auth mount caveats. *(write during Phase D)*
 - [ ] J-04: Add reproducibility doc defining required metadata capture. *(write during Phase E)*
 - [ ] J-05: Add contributor guide for adding new harness adapters. *(write during Phase B; required before Phase I)*

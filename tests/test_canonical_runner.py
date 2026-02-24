@@ -239,6 +239,7 @@ class TestRunExperimentScriptDelegation:
         assert call_kwargs.get("output_dir") == "custom/output"
         assert call_kwargs.get("seed") == 42
         assert call_kwargs.get("workers") == 4
+        assert "verbose" not in call_kwargs
 
     @patch("bench.runner.run")
     @patch("scripts.run_experiment.validate_config")

@@ -733,7 +733,7 @@ Examples:
                 print(f"Error: {e2}", file=sys.stderr)
                 print("\nTo fix this issue:", file=sys.stderr)
                 print(
-                    "  1. Run a benchmark: uv run python scripts/run_benchmark.py --config configs/benchmark.yaml",
+                    "  1. Run a benchmark: uv run python scripts/run_experiment.py --config configs/experiments/r_bench_smoke.yaml",
                     file=sys.stderr,
                 )
                 print("  2. Or use --sample to generate test data", file=sys.stderr)

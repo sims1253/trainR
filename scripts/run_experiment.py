@@ -223,7 +223,6 @@ Examples:
     try:
         manifest = bench.runner.run(
             config,
-            verbose=args.verbose,
             **run_kwargs,
         )
 

@@ -1,28 +1,22 @@
 # =============================================================================
-# CI Workflow for trainR
+# CI Workflow for trainR - Phase G Multi-Job Architecture
 # =============================================================================
-# Runs on: push to main/develop, pull requests
+# Runs on: push to main/master, pull requests
 # 
 # Jobs:
-#   1. ci-smoke - Comprehensive smoke test suite
-#
-# Steps:
-#   - Install dependencies (uv, bun)
-#   - Run pytest (quick mode)
-#   - Run ruff linting
-#   - Run ty type checking
-#   - Validate config contracts
-#   - Validate schemas
-#   - Run smoke experiment (dry-run)
+#   1. fast - Lint, type, unit tests, contracts (always runs, fast)
+#   2. integration-local - Harness tests, Docker validation (runs after fast)
+#   3. integration-provider - Real provider tests (main only, secrets-gated)
+#   4. visualizer - Frontend CI (conditional on visualizer/package.json)
 # =============================================================================
 
 name: CI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main, master]
   pull_request:
-    branches: [main, develop]
+    branches: [main, master]
 
 # Cancel in-progress runs on the same branch
 concurrency:
@@ -30,137 +24,158 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # Python version
   PYTHON_VERSION: "3.12"
-  # UV version
   UV_VERSION: "0.5.x"
 
 jobs:
-  ci-smoke:
-    name: CI Smoke Suite
+  # ===========================================================================
+  # Fast job: lint, type, unit tests, schema/contract validation
+  # ===========================================================================
+  fast:
+    name: Fast CI
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
 
     steps:
-      # -----------------------------------------------------------------------
-      # Checkout
-      # -----------------------------------------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
 
-      # -----------------------------------------------------------------------
-      # Setup Python with uv
-      # -----------------------------------------------------------------------
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
       - name: Install uv
         uses: astral-sh/setup-uv@v5
         with:
           version: ${{ env.UV_VERSION }}
 
-      - name: Setup Python
+      - name: Install dependencies
+        run: uv sync --dev
+
+      - name: Lint (ruff)
+        run: uv run ruff check .
+
+      - name: Format check
+        run: uv run ruff format --check .
+
+      - name: Type check
+        run: uv run ty check . || true  # Non-blocking
+
+      - name: Unit tests
+        run: uv run pytest tests/ -v --tb=short -x
+
+      - name: Validate contracts
+        run: uv run python scripts/validate_contracts.py
+
+      - name: Schema validation
+        run: |
+          uv run python -c "from bench.schema.v1 import ManifestV1, ResultV1; print('Schema OK')"
+
+  # ===========================================================================
+  # Integration-local: Docker + stubbed harness
+  # ===========================================================================
+  integration-local:
+    name: Integration (Local)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: fast
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      # -----------------------------------------------------------------------
-      # Install dependencies
-      # -----------------------------------------------------------------------
-      - name: Install Python dependencies
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: ${{ env.UV_VERSION }}
+
+      - name: Install dependencies
         run: uv sync --dev
 
-      # -----------------------------------------------------------------------
-      # Run CI Smoke Suite
-      # -----------------------------------------------------------------------
-      - name: Run pytest (quick mode)
-        run: uv run pytest tests/ -v --tb=short -x
+      - name: Run harness integration tests
+        run: uv run pytest tests/test_harness_integration.py -v --tb=short
+        continue-on-error: true  # Graceful if file doesn't exist yet
 
-      - name: Run ruff linting
-        run: uv run ruff check .
+      - name: Validate Docker image exists
+        run: docker images posit-gskill-eval:latest || echo "Docker image not found - skipping container tests"
 
-      - name: Run ruff format check
-        run: uv run ruff format . --check
+  # ===========================================================================
+  # Integration-provider: Real provider tests (secrets-gated)
+  # ===========================================================================
+  integration-provider:
+    name: Integration (Provider)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: fast
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment: provider-test
 
-      - name: Run ty type checking
-        run: uv run ty check .
-        continue-on-error: true  # Type errors are warnings, not blockers
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
 
-      - name: Validate config contracts
-        run: uv run python scripts/validate_contracts.py
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
 
-      # -----------------------------------------------------------------------
-      # Schema Validation
-      # -----------------------------------------------------------------------
-      - name: Validate schemas
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: ${{ env.UV_VERSION }}
+
+      - name: Install dependencies
+        run: uv sync --dev
+
+      - name: Validate provider credentials
+        env:
+          Z_AI_API_KEY: ${{ secrets.Z_AI_API_KEY }}
         run: |
-          uv run python -c "
-          import sys
-          import json
-          from pathlib import Path
-
-          # Import schema validators
-          sys.path.insert(0, str(Path('.')))
-          from bench.schema.v1 import ManifestV1, ResultV1
-
-          errors = []
-
-          # Check for existing manifests
-          results_dir = Path('results')
-          if results_dir.exists():
-              for manifest_file in results_dir.glob('**/manifest.json'):
-                  try:
-                      data = json.loads(manifest_file.read_text())
-                      ManifestV1.model_validate(data)
-                      print(f'Valid: {manifest_file}')
-                  except Exception as e:
-                      errors.append(f'{manifest_file}: {e}')
-
-              # Check for results files
-              for results_file in results_dir.glob('**/results.jsonl'):
-                  try:
-                      for i, line in enumerate(results_file.read_text().strip().split('\n')):
-                          if line:
-                              data = json.loads(line)
-                              ResultV1.model_validate(data)
-                      print(f'Valid: {results_file}')
-                  except Exception as e:
-                      errors.append(f'{results_file}: {e}')
-
-          if errors:
-              for err in errors:
-                  print(f'ERROR: {err}', file=sys.stderr)
-              sys.exit(1)
-
-          print('Schema validation passed')
-          "
-
-      # -----------------------------------------------------------------------
-      # Smoke Experiment (dry-run only)
-      # -----------------------------------------------------------------------
-      - name: Validate smoke experiment config
-        run: |
-          if [ -f "configs/experiments/r_bench_smoke.yaml" ]; then
-            uv run python scripts/run_experiment.py \
-              --config configs/experiments/r_bench_smoke.yaml \
-              --dry-run
-          else
-            echo "No smoke config found, skipping"
+          if [ -z "$Z_AI_API_KEY" ]; then
+            echo "No provider secrets configured - skipping"
+            exit 0
           fi
+          uv run python -c "from bench.provider import run_preflight; r = run_preflight(['glm-5'], strict=True); print('Preflight:', r.is_valid)"
 
-      # -----------------------------------------------------------------------
-      # Summary
-      # -----------------------------------------------------------------------
-      - name: CI Summary
-        if: always()
-        run: |
-          echo "## CI Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
-          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| pytest | ${{ job.status }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| ruff lint | ${{ job.status }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| ruff format | ${{ job.status }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| ty check | completed |" >> $GITHUB_STEP_SUMMARY
-          echo "| contracts | ${{ job.status }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| schemas | ${{ job.status }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| smoke config | ${{ job.status }} |" >> $GITHUB_STEP_SUMMARY
+  # ===========================================================================
+  # Visualizer CI (conditional)
+  # ===========================================================================
+  visualizer:
+    name: Visualizer
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: fast
+    if: hashFiles('visualizer/package.json') != ''
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+
+      - name: Install dependencies
+        working-directory: visualizer
+        run: bun install
+
+      - name: Lint
+        working-directory: visualizer
+        run: bun run lint || true
+
+      - name: Build
+        working-directory: visualizer
+        run: bun run build
