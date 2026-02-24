@@ -87,14 +87,14 @@ Phase gate: **A complete** (independent of B; can run in parallel with B).
 
 Phase gate: **B-02 (HarnessResult contract) defined.**
 
-- [ ] F-01: Define canonical telemetry schema for token/cost/turn/tool metrics.
-- [ ] F-02: Map Pi SDK/CLI native usage events into canonical schema. *Depends: F-01, B-06.*
-- [ ] F-03: Preserve raw adapter events for audit/debug. *Depends: F-01.*
-- [ ] F-04: Ensure unknown usage fields are `null`/unknown, not forced zero. *Depends: F-01.*
-- [ ] F-05: Add optional cost estimation layer with provider pricing table. *Depends: F-01.*
-- [ ] F-06: Surface normalized telemetry in result artifacts and summaries. *Depends: F-01..F-04.*
-- [ ] F-07: Add telemetry contract tests for each harness adapter. *Depends: F-01.*
-- [ ] F-08: Version the telemetry schema; add schema compatibility test in visualizer CI job. *Depends: F-01.*
+- [x] F-01: Define canonical telemetry schema for token/cost/turn/tool metrics.
+- [x] F-02: Map Pi SDK/CLI native usage events into canonical schema. *Depends: F-01, B-06.*
+- [x] F-03: Preserve raw adapter events for audit/debug. *Depends: F-01.*
+- [x] F-04: Ensure unknown usage fields are `null`/unknown, not forced zero. *Depends: F-01.*
+- [x] F-05: Add optional cost estimation layer with provider pricing table. *Depends: F-01.*
+- [x] F-06: Surface normalized telemetry in result artifacts and summaries. *Depends: F-01..F-04.*
+- [x] F-07: Add telemetry contract tests for each harness adapter. *Depends: F-01.*
+- [x] F-08: Version the telemetry schema; add schema compatibility test in visualizer CI job. *Depends: F-01.*
 
 ## G) CI + Integration Reliability
 

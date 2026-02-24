@@ -9,9 +9,12 @@ from __future__ import annotations
 import os
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Any
+from typing import TYPE_CHECKING, Any, Optional
 
 from pydantic import BaseModel, Field
+
+if TYPE_CHECKING:
+    from bench.telemetry import TelemetrySchema
 
 
 class ErrorCategory(Enum):
@@ -215,10 +218,13 @@ class HarnessResult(BaseModel):
     )
     test_summary: str | None = Field(default=None, description="Test execution summary")
 
-    # Metrics
+    # Metrics (legacy fields - prefer telemetry for new code)
     token_usage: TokenUsage = Field(default_factory=TokenUsage, description="Token consumption")
     execution_time: float = Field(default=0.0, ge=0, description="Total execution time in seconds")
     turns: int = Field(default=0, ge=0, description="Number of conversation turns")
+
+    # Unified telemetry (Phase F)
+    telemetry: "TelemetrySchema | None" = Field(default=None, description="Unified telemetry data")
 
     # Metadata
     model: str | None = Field(default=None, description="Model used for execution")
@@ -228,6 +234,24 @@ class HarnessResult(BaseModel):
         """Pydantic model configuration."""
 
         extra = "allow"
+
+    def model_post_init(self, __context: Any) -> None:
+        """Sync telemetry with legacy fields if telemetry is set."""
+        if self.telemetry is not None:
+            # Sync token usage from telemetry
+            self.token_usage = TokenUsage(
+                prompt=self.telemetry.tokens.prompt,
+                completion=self.telemetry.tokens.completion,
+                total=self.telemetry.tokens.total,
+                cache_read=self.telemetry.tokens.cache_read or 0,
+                cache_write=self.telemetry.tokens.cache_write or 0,
+            )
+            # Sync execution time and turns from telemetry
+            self.execution_time = self.telemetry.latency.total_s
+            self.turns = self.telemetry.turns
+            # Sync model from telemetry
+            if self.model is None and self.telemetry.model:
+                self.model = self.telemetry.model
 
 
 class AgentHarness(ABC):
@@ -336,3 +360,19 @@ class AgentHarness(ABC):
     def __repr__(self) -> str:
         """Return string representation of the harness."""
         return f"{self.__class__.__name__}(config={self.config!r})"
+
+
+# Resolve forward references after all classes are defined
+# This is required for Pydantic to validate TelemetrySchema in HarnessResult
+def _rebuild_models() -> None:
+    try:
+        from bench.telemetry import TelemetrySchema
+
+        HarnessResult.model_rebuild()
+    except ImportError:
+        # TelemetrySchema may not be available during initial import
+        # The model will be rebuilt when it's first accessed if needed
+        pass
+
+
+_rebuild_models()
