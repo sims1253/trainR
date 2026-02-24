@@ -30,16 +30,16 @@ Phase gate: **A complete** (all A items checked).
 
 Items are ordered by dependency -- B-01 through B-04 define the contracts that B-05 through B-11 consume.
 
-- [ ] B-01: Create `bench/harness/` module.
-- [ ] B-02: Define `HarnessRequest` and `HarnessResult` typed contracts.
-- [ ] B-03: Define `AgentHarness` protocol/interface.
-- [ ] B-04: Add `HarnessRegistry`/`HarnessFactory` for config-driven selection.
-- [ ] B-05: Refactor runner to use injected harness (no direct Pi runner calls). *Depends: B-01..B-04.*
-- [ ] B-06: Implement `PiSdkHarness` adapter (primary). *Depends: B-01..B-04.*
-- [ ] B-07: Implement `PiCliHarness` adapter (fallback). *Depends: B-01..B-04.*
-- [ ] B-08: Add `CliHarnessBase` for Codex/Claude/Gemini adapters. *Depends: B-01..B-04.*
-- [ ] B-09: Wire harness selector in runtime (`execution.harness`). *Depends: B-04, H-01.*
-- [ ] B-10: Add harness capability metadata (json mode, tools, usage support). *Depends: B-03.*
+- [x] B-01: Create `bench/harness/` module.
+- [x] B-02: Define `HarnessRequest` and `HarnessResult` typed contracts.
+- [x] B-03: Define `AgentHarness` protocol/interface.
+- [x] B-04: Add `HarnessRegistry`/`HarnessFactory` for config-driven selection.
+- [x] B-05: Refactor runner to use injected harness (no direct Pi runner calls). *Depends: B-01..B-04.*
+- [x] B-06: Implement `PiSdkHarness` adapter (primary). *Depends: B-01..B-04.* (combined with B-07 as PiDockerHarness)
+- [x] B-07: Implement `PiCliHarness` adapter (fallback). *Depends: B-01..B-04.* (combined with B-06 as PiDockerHarness)
+- [x] B-08: Add `CliHarnessBase` for Codex/Claude/Gemini adapters. *Depends: B-01..B-04.*
+- [x] B-09: Wire harness selector in runtime (`execution.harness`). *Depends: B-04, H-01.*
+- [x] B-10: Add harness capability metadata (json mode, tools, usage support). *Depends: B-03.* (partially done with config changes)
 - [ ] B-11: Add integration tests proving harness swap via config only. *Depends: B-05, B-06, B-07.*
 
 ## C) Polyglot Boundary (Python Control Plane, TS Edge)
@@ -115,7 +115,7 @@ Phase gate: **B, C, D, E complete and F-01 defined.**
 
 Phase gate: **A complete** (schema fields must land before runtime wiring).
 
-- [ ] H-01: Extend experiment config schema with `execution.harness`.
+- [x] H-01: Extend experiment config schema with `execution.harness`.
 - [ ] H-02: Add `execution.sandbox_profile`.
 - [ ] H-03: Add `execution.auth_policy` + optional auth mounts. *Depends: D-05.*
 - [ ] H-04: Add schema validation for new fields. *Depends: H-01..H-03.*

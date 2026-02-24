@@ -13,10 +13,22 @@ This is the single source of truth for experiment configuration.
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import yaml
 from pydantic import BaseModel, Field, field_validator
+
+
+# Known harness types for execution
+HarnessType = Literal[
+    "pi_docker",
+    "pi_sdk",
+    "pi_cli",
+    "codex_cli",
+    "claude_cli",
+    "gemini_cli",
+    "swe_agent",
+]
 
 
 class TaskSelectionMode(str, Enum):
@@ -115,8 +127,29 @@ class SkillConfig(BaseModel):
 
 
 class ExecutionConfig(BaseModel):
-    """Execution environment configuration."""
+    """Execution environment configuration.
 
+    Attributes:
+        harness: The harness adapter to use for running tasks.
+            - pi_docker: Docker-based execution with Pi SDK (default)
+            - pi_sdk: Native Pi SDK execution
+            - pi_cli: Pi CLI-based execution
+            - codex_cli: OpenAI Codex CLI
+            - claude_cli: Anthropic Claude CLI
+            - gemini_cli: Google Gemini CLI
+            - swe_agent: SWE-agent execution
+        timeout: Maximum time per task in seconds
+        docker_image: Docker image for evaluation containers
+        repeats: Number of times to repeat each task
+        parallel_workers: Number of parallel workers
+        save_trajectories: Whether to save agent trajectories
+        save_traces: Whether to save LLM request/response traces
+    """
+
+    harness: HarnessType = Field(
+        default="pi_docker",
+        description="Harness name: pi_docker, pi_sdk, pi_cli, codex_cli, claude_cli, gemini_cli, swe_agent",
+    )
     timeout: int = Field(
         default=600,
         ge=1,
