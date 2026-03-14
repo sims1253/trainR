@@ -46,11 +46,10 @@ from bench.experiments.runner import ExperimentRunner, run_experiment
 __all__ = [
     "DeterminismConfig",
     "ExecutionConfig",
-    # Config
     "ExperimentConfig",
-    # Matrix
     "ExperimentMatrix",
     "ExperimentRun",
+    "ExperimentRunner",
     "ModelSpec",
     "ModelsConfig",
     "OutputConfig",
@@ -62,7 +61,6 @@ __all__ = [
     "TaskSelectionMode",
     "TaskSpec",
     "TasksConfig",
-    # Tool A/B Matrix
     "ToolABMatrix",
     "ToolABPair",
     "ToolABRun",
@@ -70,4 +68,5 @@ __all__ = [
     "generate_matrix",
     "generate_tool_ab_matrix",
     "load_experiment_config",
+    "run_experiment",
 ]

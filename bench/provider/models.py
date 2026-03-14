@@ -20,8 +20,8 @@ class ProviderInfo:
     name: str
     """Provider name (e.g., 'openrouter', 'zai')."""
 
-    litellm_prefix: str
-    """LiteLLM prefix for the provider (e.g., 'openrouter/', 'openai/')."""
+    api_style: str
+    """API style for the provider (e.g., 'openai_compat', 'anthropic', 'gemini')."""
 
     api_key_env: str
     """Environment variable name for the API key."""
@@ -34,6 +34,10 @@ class ProviderInfo:
 
     supports_response_format: bool = True
     """Whether the provider supports response_format JSON mode."""
+
+    # Backward compatibility - will be removed in future version
+    litellm_prefix: str = ""
+    """DEPRECATED: Use api_style instead. LiteLLM prefix for the provider."""
 
     def __post_init__(self) -> None:
         if not self.display_name:
@@ -53,14 +57,21 @@ class ModelInfo:
     name: str = ""
     """Short name used in configs (e.g., 'glm-5', 'gpt-oss-120b')."""
 
-    litellm_model: str = ""
-    """Full LiteLLM model string (e.g., 'openai/glm-5-free')."""
+    model_id: str = ""
+    """The raw model ID to send to the API (e.g., 'glm-5-free')."""
 
     display_name: str = ""
     """Human-readable display name."""
 
     capabilities: dict[str, Any] = field(default_factory=dict)
     """Model capabilities (reasoning, json_mode, max_tokens_default, etc.)."""
+
+    _provider_info: ProviderInfo | None = field(default=None, repr=False)
+    """Reference to provider info for api_style delegation."""
+
+    # Backward compatibility - will be removed in future version
+    litellm_model: str = ""
+    """DEPRECATED: Use model_id instead. Full LiteLLM model string."""
 
     def __post_init__(self) -> None:
         if not self.name:
@@ -82,3 +93,10 @@ class ModelInfo:
     def max_tokens_default(self) -> int | None:
         """Default max tokens for the model."""
         return self.capabilities.get("max_tokens_default")
+
+    @property
+    def api_style(self) -> str:
+        """API style for this model's provider."""
+        if self._provider_info is not None:
+            return self._provider_info.api_style
+        return "openai_compat"  # Default fallback

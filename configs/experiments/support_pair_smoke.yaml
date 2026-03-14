@@ -13,7 +13,7 @@ schema_version: "1.0"
 # Models to evaluate (references configs/llm.yaml)
 models:
   names:
-    - glm-5
+    - glm-5-plan
 
 # Task selection
 tasks:

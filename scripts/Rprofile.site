@@ -1,0 +1,36 @@
+# R Sandbox Profile for Benchmark Environment
+# Disables dangerous functions that could:
+# - Execute shell commands
+# - Access network
+# - Modify files outside workspace
+
+# Block shell execution
+system <- function(...) stop("system() is disabled in sandbox")
+system2 <- function(...) stop("system2() is disabled in sandbox")
+shell <- function(...) stop("shell() is disabled in sandbox")
+shell.exec <- function(...) stop("shell.exec() is disabled in sandbox")
+
+# Block file operations outside workspace
+file.remove <- function(...) stop("file.remove() is disabled in sandbox")
+unlink <- function(...) stop("unlink() is disabled in sandbox")
+file.rename <- function(...) stop("file.rename() is disabled in sandbox")
+file.copy <- function(...) stop("file.copy() is disabled in sandbox")
+
+# Block network access
+download.file <- function(...) stop("download.file() is disabled in sandbox")
+url <- function(...) stop("url() is disabled in sandbox")
+curl <- function(...) stop("curl() is disabled in sandbox")
+
+# Warn about setwd (don't block, just warn)
+setwd <- function(dir) {
+  warning("setwd() called - paths may break in sandbox")
+  base::setwd(dir)
+}
+
+# Set options
+options(
+  download.file.method = "none",
+  timeout = 300
+)
+
+message("R Sandbox active - dangerous functions disabled")

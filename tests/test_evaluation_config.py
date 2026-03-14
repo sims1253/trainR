@@ -1,6 +1,7 @@
 """Tests for evaluation configuration."""
 
 import os
+import warnings
 from unittest.mock import patch
 
 from evaluation.config import EvaluationConfig, ModelConfig, SkillConfig, TasksConfig
@@ -158,54 +159,93 @@ class TestProviderAwareKeyCheck:
     @patch.dict(os.environ, {}, clear=True)
     def test_get_required_api_key_openrouter_missing(self):
         """Test that missing OPENROUTER_API_KEY is detected for openrouter model."""
-        env_var, api_key = get_required_api_key("openrouter/some-model")
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            env_var, api_key = get_required_api_key("openrouter/some-model")
         assert env_var == "OPENROUTER_API_KEY"
         assert api_key is None
 
     @patch.dict(os.environ, {"OPENROUTER_API_KEY": "test-key"}, clear=True)
     def test_get_required_api_key_openrouter_present(self):
         """Test that present OPENROUTER_API_KEY is returned for openrouter model."""
-        env_var, api_key = get_required_api_key("openrouter/some-model")
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            env_var, api_key = get_required_api_key("openrouter/some-model")
         assert env_var == "OPENROUTER_API_KEY"
         assert api_key == "test-key"
 
     @patch.dict(os.environ, {}, clear=True)
     def test_get_required_api_key_opencode_missing(self):
         """Test that missing OPENCODE_API_KEY is detected for opencode model."""
-        env_var, api_key = get_required_api_key("opencode/some-model")
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            env_var, api_key = get_required_api_key("opencode/some-model")
         assert env_var == "OPENCODE_API_KEY"
         assert api_key is None
 
     @patch.dict(os.environ, {"OPENCODE_API_KEY": "test-key"}, clear=True)
     def test_get_required_api_key_opencode_present(self):
         """Test that present OPENCODE_API_KEY is returned for opencode model."""
-        env_var, api_key = get_required_api_key("opencode/some-model")
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            env_var, api_key = get_required_api_key("opencode/some-model")
         assert env_var == "OPENCODE_API_KEY"
         assert api_key == "test-key"
 
     @patch.dict(os.environ, {"Z_AI_API_KEY": "zai-key"}, clear=True)
     def test_get_required_api_key_zai_present(self):
         """Test that Z_AI_API_KEY is detected for zai model."""
-        env_var, api_key = get_required_api_key("zai/some-model")
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            env_var, api_key = get_required_api_key("zai/some-model")
         assert env_var == "Z_AI_API_KEY"
         assert api_key == "zai-key"
 
+    @patch.dict(os.environ, {"ZAI_API_KEY": "zai-alias-key"}, clear=True)
+    def test_get_required_api_key_zai_alias_present(self):
+        """Test that ZAI_API_KEY alias resolves to canonical Z_AI_API_KEY."""
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            env_var, api_key = get_required_api_key("zai/some-model")
+        assert env_var == "Z_AI_API_KEY"
+        assert api_key == "zai-alias-key"
+
     def test_get_required_api_key_unknown_prefix(self):
         """Test that unknown prefix returns (None, None)."""
-        env_var, api_key = get_required_api_key("unknown-provider/some-model")
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            env_var, api_key = get_required_api_key("unknown-provider/some-model")
         assert env_var is None
         assert api_key is None
 
     @patch.dict(os.environ, {"OPENAI_API_KEY": "openai-key"}, clear=True)
     def test_get_required_api_key_openai(self):
         """Test that OPENAI_API_KEY is detected for openai model."""
-        env_var, api_key = get_required_api_key("openai/gpt-4")
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            env_var, api_key = get_required_api_key("openai/gpt-4")
         assert env_var == "OPENAI_API_KEY"
         assert api_key == "openai-key"
 
     @patch.dict(os.environ, {"ANTHROPIC_API_KEY": "anthropic-key"}, clear=True)
     def test_get_required_api_key_anthropic(self):
         """Test that ANTHROPIC_API_KEY is detected for anthropic model."""
-        env_var, api_key = get_required_api_key("anthropic/claude-3")
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            env_var, api_key = get_required_api_key("anthropic/claude-3")
         assert env_var == "ANTHROPIC_API_KEY"
         assert api_key == "anthropic-key"
+
+    @patch.dict(os.environ, {}, clear=True)
+    def test_get_required_api_key_model_id_uses_llm_catalog(self):
+        """Model id aliases in llm.yaml should still resolve required env vars."""
+        env_var, api_key = get_required_api_key("glm-5")
+        assert env_var == "Z_AI_API_KEY"
+        assert api_key is None
+
+    @patch.dict(os.environ, {"Z_AI_API_KEY": "zai-key"}, clear=True)
+    def test_get_required_api_key_model_id_prefers_llm_catalog(self):
+        """Resolved model ID should use provider mapping from llm.yaml."""
+        env_var, api_key = get_required_api_key("openai/glm-5")
+        assert env_var == "Z_AI_API_KEY"
+        assert api_key == "zai-key"

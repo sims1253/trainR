@@ -133,7 +133,7 @@ class ManifestV1(BaseModel):
 
     # Results reference
     results_path: str | None = Field(default=None, description="Path to results file")
-    results: list[ResultV1] = Field(default_factory=list, description="Individual results")
+    results: list[ResultV1] = Field(default_factory=list, description="Individual results (cleared when memory-saving is enabled)")
 
     # Additional metadata
     metadata: dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
@@ -150,43 +150,68 @@ class ManifestV1(BaseModel):
         """Export this model's JSON schema."""
         return ManifestV1.model_json_schema()
 
-    def add_result(self, result: ResultV1) -> None:
-        """Add a result to the manifest."""
-        self.results.append(result)
-        self._update_summary()
+    def add_result(self, result: ResultV1, keep_in_memory: bool = True) -> None:
+        """Add a result to the manifest and update summary.
+
+        Args:
+            result: The result to add
+            keep_in_memory: Whether to keep the result object in the results list.
+                            Set to False to save memory during large runs.
+        """
+        self._update_summary_incremental(result)
+        if keep_in_memory:
+            self.results.append(result)
+
+    def _update_summary_incremental(self, result: ResultV1) -> None:
+        """Update summary statistics incrementally from a single result."""
+        s = self.summary
+        old_completed = s.completed
+        s.completed += 1
+        s.total_tasks = self.task_count
+
+        if result.passed:
+            s.passed += 1
+        else:
+            s.failed += 1
+
+        if result.error_category:
+            s.errors += 1
+
+        # Update averages: (old_avg * old_count + new_val) / new_count
+        s.avg_score = (s.avg_score * old_completed + result.score) / s.completed
+        s.avg_latency_s = (s.avg_latency_s * old_completed + result.latency_s) / s.completed
+        s.total_tokens += result.token_usage.total
+
+        # Update model summaries incrementally
+        model_summary = next((ms for ms in self.model_summaries if ms.model == result.model), None)
+        if not model_summary:
+            model_summary = ModelSummaryV1(model=result.model)
+            self.model_summaries.append(model_summary)
+
+        old_model_total = model_summary.total
+        model_summary.total += 1
+        if result.passed:
+            model_summary.passed += 1
+
+        model_summary.avg_score = (model_summary.avg_score * old_model_total + result.score) / model_summary.total
+        model_summary.avg_latency_s = (model_summary.avg_latency_s * old_model_total + result.latency_s) / model_summary.total
+        model_summary.total_tokens += result.token_usage.total
+
+        # Keep model_summaries sorted by model name
+        self.model_summaries.sort(key=lambda ms: ms.model)
 
     def _update_summary(self) -> None:
-        """Update summary statistics from results."""
+        """Update summary statistics from results list (recalculates everything)."""
         if not self.results:
             return
 
-        self.summary.total_tasks = self.task_count
-        self.summary.completed = len(self.results)
-        self.summary.passed = sum(1 for r in self.results if r.passed)
-        self.summary.failed = self.summary.completed - self.summary.passed
-        self.summary.errors = sum(1 for r in self.results if r.error_category)
-        self.summary.avg_score = sum(r.score for r in self.results) / len(self.results)
-        self.summary.avg_latency_s = sum(r.latency_s for r in self.results) / len(self.results)
-        self.summary.total_tokens = sum(r.token_usage.total for r in self.results)
+        # Reset summary
+        self.summary = ResultSummaryV1(total_tasks=self.task_count)
+        self.model_summaries = []
 
-        # Update model summaries
-        model_results: dict[str, list[ResultV1]] = {}
+        # Rebuild from results list
         for r in self.results:
-            if r.model not in model_results:
-                model_results[r.model] = []
-            model_results[r.model].append(r)
-
-        self.model_summaries = [
-            ModelSummaryV1(
-                model=model,
-                total=len(results),
-                passed=sum(1 for r in results if r.passed),
-                avg_score=sum(r.score for r in results) / len(results),
-                avg_latency_s=sum(r.latency_s for r in results) / len(results),
-                total_tokens=sum(r.token_usage.total for r in results),
-            )
-            for model, results in sorted(model_results.items())
-        ]
+            self._update_summary_incremental(r)
 
     def finalize(self, end_time: datetime | None = None) -> None:
         """Finalize the manifest with end time and duration."""

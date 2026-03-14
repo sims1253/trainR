@@ -294,11 +294,11 @@ provider = resolver.resolve_provider("glm-5")  # Returns: "opencode"
 # Get API key environment variable
 api_key_env = resolver.get_api_key_env("opencode")  # Returns: "OPENCODE_API_KEY"
 
-# Get LiteLLM prefix
-prefix = resolver.get_litellm_prefix("opencode")  # Returns: "openai/"
+# Get API style for a model (openai_compat, openai_native, anthropic, gemini)
+api_style = resolver.get_api_style("glm-5")  # Returns: "openai_compat"
 
-# Get full LiteLLM model string
-litellm_model = resolver.get_litellm_model("glm-5")  # Returns: "openai/glm-5-free"
+# Get base URL for provider
+base_url = resolver.get_base_url("opencode")  # Returns provider-specific URL
 ```
 
 #### CredentialResolver
@@ -350,9 +350,9 @@ print("Warnings:", result.warnings)
 @dataclass
 class ProviderInfo:
     name: str                    # Provider name
-    litellm_prefix: str          # LiteLLM prefix
     api_key_env: str             # API key env var name
     base_url: str | None         # Custom API URL
+    api_style: str               # API style: openai_compat, openai_native, anthropic, gemini
     supports_response_format: bool
 
 @dataclass
@@ -360,8 +360,61 @@ class ModelInfo:
     id: str                      # Model identifier
     provider: str                # Provider name
     name: str                    # Short name
-    litellm_model: str           # Full LiteLLM string
+    api_style: str               # API style for this model
     capabilities: dict[str, Any] # Model capabilities
+```
+
+---
+
+### bench.provider.inference (Inference Gateway)
+
+The inference gateway provides a unified interface for structured LLM generation across multiple providers.
+
+#### Location
+`bench/provider/inference.py`
+
+#### Single Entry Point
+
+```python
+from bench.provider.inference import generate_structured
+
+# Generate structured output with any configured model
+result = generate_structured(
+    model="glm-5",
+    messages=[{"role": "user", "content": "..."}],
+    response_format=MyResponseModel,  # Pydantic model for structured output
+    temperature=0.7,
+    max_tokens=2048,
+)
+```
+
+#### API Style Routing
+
+The gateway automatically routes to the correct adapter based on the model's `api_style`:
+
+| API Style | Adapter | Description |
+|-----------|---------|-------------|
+| `openai_compat` | `bench.provider.adapters.openai_compat` | OpenAI-compatible APIs (OpenRouter, OpenCode, z.ai) |
+| `openai_native` | `bench.provider.adapters.openai_native` | Native OpenAI API |
+| `anthropic` | `bench.provider.adapters.anthropic` | Anthropic Claude API |
+| `gemini` | `bench.provider.adapters.gemini` | Google Gemini API |
+
+#### Architecture
+
+```
+generate_structured()
+         │
+         ▼
+    API Style Router
+         │
+    ┌────┼────┬─────────────┐
+    ▼    ▼    ▼             ▼
+openai_compat  anthropic   gemini
+    │    │    │             │
+    └────┴────┴─────────────┘
+              │
+              ▼
+        Provider HTTP Client
 ```
 
 ---
@@ -598,7 +651,7 @@ HarnessType = Literal[
 providers:
   my_provider:
     api_key_env: MY_PROVIDER_API_KEY
-    litellm_prefix: my_provider/
+    api_style: openai_compat  # Options: openai_compat, openai_native, anthropic, gemini
     base_url: https://api.myprovider.com/v1
 
 models:
@@ -616,11 +669,6 @@ models:
 PROVIDER_API_KEY_MAP = {
     # ...existing mappings...
     "my_provider": "MY_PROVIDER_API_KEY",
-}
-
-PROVIDER_LITELLM_PREFIX = {
-    # ...existing mappings...
-    "my_provider": "my_provider/",
 }
 ```
 
@@ -738,6 +786,8 @@ execution:
 | CLI Base Harness | `bench.harness.adapters.cli_base` |
 | Provider Resolver | `bench.provider.resolver` |
 | Credential Resolver | `bench.provider.auth` |
+| Inference Gateway | `bench.provider.inference` |
+| OpenAI Compat Adapter | `bench.provider.adapters.openai_compat` |
 | Preflight | `bench.provider.preflight` |
 | Sandbox Policy | `bench.sandbox.policy` |
 | Docker Builder | `bench.sandbox.docker` |
@@ -766,6 +816,9 @@ from bench.provider import (
     AuthPolicy,
     run_preflight,
 )
+
+# Inference gateway
+from bench.provider.inference import generate_structured
 
 # Sandbox policies
 from bench.sandbox import (

@@ -1,0 +1,53 @@
+{
+  "task_id": "kaggle_home-credit-default-risk_tidy-xgb-all-tables-0-796",
+  "source": {
+    "type": "kaggle_kernel",
+    "competition": "https://www.kaggle.com/competitions/home-credit-default-risk",
+    "competition_title": "Home Credit Default Risk",
+    "kernel_slug": "tidy-xgb-all-tables-0-796",
+    "kernel_ref": "kailex/tidy-xgb-all-tables-0-796",
+    "author": "kailex",
+    "votes": 569,
+    "url": "https://www.kaggle.com/code/kailex/tidy-xgb-all-tables-0-796",
+    "language": "r",
+    "kernel_type": "script"
+  },
+  "problem_statement": {
+    "title": "Home Credit Default Risk",
+    "description": "Can you predict how capable each applicant is of repaying a loan?",
+    "evaluation_metric": "Area Under Receiver Operating Characteristic Curve",
+    "problem_type": "unknown",
+    "instruction": "Complete the Home Credit Default Risk competition task.",
+    "context": "Can you predict how capable each applicant is of repaying a loan?"
+  },
+  "grading": {
+    "metric": "Area Under Receiver Operating Characteristic Curve",
+    "metric_description": "Can you predict how capable each applicant is of repaying a loan?",
+    "problem_type": "classification",
+    "competition_slug": "home-credit-default-risk",
+    "data_available": true,
+    "grading_method": "metric",
+    "baseline_score": null
+  },
+  "reference_solution": {
+    "code": "library(tidyverse)\nlibrary(xgboost)\nlibrary(magrittr)\nset.seed(0)\n \n#---------------------------\ncat(\"Loading data...\\n\")\n\nbbalance <- read_csv(\"../input/bureau_balance.csv\") \nbureau <- read_csv(\"../input/bureau.csv\")\ncc_balance <- read_csv(\"../input/credit_card_balance.csv\")\npayments <- read_csv(\"../input/installments_payments.csv\") \npc_balance <- read_csv(\"../input/POS_CASH_balance.csv\")\nprev <- read_csv(\"../input/previous_application.csv\")\ntr <- read_csv(\"../input/application_train.csv\") \nte <- read_csv(\"../input/application_test.csv\")\n\n#---------------------------\ncat(\"Preprocessing...\\n\")\n\nfn <- funs(mean, sd, min, max, sum, n_distinct, .args = list(na.rm = TRUE))\n\nsum_bbalance <- bbalance %>%\n  mutate_if(is.character, funs(factor(.) %>% as.integer)) %>% \n  group_by(SK_ID_BUREAU) %>% \n  summarise_all(fn) \nrm(bbalance); gc()\n\nsum_bureau <- bureau %>% \n  left_join(sum_bbalance, by = \"SK_ID_BUREAU\") %>% \n  select(-SK_ID_BUREAU) %>% \n  mutate_if(is.character, funs(factor(.) %>% as.integer)) %>% \n  group_by(SK_ID_CURR) %>% \n  summarise_all(fn)\nrm(bureau, sum_bbalance); gc()\n\nsum_cc_balance <- cc_balance %>% \n  select(-SK_ID_PREV) %>% \n  mutate_if(is.character, funs(factor(.) %>% as.integer)) %>% \n  group_by(SK_ID_CURR) %>% \n  summarise_all(fn)\nrm(cc_balance); gc()\n\nsum_payments <- payments %>% \n  select(-SK_ID_PREV) %>% \n  mutate(PAYMENT_PERC = AMT_PAYMENT / AMT_INSTALMENT,\n         PAYMENT_DIFF = AMT_INSTALMENT - AMT_PAYMENT,\n         DPD = DAYS_ENTRY_PAYMENT - DAYS_INSTALMENT,\n         DBD = DAYS_INSTALMENT - DAYS_ENTRY_PAYMENT,\n         DPD = ifelse(DPD > 0, DPD, 0),\n         DBD = ifelse(DBD > 0, DBD, 0)) %>% \n  group_by(SK_ID_CURR) %>% \n  summarise_all(fn) \nrm(payments); gc()\n\nsum_pc_balance <- pc_balance %>% \n  select(-SK_ID_PREV) %>% \n  mutate_if(is.character, funs(factor(.) %>% as.integer)) %>% \n  group_by(SK_ID_CURR) %>% \n  summarise_all(fn)\nrm(pc_balance); gc()\n\nsum_prev <- prev %>%\n  select(-SK_ID_PREV) %>% \n  mutate_if(is.character, funs(factor(.) %>% as.integer)) %>% \n  mutate(DAYS_FIRST_DRAWING = ifelse(DAYS_FIRST_DRAWING == 365243, NA, DAYS_FIRST_DRAWING),\n         DAYS_FIRST_DUE = ifelse(DAYS_FIRST_DUE == 365243, NA, DAYS_FIRST_DUE),\n         DAYS_LAST_DUE_1ST_VERSION = ifelse(DAYS_LAST_DUE_1ST_VERSION == 365243, NA, DAYS_LAST_DUE_1ST_VERSION),\n         DAYS_LAST_DUE = ifelse(DAYS_LAST_DUE == 365243, NA, DAYS_LAST_DUE),\n         DAYS_TERMINATION = ifelse(DAYS_TERMINATION == 365243, NA, DAYS_TERMINATION),\n         APP_CREDIT_PERC = AMT_APPLICATION / AMT_CREDIT) %>% \n  group_by(SK_ID_CURR) %>% \n  summarise_all(fn) \nrm(prev); gc()\n\ntri <- 1:nrow(tr)\ny <- tr$TARGET\n\ntr_te <- tr %>% \n  select(-TARGET) %>% \n  bind_rows(te) %>%\n  left_join(sum_bureau, by = \"SK_ID_CURR\") %>% \n  left_join(sum_cc_balance, by = \"SK_ID_CURR\") %>% \n  left_join(sum_payments, by = \"SK_ID_CURR\") %>% \n  left_join(sum_pc_balance, by = \"SK_ID_CURR\") %>% \n  left_join(sum_prev, by = \"SK_ID_CURR\") %>% \n  select(-SK_ID_CURR) %>% \n  mutate_if(is.character, funs(factor(.) %>% as.integer)) %>% \n  mutate(na = apply(., 1, function(x) sum(is.na(x))),\n         DAYS_EMPLOYED = ifelse(DAYS_EMPLOYED == 365243, NA, DAYS_EMPLOYED),\n         DAYS_EMPLOYED_PERC = sqrt(DAYS_EMPLOYED / DAYS_BIRTH),\n         INCOME_CREDIT_PERC = AMT_INCOME_TOTAL / AMT_CREDIT,\n         INCOME_PER_PERSON = log1p(AMT_INCOME_TOTAL / CNT_FAM_MEMBERS),\n         ANNUITY_INCOME_PERC = sqrt(AMT_ANNUITY / (1 + AMT_INCOME_TOTAL)),\n         LOAN_INCOME_RATIO = AMT_CREDIT / AMT_INCOME_TOTAL,\n         ANNUITY_LENGTH = AMT_CREDIT / AMT_ANNUITY,\n         CHILDREN_RATIO = CNT_CHILDREN / CNT_FAM_MEMBERS, \n         CREDIT_TO_GOODS_RATIO = AMT_CREDIT / AMT_GOODS_PRICE,\n         INC_PER_CHLD = AMT_INCOME_TOTAL / (1 + CNT_CHILDREN),\n         SOURCES_PROD = EXT_SOURCE_1 * EXT_SOURCE_2 * EXT_SOURCE_3,\n         CAR_TO_BIRTH_RATIO = OWN_CAR_AGE / DAYS_BIRTH,\n         CAR_TO_EMPLOY_RATIO = OWN_CAR_AGE / DAYS_EMPLOYED,\n         PHONE_TO_BIRTH_RATIO = DAYS_LAST_PHONE_CHANGE / DAYS_BIRTH,\n         PHONE_TO_EMPLOY_RATIO = DAYS_LAST_PHONE_CHANGE / DAYS_EMPLOYED) \n\ndocs <- str_subset(names(tr), \"FLAG_DOC\")\nlive <- str_subset(names(tr), \"(?!NFLAG_)(?!FLAG_DOC)(?!_FLAG_)FLAG_\")\ninc_by_org <- tr_te %>% \n  group_by(ORGANIZATION_TYPE) %>% \n  summarise(m = median(AMT_INCOME_TOTAL)) %$% \n  setNames(as.list(m), ORGANIZATION_TYPE)\n\nrm(tr, te, fn, sum_bureau, sum_cc_balance, \n   sum_payments, sum_pc_balance, sum_prev); gc()\n\ntr_te %<>% \n  mutate(DOC_IND_KURT = apply(tr_te[, docs], 1, moments::kurtosis),\n         LIVE_IND_SUM = apply(tr_te[, live], 1, sum),\n         NEW_INC_BY_ORG = recode(tr_te$ORGANIZATION_TYPE, !!!inc_by_org),\n         NEW_EXT_SOURCES_MEAN = apply(tr_te[, c(\"EXT_SOURCE_1\", \"EXT_SOURCE_2\", \"EXT_SOURCE_3\")], 1, mean),\n         NEW_SCORES_STD = apply(tr_te[, c(\"EXT_SOURCE_1\", \"EXT_SOURCE_2\", \"EXT_SOURCE_3\")], 1, sd))%>%\n  mutate_all(funs(ifelse(is.nan(.), NA, .))) %>% \n  mutate_all(funs(ifelse(is.infinite(.), NA, .))) %>% \n  data.matrix()\n\n#---------------------------\ncat(\"Preparing data...\\n\")\ndtest <- xgb.DMatrix(data = tr_te[-tri, ])\ntr_te <- tr_te[tri, ]\ntri <- caret::createDataPartition(y, p = 0.9, list = F) %>% c()\ndtrain <- xgb.DMatrix(data = tr_te[tri, ], label = y[tri])\ndval <- xgb.DMatrix(data = tr_te[-tri, ], label = y[-tri])\ncols <- colnames(tr_te)\n\nrm(tr_te, y, tri); gc()\n\n#---------------------------\ncat(\"Training model...\\n\")\np <- list(objective = \"binary:logistic\",\n          booster = \"gbtree\",\n          eval_metric = \"auc\",\n          nthread = 4,\n          eta = 0.05,\n          max_depth = 6,\n          min_child_weight = 30,\n          gamma = 0,\n          subsample = 0.85,\n          colsample_bytree = 0.7,\n          colsample_bylevel = 0.632,\n          alpha = 0,\n          lambda = 0,\n          nrounds = 2000)\n\nset.seed(0)\nm_xgb <- xgb.train(p, dtrain, p$nrounds, list(val = dval), print_every_n = 50, early_stopping_rounds = 300)\n\nxgb.importance(cols, model=m_xgb) %>% \n  xgb.plot.importance(top_n = 30)\n\n#---------------------------\nread_csv(\"../input/sample_submission.csv\") %>%  \n  mutate(SK_ID_CURR = as.integer(SK_ID_CURR),\n         TARGET = predict(m_xgb, dtest)) %>%\n  write_csv(paste0(\"tidy_xgb_\", round(m_xgb$best_score, 5), \".csv\"))",
+    "format": "r_script",
+    "key_techniques": []
+  },
+  "metadata": {
+    "task_type": "feature_impl",
+    "difficulty": "medium",
+    "quality_score": 5,
+    "mined_at": "2026-02-27T00:24:38.660307+00:00",
+    "competition_type": null,
+    "tags": [
+      "banking",
+      "tabular",
+      "auc"
+    ],
+    "evaluation_criteria": "Area Under Receiver Operating Characteristic Curve",
+    "key_techniques": [],
+    "potential_improvements": [],
+    "code_format": "r_script"
+  }
+}

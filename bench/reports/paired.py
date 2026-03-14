@@ -215,6 +215,7 @@ def compute_paired_deltas(
         treatment = treatment_by_pair.get(pair_id)
         if not treatment:
             continue
+        pair_id_str = str(pair_id)
 
         # Extract join keys
         join_key_task = _extract_join_key(control, "task")
@@ -238,7 +239,7 @@ def compute_paired_deltas(
 
         # Compute deltas
         delta = ToolPairDelta(
-            pair_id=pair_id,
+            pair_id=pair_id_str,
             control_tool=control.get("tool_profile", control.get("tool", "unknown")),
             treatment_tool=treatment.get("tool_profile", treatment.get("tool", "unknown")),
             join_key_task=join_key_task,

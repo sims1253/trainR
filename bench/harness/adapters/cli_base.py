@@ -2,11 +2,23 @@
 
 from __future__ import annotations
 
+import contextlib
+import os
 import subprocess
+import tempfile
 import time
 import uuid
 from abc import abstractmethod
 from pathlib import Path
+
+from bench.telemetry import (
+    LatencyBreakdown,
+    TelemetrySchema,
+    ToolCallMetrics,
+)
+from bench.telemetry import (
+    TokenUsage as TelemetryTokenUsage,
+)
 
 from ..base import (
     AgentHarness,
@@ -15,6 +27,38 @@ from ..base import (
     HarnessRequest,
     HarnessResult,
 )
+
+
+def _attach_failure_telemetry(
+    result: HarnessResult,
+    request: HarnessRequest,
+    execution_time: float,
+    provider: str | None = None,
+    model: str | None = None,
+    harness: str = "unknown",
+) -> HarnessResult:
+    """Ensure telemetry is populated for failure paths.
+
+    For failures where token/tool stats are unknown, emit zero/default
+    telemetry with latency and harness/model/provider set when known.
+    """
+    if result.telemetry is not None:
+        return result
+
+    result.telemetry = TelemetrySchema(
+        tokens=TelemetryTokenUsage(
+            prompt=0,
+            completion=0,
+            total=0,
+        ),
+        turns=0,
+        tools=ToolCallMetrics(),
+        latency=LatencyBreakdown(total_s=execution_time, execution_s=execution_time),
+        provider=provider,
+        model=model,
+        harness=harness,
+    )
+    return result
 
 
 class CliHarnessBase(AgentHarness):
@@ -91,6 +135,10 @@ class CliHarnessBase(AgentHarness):
         start_time = time.time()
         run_id = str(uuid.uuid4())
 
+        # Resolve model/provider for telemetry
+        model_name = request.metadata.get("model") or self.config.model
+        provider_name = model_name.split("/", 1)[0] if model_name and "/" in model_name else None
+
         try:
             # Build full command
             cmd = self.cli_command + self.build_cli_args(request)
@@ -101,43 +149,96 @@ class CliHarnessBase(AgentHarness):
             # Get working directory
             cwd = self.config.working_dir
 
-            # Run CLI
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=self.get_timeout(request),
-                env=env,
-                cwd=cwd,
-            )
+            # Check if we should preserve container logs
+            save_container_logs = request.metadata.get("save_container_logs", False)
 
-            execution_time = time.time() - start_time
+            # Create temp file for streaming stdout (avoids memory bloat with large outputs)
+            stdout_fd, stdout_path = tempfile.mkstemp(suffix=".log", prefix=f"cli_{self.cli_name}_")
+            os.close(stdout_fd)  # Close the fd, we'll reopen for subprocess
+
+            stdout_content = None
+            log_path_to_preserve = None
+
+            try:
+                with open(stdout_path, "w") as stdout_file:
+                    result = subprocess.run(
+                        cmd,
+                        stdout=stdout_file,
+                        stderr=subprocess.PIPE,
+                        text=True,
+                        timeout=self.get_timeout(request),
+                        env=env,
+                        cwd=cwd,
+                    )
+
+                execution_time = time.time() - start_time
+
+                # Read stdout back from file
+                with open(stdout_path) as f:
+                    stdout_content = f.read()
+
+                # If save_container_logs is True, preserve the log file path
+                if save_container_logs:
+                    log_path_to_preserve = stdout_path
+                else:
+                    # Clean up temp file
+                    with contextlib.suppress(OSError):
+                        os.unlink(stdout_path)
+
+            except subprocess.TimeoutExpired:
+                # Clean up temp file on timeout
+                with contextlib.suppress(OSError):
+                    os.unlink(stdout_path)
+                raise
+            except Exception:
+                # Clean up temp file on any other exception
+                with contextlib.suppress(OSError):
+                    os.unlink(stdout_path)
+                raise
 
             if result.returncode != 0:
-                return HarnessResult(
+                failure_result = HarnessResult(
                     task_id=request.task_id,
                     run_id=run_id,
                     success=False,
                     error_message=result.stderr or f"CLI exited with code {result.returncode}",
                     error_category=ErrorCategory.AGENT_ERROR,
                     execution_time=execution_time,
-                    output=result.stdout,
+                    output=stdout_content,
+                )
+                # Preserve log path in metadata if requested
+                if log_path_to_preserve:
+                    failure_result.metadata = failure_result.metadata or {}
+                    failure_result.metadata["container_log_path"] = log_path_to_preserve
+                return _attach_failure_telemetry(
+                    failure_result,
+                    request,
+                    execution_time,
+                    provider=provider_name,
+                    model=model_name,
+                    harness=self.cli_name,
                 )
 
             # Parse output
-            harness_result = self.parse_output(result.stdout, request)
+            harness_result = self.parse_output(stdout_content, request)
             harness_result.execution_time = execution_time
             harness_result.run_id = run_id
+            self._ensure_telemetry(harness_result, request, execution_time)
 
             # Preserve raw output in metadata if not already in output
             if not harness_result.output:
-                harness_result.output = result.stdout
+                harness_result.output = stdout_content
+
+            # Preserve log path in metadata if requested
+            if log_path_to_preserve:
+                harness_result.metadata = harness_result.metadata or {}
+                harness_result.metadata["container_log_path"] = log_path_to_preserve
 
             return harness_result
 
         except subprocess.TimeoutExpired:
             execution_time = time.time() - start_time
-            return HarnessResult(
+            timeout_result = HarnessResult(
                 task_id=request.task_id,
                 run_id=run_id,
                 success=False,
@@ -145,10 +246,18 @@ class CliHarnessBase(AgentHarness):
                 error_category=ErrorCategory.TIMEOUT,
                 execution_time=execution_time,
             )
+            return _attach_failure_telemetry(
+                timeout_result,
+                request,
+                execution_time,
+                provider=provider_name,
+                model=model_name,
+                harness=self.cli_name,
+            )
 
         except Exception as e:
             execution_time = time.time() - start_time
-            return HarnessResult(
+            exception_result = HarnessResult(
                 task_id=request.task_id,
                 run_id=run_id,
                 success=False,
@@ -156,11 +265,53 @@ class CliHarnessBase(AgentHarness):
                 error_category=ErrorCategory.from_exception(e),
                 execution_time=execution_time,
             )
+            return _attach_failure_telemetry(
+                exception_result,
+                request,
+                execution_time,
+                provider=provider_name,
+                model=model_name,
+                harness=self.cli_name,
+            )
+
+    def _ensure_telemetry(
+        self, result: HarnessResult, request: HarnessRequest, execution_time: float
+    ) -> None:
+        """Ensure every CLI execution emits canonical telemetry."""
+        model_name = result.model or request.metadata.get("model") or self.config.model
+        provider_name = model_name.split("/", 1)[0] if model_name and "/" in model_name else None
+
+        if result.telemetry is None:
+            result.telemetry = TelemetrySchema(
+                tokens=TelemetryTokenUsage(
+                    prompt=result.token_usage.prompt,
+                    completion=result.token_usage.completion,
+                    total=result.token_usage.total,
+                    cache_read=result.token_usage.cache_read,
+                    cache_write=result.token_usage.cache_write,
+                ),
+                turns=result.turns,
+                tools=ToolCallMetrics(),
+                latency=LatencyBreakdown(total_s=execution_time, execution_s=execution_time),
+                provider=provider_name,
+                model=model_name,
+                harness=self.cli_name,
+            )
+            return
+
+        # Keep telemetry latency in sync with measured wall-clock execution.
+        result.telemetry.latency.total_s = execution_time
+        if result.telemetry.latency.execution_s is None:
+            result.telemetry.latency.execution_s = execution_time
+        if result.telemetry.model is None:
+            result.telemetry.model = model_name
+        if result.telemetry.provider is None:
+            result.telemetry.provider = provider_name
+        if result.telemetry.harness is None:
+            result.telemetry.harness = self.cli_name
 
     def _build_env(self, request: HarnessRequest) -> dict[str, str]:
         """Build environment variables for CLI execution."""
-        import os
-
         env = os.environ.copy()
 
         # Add environment variables from config
@@ -195,4 +346,5 @@ class CliHarnessBase(AgentHarness):
         return HarnessResult(
             task_id=request.task_id,
             run_id=run_id or str(uuid.uuid4()),
+            success=False,
         )

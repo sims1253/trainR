@@ -14,6 +14,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+from typing import ClassVar
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -37,43 +38,47 @@ class TestCanonicalRunnerAPI:
         from bench.runner import run
 
         # Create a mock config file path
-        with patch("bench.runner.load_experiment_config") as mock_load:
-            with patch("bench.runner._apply_overrides") as mock_apply:
-                with patch("bench.runner._create_dry_run_manifest") as mock_dry_run:
-                    mock_config = MagicMock()
-                    mock_config.name = "test"
-                    mock_config.generate_run_id.return_value = "test-run"
-                    mock_config.skill.get_name.return_value = "test-skill"
-                    mock_load.return_value = mock_config
-                    mock_apply.return_value = mock_config
-                    mock_dry_run.return_value = MagicMock()
+        with (
+            patch("bench.runner.load_experiment_config") as mock_load,
+            patch("bench.runner._apply_overrides") as mock_apply,
+            patch("bench.runner._create_dry_run_manifest") as mock_dry_run,
+        ):
+            mock_config = MagicMock()
+            mock_config.name = "test"
+            mock_config.generate_run_id.return_value = "test-run"
+            mock_config.skill.get_name.return_value = "test-skill"
+            mock_load.return_value = mock_config
+            mock_apply.return_value = mock_config
+            mock_dry_run.return_value = MagicMock()
 
-                    # Should not raise - string path accepted
-                    with patch.object(Path, "exists", return_value=True):
-                        run("configs/test.yaml", dry_run=True)
+            # Should not raise - string path accepted
+            with patch.object(Path, "exists", return_value=True):
+                run("configs/test.yaml", dry_run=True)
 
-                    mock_load.assert_called_once()
+            mock_load.assert_called_once()
 
     def test_run_function_signature_accepts_path(self):
         """Test that run() accepts a pathlib.Path argument."""
         from bench.runner import run
 
-        with patch("bench.runner.load_experiment_config") as mock_load:
-            with patch("bench.runner._apply_overrides") as mock_apply:
-                with patch("bench.runner._create_dry_run_manifest") as mock_dry_run:
-                    mock_config = MagicMock()
-                    mock_config.name = "test"
-                    mock_config.generate_run_id.return_value = "test-run"
-                    mock_config.skill.get_name.return_value = "test-skill"
-                    mock_load.return_value = mock_config
-                    mock_apply.return_value = mock_config
-                    mock_dry_run.return_value = MagicMock()
+        with (
+            patch("bench.runner.load_experiment_config") as mock_load,
+            patch("bench.runner._apply_overrides") as mock_apply,
+            patch("bench.runner._create_dry_run_manifest") as mock_dry_run,
+        ):
+            mock_config = MagicMock()
+            mock_config.name = "test"
+            mock_config.generate_run_id.return_value = "test-run"
+            mock_config.skill.get_name.return_value = "test-skill"
+            mock_load.return_value = mock_config
+            mock_apply.return_value = mock_config
+            mock_dry_run.return_value = MagicMock()
 
-                    # Should not raise - Path accepted
-                    with patch.object(Path, "exists", return_value=True):
-                        run(Path("configs/test.yaml"), dry_run=True)
+            # Should not raise - Path accepted
+            with patch.object(Path, "exists", return_value=True):
+                run(Path("configs/test.yaml"), dry_run=True)
 
-                    mock_load.assert_called_once()
+            mock_load.assert_called_once()
 
     def test_run_function_signature_accepts_config_object(self):
         """Test that run() accepts an ExperimentConfig object."""
@@ -103,13 +108,15 @@ class TestCanonicalRunnerAPI:
             determinism=DeterminismConfig(seed=42),
         )
 
-        with patch("bench.runner._apply_overrides") as mock_apply:
-            with patch("bench.runner._create_dry_run_manifest") as mock_dry_run:
-                mock_apply.return_value = config
-                mock_dry_run.return_value = MagicMock()
+        with (
+            patch("bench.runner._apply_overrides") as mock_apply,
+            patch("bench.runner._create_dry_run_manifest") as mock_dry_run,
+        ):
+            mock_apply.return_value = config
+            mock_dry_run.return_value = MagicMock()
 
-                # Should not raise - ExperimentConfig accepted
-                run(config, dry_run=True)
+            # Should not raise - ExperimentConfig accepted
+            run(config, dry_run=True)
 
     def test_run_returns_manifest_v1(self):
         """Test that run() returns a ManifestV1 instance."""
@@ -117,26 +124,28 @@ class TestCanonicalRunnerAPI:
         from bench.runner import run
         from bench.schema.v1 import ManifestV1
 
-        with patch("bench.runner._apply_overrides") as mock_apply:
-            with patch("bench.runner._create_validation_manifest") as mock_validate:
-                mock_config = MagicMock(spec=ExperimentConfig)
-                mock_config.name = "test"
-                mock_apply.return_value = mock_config
+        with (
+            patch("bench.runner._apply_overrides") as mock_apply,
+            patch("bench.runner._create_validation_manifest") as mock_validate,
+        ):
+            mock_config = MagicMock(spec=ExperimentConfig)
+            mock_config.name = "test"
+            mock_apply.return_value = mock_config
 
-                # Create a real ManifestV1 for the return
-                expected_manifest = ManifestV1(
-                    run_id="test-run",
-                    run_name="test",
-                    models=["test-model"],
-                    task_count=0,
-                    skill_version="test-skill",
-                )
-                mock_validate.return_value = expected_manifest
+            # Create a real ManifestV1 for the return
+            expected_manifest = ManifestV1(
+                run_id="test-run",
+                run_name="test",
+                models=["test-model"],
+                task_count=0,
+                skill_version="test-skill",
+            )
+            mock_validate.return_value = expected_manifest
 
-                result = run(mock_config, validate_only=True)
+            result = run(mock_config, validate_only=True)
 
-                assert isinstance(result, ManifestV1)
-                assert result.run_id == "test-run"
+            assert isinstance(result, ManifestV1)
+            assert result.run_id == "test-run"
 
     def test_run_raises_filenotfound_for_missing_config(self):
         """Test that run() raises FileNotFoundError for missing config file."""
@@ -151,22 +160,24 @@ class TestCanonicalRunnerAPI:
         from bench.runner import run
         from bench.schema.v1 import ManifestV1
 
-        with patch("bench.runner._apply_overrides") as mock_apply:
-            with patch("bench.runner._create_dry_run_manifest") as mock_dry_run:
-                mock_config = MagicMock(spec=ExperimentConfig)
-                mock_apply.return_value = mock_config
+        with (
+            patch("bench.runner._apply_overrides") as mock_apply,
+            patch("bench.runner._create_dry_run_manifest") as mock_dry_run,
+        ):
+            mock_config = MagicMock(spec=ExperimentConfig)
+            mock_apply.return_value = mock_config
 
-                expected_manifest = ManifestV1(
-                    run_id="test-run",
-                    models=["test-model"],
-                    task_count=0,
-                )
-                mock_dry_run.return_value = expected_manifest
+            expected_manifest = ManifestV1(
+                run_id="test-run",
+                models=["test-model"],
+                task_count=0,
+            )
+            mock_dry_run.return_value = expected_manifest
 
-                result = run(mock_config, dry_run=True)
+            result = run(mock_config, dry_run=True)
 
-                mock_dry_run.assert_called_once_with(mock_config)
-                assert isinstance(result, ManifestV1)
+            mock_dry_run.assert_called_once_with(mock_config)
+            assert isinstance(result, ManifestV1)
 
     def test_run_supports_validate_only_mode(self):
         """Test that run() supports validate_only mode."""
@@ -174,22 +185,24 @@ class TestCanonicalRunnerAPI:
         from bench.runner import run
         from bench.schema.v1 import ManifestV1
 
-        with patch("bench.runner._apply_overrides") as mock_apply:
-            with patch("bench.runner._create_validation_manifest") as mock_validate:
-                mock_config = MagicMock(spec=ExperimentConfig)
-                mock_apply.return_value = mock_config
+        with (
+            patch("bench.runner._apply_overrides") as mock_apply,
+            patch("bench.runner._create_validation_manifest") as mock_validate,
+        ):
+            mock_config = MagicMock(spec=ExperimentConfig)
+            mock_apply.return_value = mock_config
 
-                expected_manifest = ManifestV1(
-                    run_id="test-run",
-                    models=[],
-                    task_count=0,
-                )
-                mock_validate.return_value = expected_manifest
+            expected_manifest = ManifestV1(
+                run_id="test-run",
+                models=[],
+                task_count=0,
+            )
+            mock_validate.return_value = expected_manifest
 
-                result = run(mock_config, validate_only=True)
+            result = run(mock_config, validate_only=True)
 
-                mock_validate.assert_called_once_with(mock_config)
-                assert isinstance(result, ManifestV1)
+            mock_validate.assert_called_once_with(mock_config)
+            assert isinstance(result, ManifestV1)
 
 
 class TestRunExperimentScriptDelegation:
@@ -241,6 +254,145 @@ class TestRunExperimentScriptDelegation:
         assert call_kwargs.get("seed") == 42
         assert call_kwargs.get("workers") == 4
         assert "verbose" not in call_kwargs
+
+    @patch("bench.runner.run")
+    @patch("scripts.run_experiment.validate_config")
+    def test_save_container_logs_flag_passes_override(self, mock_validate, mock_run):
+        """--save-container-logs should pass save_container_logs=True to runner."""
+        mock_config = MagicMock()
+        mock_config.output.dir = "default"
+        mock_config.determinism.seed = None
+        mock_config.execution.parallel_workers = 1
+        mock_validate.return_value = mock_config
+
+        mock_manifest = MagicMock()
+        mock_manifest.results_path = None
+        mock_manifest.model_summaries = []
+        mock_manifest.summary.pass_rate = 0.0
+        mock_manifest.summary.completed = 0
+        mock_manifest.summary.total_tasks = 0
+        mock_manifest.summary.avg_score = 0.0
+        mock_manifest.summary.avg_latency_s = 0.0
+        mock_manifest.summary.total_tokens = 0
+        mock_manifest.duration_s = None
+        mock_run.return_value = mock_manifest
+
+        with (
+            patch(
+                "sys.argv",
+                [
+                    "run_experiment.py",
+                    "--config",
+                    "test.yaml",
+                    "--save-container-logs",
+                ],
+            ),
+            patch.object(Path, "exists", return_value=True),
+        ):
+            from scripts.run_experiment import main
+
+            with contextlib.suppress(SystemExit):
+                main()
+
+        mock_run.assert_called_once()
+        call_kwargs = mock_run.call_args[1]
+        assert call_kwargs.get("save_container_logs") is True
+
+    @patch("bench.runner.run")
+    @patch("scripts.run_experiment.validate_config")
+    def test_provider_limit_flag_passes_override(self, mock_validate, mock_run):
+        """--provider-limit should pass provider_parallel_limits to runner."""
+        mock_config = MagicMock()
+        mock_config.output.dir = "default"
+        mock_config.determinism.seed = None
+        mock_config.execution.parallel_workers = 1
+        mock_validate.return_value = mock_config
+
+        mock_manifest = MagicMock()
+        mock_manifest.results_path = None
+        mock_manifest.model_summaries = []
+        mock_manifest.summary.pass_rate = 0.0
+        mock_manifest.summary.completed = 0
+        mock_manifest.summary.total_tasks = 0
+        mock_manifest.summary.avg_score = 0.0
+        mock_manifest.summary.avg_latency_s = 0.0
+        mock_manifest.summary.total_tokens = 0
+        mock_manifest.duration_s = None
+        mock_run.return_value = mock_manifest
+
+        with (
+            patch(
+                "sys.argv",
+                [
+                    "run_experiment.py",
+                    "--config",
+                    "test.yaml",
+                    "--provider-limit",
+                    "openrouter=1",
+                    "--provider-limit",
+                    "zai=2",
+                ],
+            ),
+            patch.object(Path, "exists", return_value=True),
+        ):
+            from scripts.run_experiment import main
+
+            with contextlib.suppress(SystemExit):
+                main()
+
+        mock_run.assert_called_once()
+        call_kwargs = mock_run.call_args[1]
+        assert call_kwargs.get("provider_parallel_limits") == {
+            "openrouter": 1,
+            "zai_coding_plan": 2,
+        }
+
+    @patch("bench.runner.run")
+    @patch("scripts.run_experiment.validate_config")
+    def test_provider_pacing_flags_pass_overrides(self, mock_validate, mock_run):
+        """--provider-min-interval/--provider-rps should pass pacing overrides."""
+        mock_config = MagicMock()
+        mock_config.output.dir = "default"
+        mock_config.determinism.seed = None
+        mock_config.execution.parallel_workers = 1
+        mock_validate.return_value = mock_config
+
+        mock_manifest = MagicMock()
+        mock_manifest.results_path = None
+        mock_manifest.model_summaries = []
+        mock_manifest.summary.pass_rate = 0.0
+        mock_manifest.summary.completed = 0
+        mock_manifest.summary.total_tasks = 0
+        mock_manifest.summary.avg_score = 0.0
+        mock_manifest.summary.avg_latency_s = 0.0
+        mock_manifest.summary.total_tokens = 0
+        mock_manifest.duration_s = None
+        mock_run.return_value = mock_manifest
+
+        with (
+            patch(
+                "sys.argv",
+                [
+                    "run_experiment.py",
+                    "--config",
+                    "test.yaml",
+                    "--provider-min-interval",
+                    "zai=1.5",
+                    "--provider-rps",
+                    "openrouter=2.0",
+                ],
+            ),
+            patch.object(Path, "exists", return_value=True),
+        ):
+            from scripts.run_experiment import main
+
+            with contextlib.suppress(SystemExit):
+                main()
+
+        mock_run.assert_called_once()
+        call_kwargs = mock_run.call_args[1]
+        assert call_kwargs.get("provider_min_interval_s") == {"zai_coding_plan": 1.5}
+        assert call_kwargs.get("provider_max_requests_per_second") == {"openrouter": 2.0}
 
     @patch("bench.runner.run")
     @patch("scripts.run_experiment.validate_config")
@@ -481,7 +633,7 @@ class TestPositGskillEvaluateUsesCanonicalRunner:
         with pytest.raises(SystemExit) as exc_info:
             run_evaluate(args)
 
-        assert exc_info.value.code == 1
+        assert getattr(exc_info.value, "code", None) == 1
         # Should not have called the runner
         mock_run.assert_not_called()
 
@@ -502,7 +654,7 @@ class TestPositGskillEvaluateUsesCanonicalRunner:
         with pytest.raises(SystemExit) as exc_info:
             run_evaluate(args)
 
-        assert exc_info.value.code == 1
+        assert getattr(exc_info.value, "code", None) == 1
         mock_run.assert_not_called()
 
     @patch("bench.runner.run")
@@ -529,7 +681,7 @@ class TestPositGskillEvaluateUsesCanonicalRunner:
         with pytest.raises(SystemExit) as exc_info:
             run_evaluate(args)
 
-        assert exc_info.value.code == 1
+        assert getattr(exc_info.value, "code", None) == 1
 
 
 class TestCanonicalRunnerExports:
@@ -588,23 +740,25 @@ class TestRunnerIntegration:
             determinism=DeterminismConfig(seed=42),
         )
 
-        with patch("bench.runner._apply_overrides") as mock_apply:
-            with patch("bench.runner._create_validation_manifest") as mock_validate:
-                mock_apply.return_value = config
+        with (
+            patch("bench.runner._apply_overrides") as mock_apply,
+            patch("bench.runner._create_validation_manifest") as mock_validate,
+        ):
+            mock_apply.return_value = config
 
-                expected_manifest = ManifestV1(
-                    run_id="test-run",
-                    run_name="test-experiment",
-                    models=["test-model"],
-                    task_count=0,
-                    skill_version="no_skill",
-                )
-                mock_validate.return_value = expected_manifest
+            expected_manifest = ManifestV1(
+                run_id="test-run",
+                run_name="test-experiment",
+                models=["test-model"],
+                task_count=0,
+                skill_version="no_skill",
+            )
+            mock_validate.return_value = expected_manifest
 
-                result = run(config, validate_only=True)
+            result = run(config, validate_only=True)
 
-                assert isinstance(result, ManifestV1)
-                mock_validate.assert_called_once()
+            assert isinstance(result, ManifestV1)
+            mock_validate.assert_called_once()
 
 
 class TestGuardNoBypassPaths:
@@ -618,41 +772,45 @@ class TestGuardNoBypassPaths:
     """
 
     # Directories to exclude from scanning
-    EXCLUDED_DIRS = {
-        ".venv",
-        ".git",
-        "__pycache__",
-        "node_modules",
-        ".pytest_cache",
-        "build",
-        "dist",
-    }
+    EXCLUDED_DIRS: ClassVar[frozenset[str]] = frozenset(
+        {
+            ".venv",
+            ".git",
+            "__pycache__",
+            "node_modules",
+            ".pytest_cache",
+            "build",
+            "dist",
+        }
+    )
 
     # Files that are allowed to use low-level components directly
     # These are test utilities, development scripts, or the canonical runner itself
-    ALLOWED_DIRECT_IMPORTS = {
-        # Test files can import anything
-        "tests/",
-        # The canonical runner itself uses ExperimentRunner internally
-        "bench/runner.py",
-        "bench/experiments/runner.py",
-        "bench/experiments/__init__.py",
-        # Evaluation sandbox is the abstraction layer
-        "evaluation/__init__.py",
-        "evaluation/sandbox.py",
-        "evaluation/pi_runner.py",
-        # Development/utility scripts for testing the runner directly
-        "scripts/test_docker_pi_runner.py",
-        # Optimization uses sandbox directly for single-task evaluation
-        "optimization/adapter.py",
-        # Legacy run_evaluation.py is a development utility, not canonical path
-        "scripts/run_evaluation.py",
-        # Tests mocking the sandbox
-        "tests/test_optimization.py",
-        "tests/test_evaluation_config.py",
-        # GEPA adapter for optimization
-        "bench/optimize/gepa_adapter.py",
-    }
+    ALLOWED_DIRECT_IMPORTS: ClassVar[frozenset[str]] = frozenset(
+        {
+            # Test files can import anything
+            "tests/",
+            # The canonical runner itself uses ExperimentRunner internally
+            "bench/runner.py",
+            "bench/experiments/runner.py",
+            "bench/experiments/__init__.py",
+            # Evaluation sandbox is the abstraction layer
+            "evaluation/__init__.py",
+            "evaluation/sandbox.py",
+            "evaluation/pi_runner.py",
+            # Development/utility scripts for testing the runner directly
+            "scripts/test_docker_pi_runner.py",
+            # Optimization uses sandbox directly for single-task evaluation
+            "optimization/adapter.py",
+            # Legacy run_evaluation.py is a development utility, not canonical path
+            "scripts/run_evaluation.py",
+            # Tests mocking the sandbox
+            "tests/test_optimization.py",
+            "tests/test_evaluation_config.py",
+            # GEPA adapter for optimization
+            "bench/optimize/gepa_adapter.py",
+        }
+    )
 
     def _get_python_files(self, base_path: Path) -> list[Path]:
         """Get all Python files in the project, excluding virtual environments."""
@@ -783,13 +941,11 @@ class TestGuardNoBypassPaths:
 
             content = script.read_text()
             # Check for direct imports from bench.experiments.runner
-            if "from bench.experiments.runner import" in content:
-                # Allow imports that don't include ExperimentRunner
-                if "ExperimentRunner" in content:
-                    raise AssertionError(
-                        f"{script.name} should not import ExperimentRunner from "
-                        "bench.experiments.runner. Use bench.runner.run() instead."
-                    )
+            if "from bench.experiments.runner import" in content and "ExperimentRunner" in content:
+                raise AssertionError(
+                    f"{script.name} should not import ExperimentRunner from "
+                    "bench.experiments.runner. Use bench.runner.run() instead."
+                )
 
     def test_posit_gskill_uses_canonical_runner(self):
         """Guard: posit_gskill evaluate command uses bench.runner.run()."""
@@ -840,7 +996,7 @@ class TestGuardNoBypassPaths:
         # Direct instantiation of ExperimentRunner bypasses bench.runner.run()
         # which means no canonical guarantees (telemetry, logging, etc.)
 
-        ALLOWED_FILES = {
+        allowed_files = {
             "bench/runner.py",  # The canonical runner itself
             "bench/experiments/runner.py",  # The ExperimentRunner implementation
             "bench/optimize/",  # GEPA adapter uses ExperimentRunner for optimization
@@ -856,22 +1012,20 @@ class TestGuardNoBypassPaths:
                 continue
 
             # Skip allowed files
-            if any(allowed in str(py_file) for allowed in ALLOWED_FILES):
+            if any(allowed in str(py_file) for allowed in allowed_files):
                 continue
 
             content = py_file.read_text()
             # Check for direct ExperimentRunner instantiation
             if "ExperimentRunner(" in content and "from bench.experiments" in content:
-                # Also check it's not just an import but an actual instantiation
-                if "ExperimentRunner(" in content:
-                    pytest.fail(
-                        f"Direct ExperimentRunner instantiation in {py_file}. "
-                        "Use bench.runner.run() instead."
-                    )
+                pytest.fail(
+                    f"Direct ExperimentRunner instantiation in {py_file}. "
+                    "Use bench.runner.run() instead."
+                )
 
     def test_no_run_experiment_function_calls(self):
         """Guard: No direct run_experiment() calls outside allowlist."""
-        ALLOWED_FILES = {
+        allowed_files = {
             "bench/runner.py",
             "bench/experiments/runner.py",
             "tests/",
@@ -884,7 +1038,7 @@ class TestGuardNoBypassPaths:
             ):
                 continue
 
-            if any(allowed in str(py_file) for allowed in ALLOWED_FILES):
+            if any(allowed in str(py_file) for allowed in allowed_files):
                 continue
 
             content = py_file.read_text()

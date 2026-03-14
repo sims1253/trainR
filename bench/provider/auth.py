@@ -4,6 +4,7 @@ import os
 from dataclasses import dataclass
 from enum import Enum
 
+from .env import get_env_var
 from .models import CredentialSource
 
 
@@ -72,13 +73,21 @@ class CredentialResolver:
     - Tracking credential sources
     """
 
-    def __init__(self, policy: AuthPolicy = AuthPolicy.ENV) -> None:
+    def __init__(
+        self,
+        policy: AuthPolicy = AuthPolicy.ENV,
+        allow_env_fallback: bool = True,
+    ) -> None:
         """Initialize the credential resolver.
 
         Args:
             policy: The authentication policy to use.
+            allow_env_fallback: If True and policy is MOUNTED_FILE, fall back to
+                environment variables when the mounted file is not found.
+                If False, fail strictly when mounted file not found.
         """
         self._policy = policy
+        self._allow_env_fallback = allow_env_fallback
         self._cache: dict[str, CredentialInfo] = {}
 
     @property
@@ -117,7 +126,7 @@ class CredentialResolver:
 
     def _resolve_from_env(self, env_var: str) -> CredentialInfo:
         """Resolve credential from environment variable."""
-        value = os.environ.get(env_var)
+        value = get_env_var(env_var)
         return CredentialInfo(
             source=CredentialSource.ENV,
             location=env_var,
@@ -129,6 +138,12 @@ class CredentialResolver:
         """Resolve credential from mounted file.
 
         Looks for a file at /run/secrets/{lowercase_env_var_name}
+
+        Args:
+            env_var: The environment variable name (used to derive file path).
+
+        Returns:
+            CredentialInfo with source, location, value, and validity.
         """
         # Convert env var name to expected file path
         # e.g., OPENROUTER_API_KEY -> /run/secrets/openrouter_api_key
@@ -148,8 +163,16 @@ class CredentialResolver:
             except OSError:
                 pass
 
-        # Fall back to environment variable
-        return self._resolve_from_env(env_var)
+        # Handle fallback based on configuration
+        if self._allow_env_fallback:
+            return self._resolve_from_env(env_var)
+        else:
+            return CredentialInfo(
+                source=CredentialSource.MOUNTED_FILE,
+                location=file_path,
+                value=None,
+                is_valid=False,
+            )
 
     def get(self, env_var: str) -> str | None:
         """Get the credential value.
@@ -178,23 +201,29 @@ class CredentialResolver:
         self._cache.clear()
 
 
-# Module-level singleton
-_resolver_instance: CredentialResolver | None = None
+# Module-level singleton cache keyed by policy
+_resolver_instances: dict[AuthPolicy, CredentialResolver] = {}
 
 
 def get_credential_resolver(policy: AuthPolicy = AuthPolicy.ENV) -> CredentialResolver:
-    """Get the singleton CredentialResolver instance.
+    """Get a singleton CredentialResolver instance for a policy.
 
     Args:
-        policy: The auth policy to use. Only used on first call.
+        policy: The auth policy to use.
 
     Returns:
-        The CredentialResolver singleton.
+        The CredentialResolver singleton for the requested policy.
     """
-    global _resolver_instance
-    if _resolver_instance is None:
-        _resolver_instance = CredentialResolver(policy)
-    return _resolver_instance
+    resolver = _resolver_instances.get(policy)
+    if resolver is None:
+        resolver = CredentialResolver(policy)
+        _resolver_instances[policy] = resolver
+    return resolver
+
+
+def clear_credential_resolver_cache() -> None:
+    """Clear cached policy-specific credential resolver instances."""
+    _resolver_instances.clear()
 
 
 def get_credentials(env_var: str, policy: AuthPolicy = AuthPolicy.ENV) -> str | None:

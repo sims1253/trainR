@@ -5,7 +5,7 @@
 # Each entry references a model defined in configs/llm.yaml
 # Comment out models you don't want to run
 models:
-  - glm-5
+  - glm-5-plan
   - minimax-m2.5
   # - gpt-5-nano  # Commented out in llm.yaml
   - gpt-oss-120b
@@ -46,12 +46,12 @@ judge:
   mode: "ensemble"
   
   # Single judge model (references llm.yaml)
-  single: glm-5
+  single: glm-5-plan
   
   # Ensemble configuration (used when mode: "ensemble")
   ensemble:
     judges:
-      - glm-5
+      - glm-5-plan
       # - kimi-k2.5  # Commented out in llm.yaml
       - minimax-m2.5
       - gpt-oss-120b

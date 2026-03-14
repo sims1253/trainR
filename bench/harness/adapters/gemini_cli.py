@@ -52,9 +52,11 @@ class GeminiCliHarness(CliHarnessBase):
     def parse_output(self, output: str, request: HarnessRequest) -> HarnessResult:
         """Parse Gemini CLI output."""
         run_id = str(uuid.uuid4())
+        model_name = request.metadata.get("model") or self.config.model
 
         try:
             data = json.loads(output)
+            model_name = data.get("model") or model_name
 
             # Extract test results
             test_results = []
@@ -89,6 +91,7 @@ class GeminiCliHarness(CliHarnessBase):
                 test_results=test_results,
                 error_message=data.get("error"),
                 error_category=ErrorCategory.NONE if success else ErrorCategory.TASK_ERROR,
+                model=model_name,
                 metadata={"score": score, "raw_response": data},
             )
         except json.JSONDecodeError:
@@ -101,4 +104,5 @@ class GeminiCliHarness(CliHarnessBase):
                 success=passed,
                 output=output,
                 error_category=ErrorCategory.NONE if passed else ErrorCategory.TASK_ERROR,
+                model=model_name,
             )

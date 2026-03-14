@@ -1,0 +1,62 @@
+# R Benchmark Image with Kaggle Data
+# Build: docker build -f Dockerfile.benchmark -t r-benchmark:latest .
+#
+# Two-Tier Data Strategy:
+# -----------------------
+# SMALL datasets (< 500MB) are baked into the image for fast iteration:
+#   - titanic (90KB)
+#   - house-prices-advanced-regression-techniques (935KB)
+#   - walmart-recruiting-store-sales-forecasting (3.1MB)
+#   - competitive-data-science-predict-future-sales (96.9MB)
+#   - store-sales-time-series-forecasting (119MB)
+#   - porto-seguro-safe-driver-prediction (286.7MB)
+#
+# LARGE datasets (> 500MB) are excluded via .dockerignore and must be
+# volume-mounted at runtime using docker-compose:
+#   - santander-customer-transaction-prediction (578MB)
+#   - ieee-fraud-detection (1.3GB)
+#   - tabular-playground-series-feb-2022 (1.7GB)
+#   - home-credit-default-risk (2.5GB)
+#   - talkingdata-adtracking-fraud-detection (11.8GB)
+#   - h-and-m-personalized-fashion-recommendations (15.3GB)
+
+FROM r-base:4.3.2
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libcurl4-openssl-dev \
+    libssl-dev \
+    libxml2-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install common R packages for ML
+RUN R -e "install.packages(c(\
+    'tidyverse', \
+    'caret', \
+    'randomForest', \
+    'xgboost', \
+    'e1071', \
+    'glmnet', \
+    'rpart', \
+    'rmarkdown' \
+), repos='https://cloud.r-project.org/')"
+
+# Create directories
+RUN mkdir -p /opt/kaggle-data /workspace/data /workspace/output
+
+# Copy small Kaggle datasets only (large datasets excluded via .dockerignore)
+# The .dockerignore file excludes datasets > 500MB
+COPY data/kaggle/ /opt/kaggle-data/
+
+# Copy entrypoint script
+COPY scripts/docker-entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Copy R sandbox profile to disable dangerous functions
+COPY scripts/Rprofile.site /usr/lib/R/etc/Rprofile.site
+ENV R_ENABLE_SANDBOX=1
+
+WORKDIR /workspace
+
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["R"]

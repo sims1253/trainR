@@ -33,6 +33,9 @@ class ToolCallMetrics(BaseModel):
     total_duration_ms: float = 0.0
     by_tool: dict[str, int] = Field(default_factory=dict)  # tool_name -> count
     errors: dict[str, int] = Field(default_factory=dict)  # tool_name -> error_count
+    duration_ms_by_tool: dict[str, float] = Field(
+        default_factory=dict
+    )  # tool_name -> total duration ms
 
 
 class LatencyBreakdown(BaseModel):

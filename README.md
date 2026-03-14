@@ -25,7 +25,7 @@ Early development release. Core functionality works, but APIs may change.
 - Docker
 - [uv](https://docs.astral.sh/uv/) (`curl -LsSf https://astral.sh/uv/install.sh | sh`)
 - [gh CLI](https://cli.github.com/) authenticated (`gh auth login`)
-- OpenRouter API key (get one at [openrouter.ai](https://openrouter.ai))
+- API key for at least one provider (OpenRouter, OpenCode, or z.ai)
 
 ### 2. Setup
 
@@ -34,11 +34,13 @@ Early development release. Core functionality works, but APIs may change.
 git clone <repo-url>
 cd trainR
 
-# Set API key in shell config
-# Fish: add to ~/.config/fish/config.fish
-#   set -gx OPENROUTER_API_KEY "your-key"
-# Bash: add to ~/.bashrc
-#   export OPENROUTER_API_KEY="your-key"
+# Create local env file (single source of truth for project secrets)
+cp .env.example .env
+
+# Edit .env and set at least one of:
+# OPENROUTER_API_KEY=...
+# OPENCODE_API_KEY=...
+# Z_AI_API_KEY=...
 
 # Install dependencies
 uv sync
@@ -66,12 +68,19 @@ make benchmark
 # Quick smoke test (verifies pipeline works)
 make benchmark-smoke
 
+# Run first benchmark (1 task x 3 providers)
+uv run python scripts/run_experiment.py --config configs/experiments/first_benchmark.yaml
+
 # Run with a specific experiment config
 uv run python scripts/run_experiment.py --config configs/experiments/r_bench_smoke.yaml
 
 # Run with custom output directory and seed
 uv run python scripts/run_experiment.py --config configs/experiments/r_bench_smoke.yaml \
     --output-dir results/my_run --seed 42
+
+# Capture raw Docker stdout/stderr logs per run (for debugging)
+uv run python scripts/run_experiment.py --config configs/experiments/first_benchmark.yaml \
+    --save-container-logs
 ```
 
 ### 5. Run Optimization
@@ -98,11 +107,17 @@ uv run python scripts/mine_prs.py --repos-file configs/repos_to_mine.yaml
 
 ### Environment Variables
 
+trainR automatically loads project-local `.env` values.
+Supported aliases are normalized automatically (for example `ZAI_API_KEY`, `GOOGLE_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `OPENCODE_API_TOKEN`).
+
 | Variable | Description | Required |
 |----------|-------------|----------|
-| `OPENROUTER_API_KEY` | OpenRouter API key | Yes |
-| `GITHUB_TOKEN` | GitHub PAT (for PR mining) | Via gh CLI |
-| `LLM_MODEL_REFLECTION` | Model for GEPA reflection | Default: openrouter/openai/gpt-oss-120b:free |
+| `OPENROUTER_API_KEY` | OpenRouter API key | One provider key required |
+| `OPENCODE_API_KEY` | OpenCode API key | One provider key required |
+| `Z_AI_API_KEY` | z.ai API key (canonical) | One provider key required |
+| `ZAI_API_KEY` | z.ai alias (auto-normalized) | Optional |
+| `GITHUB_TOKEN` | GitHub PAT (for PR mining) | Optional (or use gh CLI) |
+| `LLM_MODEL_REFLECTION` | Model for GEPA reflection | Default: from `configs/llm.yaml` |
 
 ### Model Selection
 
@@ -140,7 +155,8 @@ trainR/
 ├── tasks/                # Generated tasks (60/20/20 split)
 │   ├── train/            # 83 tasks
 │   ├── dev/              # 28 tasks
-│   └── held_out/         # 27 tasks
+│   ├── held_out/         # 27 tasks
+│   └── kaggle/           # 12 tasks (from 12 competitions)
 │
 ├── skills/               # Skill definitions
 ├── tests/                # pytest suite
@@ -159,10 +175,11 @@ make docker-build       # Build evaluation Docker image
 make generate-tasks     # Generate from package (PACKAGES=dplyr)
 
 # Benchmark (canonical runner)
-make benchmark          # Run: scripts/run_experiment.py --config configs/experiments/r_bench_smoke.yaml
+make benchmark          # Run: scripts/run_experiment.py --config configs/experiments/first_benchmark.yaml
 make benchmark-smoke    # Quick smoke test (verifies pipeline)
 
 # Direct experiment runner
+uv run python scripts/run_experiment.py --config configs/experiments/first_benchmark.yaml
 uv run python scripts/run_experiment.py --config configs/experiments/r_bench_smoke.yaml
 uv run python scripts/run_experiment.py --config configs/experiments/support_pair_smoke.yaml
 
@@ -223,21 +240,21 @@ All execution paths must delegate to `bench.runner.run()` to ensure:
   R Packages (20 packages)
            │
            ▼
-   Task Generator (tree-sitter) → 138 Tasks
+   Task Generator (tree-sitter) → Tasks
            │                        │
            │                        ▼
-           │    ┌─────────────────────────────────────┐
-           │    │         EVALUATION LOOP              │
-           │    │                                      │
-           │    │  Skill → pi CLI → Tests (Docker)     │
-           │    │                │                     │
-           │    │          Pass/Fail + Score           │
-           │    │                │                     │
-           │    │     GEPA Evolution (LiteLLM)         │
-           │    └─────────────────────────────────────┘
-           │                    │
-           │                    ▼
-           │           Evolved Skill
+           │      ┌────────────────────────────────────┐
+           │      │         EVALUATION LOOP            │
+           │      │                                    │
+           │      │  Skill → pi CLI → Tests (Docker)   │
+           │      │                │                   │
+           │      │          Pass/Fail + Score         │
+           │      │                │                   │
+            │      │     GEPA Evolution (Gateway)      │
+           │      └────────────────────────────────────┘
+           │                        │
+           │                        ▼
+           │                  Evolved Skill
            │
            └── Baseline Comparison → Model Report
 ```
@@ -254,7 +271,10 @@ See [PLAN.md](PLAN.md) for the full project roadmap.
 
 - [GEPA](https://github.com/gepa-ai/gepa) - Evolutionary prompt optimization
 - [OpenRouter](https://openrouter.ai) - Multi-provider LLM access
-- [LiteLLM](https://github.com/BerriAI/litellm) - Unified LLM interface
 - [tree-sitter-language-pack](https://github.com/Goldziher/tree-sitter-language-pack) - R parsing
 - [SWE-bench](https://github.com/swe-bench/SWE-bench) - Task collection methodology
 - All R package authors (see PACKAGES.md)
+
+### Historical
+
+- [LiteLLM](https://github.com/BerriAI/litellm) - Previous unified LLM interface (superseded by provider-native inference gateway)

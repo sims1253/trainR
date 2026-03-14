@@ -7,18 +7,16 @@ description: "Quick smoke test for R package benchmark evaluation"
 schema_version: "1.0"
 
 # Models to evaluate (references configs/llm.yaml)
-# Use a single fast model for smoke testing
+# Use a single model for quick smoke validation
 models:
   names:
-    - glm-5
+    - gpt-oss-120b
 
 # Task selection
 tasks:
-  selection: "splits"
-  splits:
-    - dev
+  selection: "task_id"
+  task_id: "task-c742880b"
   dir: "tasks"
-  max_tasks: 2  # Limit to 2 tasks for smoke testing
 
 # Skill configuration (no skill for baseline)
 skill:
@@ -27,9 +25,9 @@ skill:
 # Execution settings
 execution:
   harness: "pi_docker"
-  sandbox_profile: "strict"
+  sandbox_profile: "networked"
   auth_policy: "env"
-  timeout: 300
+  timeout: 900
   docker_image: "posit-gskill-eval:latest"
   repeats: 1
   parallel_workers: 1

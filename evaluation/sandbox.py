@@ -1,17 +1,13 @@
 """Evaluation sandbox using Docker + cc-mirror."""
 
 import logging
-import os
 import time
 import warnings
 from pathlib import Path
-from typing import Any
+from typing import Any, TypedDict
 
-from bench.eval.telemetry import (
-    TelemetryCollector,
-    ToolErrorType,
-    classify_error_type,
-)
+from bench.provider import get_env_var
+from bench.telemetry import TelemetryCollector
 from config import get_llm_config
 
 from .models import EvaluationResult, FailureCategory, TestResult, TrajectoryRecord
@@ -20,11 +16,94 @@ from .pi_runner import DockerPiRunner, DockerPiRunnerConfig
 logger = logging.getLogger(__name__)
 
 
+class _TelemetryFields(TypedDict):
+    tool_call_counts: dict[str, int]
+    tool_errors: dict[str, int]
+    tool_total_time_ms: dict[str, float]
+
+
+def _telemetry_fields(telemetry: TelemetryCollector) -> _TelemetryFields:
+    """Extract flat tool metrics for EvaluationResult payloads."""
+    schema = telemetry.collect(model=None, harness="evaluation_sandbox")
+    return {
+        "tool_call_counts": {
+            str(tool): int(count) for tool, count in schema.tools.by_tool.items()
+        },
+        "tool_errors": {
+            str(tool): int(count) for tool, count in schema.tools.errors.items()
+        },
+        "tool_total_time_ms": dict(schema.tools.duration_ms_by_tool),
+    }
+
+
+def _select_env_var(env_vars: list[str]) -> tuple[str | None, str | None]:
+    """Choose the first available credential; otherwise return first required var."""
+    for env_var in env_vars:
+        value = get_env_var(env_var)
+        if value:
+            return env_var, value
+    if env_vars:
+        env_var = env_vars[0]
+        return env_var, get_env_var(env_var)
+    return None, None
+
+
+def _resolve_env_vars_from_llm_catalog(model: str) -> list[str]:
+    """Resolve candidate env vars for a model using llm.yaml name/id mappings."""
+    llm_config = get_llm_config()
+    models_cfg = llm_config.config.get("models", {})
+    providers_cfg = llm_config.config.get("providers", {})
+    candidates: list[str] = []
+
+    def add_env_for_provider(provider_name: str | None) -> None:
+        if not provider_name:
+            return
+        env_var = providers_cfg.get(provider_name, {}).get("api_key_env")
+        if not env_var:
+            try:
+                from bench.provider import resolve_api_key_env
+
+                env_var = resolve_api_key_env(provider_name)
+            except (ImportError, KeyError):
+                env_var = None
+        if env_var and env_var not in candidates:
+            candidates.append(env_var)
+
+    # Match against resolved model IDs from llm.yaml.
+    for model_name, model_cfg in models_cfg.items():
+        try:
+            full_cfg = llm_config.get_model_config(model_name)
+        except ValueError:
+            continue
+        # Construct full model ID with prefix (e.g., "openai/glm-5")
+        raw_id = full_cfg.get("id", model_name)
+        prefix = full_cfg.get("litellm_prefix", "")
+        model_id = f"{prefix}/{raw_id}" if prefix else raw_id
+        if model_id != model:
+            continue
+        if "providers" in model_cfg:
+            for provider_entry in model_cfg.get("providers", []):
+                add_env_for_provider(provider_entry.get("provider"))
+        else:
+            add_env_for_provider(model_cfg.get("provider"))
+
+    # Match against raw model ids from llm.yaml.
+    for model_cfg in models_cfg.values():
+        if "providers" in model_cfg:
+            for provider_entry in model_cfg.get("providers", []):
+                if provider_entry.get("id") == model:
+                    add_env_for_provider(provider_entry.get("provider"))
+        elif model_cfg.get("id") == model:
+            add_env_for_provider(model_cfg.get("provider"))
+
+    return candidates
+
+
 def get_required_api_key(model: str) -> tuple[str | None, str | None]:
     """Get the required API key environment variable for a model.
 
     Args:
-        model: Model name (either a short name from llm.yaml or full LiteLLM path)
+        model: Model name (either a short name from llm.yaml or provider/model format)
 
     Returns:
         Tuple of (env_var_name, env_var_value) or (None, None) if no key required.
@@ -36,42 +115,52 @@ def get_required_api_key(model: str) -> tuple[str | None, str | None]:
         model_cfg = llm_config.get_model_config(model)
         env_var = model_cfg.get("api_key_env")
         if env_var:
-            return env_var, os.environ.get(env_var)
+            return env_var, get_env_var(env_var)
     except ValueError:
         pass
 
+    # Try to resolve from llm.yaml model id mappings.
+    env_var, api_key = _select_env_var(_resolve_env_vars_from_llm_catalog(model))
+    if env_var:
+        return env_var, api_key
+
     # Try central resolver for provider prefix
-    for prefix in ["openrouter/", "opencode/", "zai/", "openai/", "anthropic/", "gemini/"]:
-        if model.startswith(prefix):
-            provider = prefix.rstrip("/")
-            try:
-                from bench.provider import resolve_api_key_env
+    if "/" in model:
+        provider = model.split("/", 1)[0]
+        try:
+            from bench.provider import resolve_api_key_env
 
-                key_name = resolve_api_key_env(provider)
-                return key_name, os.environ.get(key_name)
-            except (ImportError, KeyError):
-                pass
+            key_name = resolve_api_key_env(provider)
+            return key_name, get_env_var(key_name)
+        except (ImportError, KeyError):
+            pass
 
-            # Fallback to local mapping (deprecated)
-            warnings.warn(
-                f"Using fallback mapping in get_required_api_key(). "
-                f"Prefer bench.provider.resolve_api_key_env() for provider '{provider}'.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            provider_key_mapping = {
-                "openrouter/": "OPENROUTER_API_KEY",
-                "opencode/": "OPENCODE_API_KEY",
-                "zai/": "Z_AI_API_KEY",
-                "openai/": "OPENAI_API_KEY",
-                "anthropic/": "ANTHROPIC_API_KEY",
-                "gemini/": "GEMINI_API_KEY",
+        # Fallback to canonical provider mapping (deprecated)
+        warnings.warn(
+            f"Using fallback mapping in get_required_api_key(). "
+            f"Prefer bench.provider.resolve_api_key_env() for provider '{provider}'.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        try:
+            from bench.provider.resolver import PROVIDER_API_KEY_MAP
+        except ImportError:
+            provider_api_key_map = {
+                "openrouter": "OPENROUTER_API_KEY",
+                "opencode": "OPENCODE_API_KEY",
+                "zai": "Z_AI_API_KEY",
+                "openai": "OPENAI_API_KEY",
+                "anthropic": "ANTHROPIC_API_KEY",
+                "gemini": "GEMINI_API_KEY",
             }
-            key_name = provider_key_mapping.get(prefix)
-            if key_name:
-                return key_name, os.environ.get(key_name)
+        else:
+            provider_api_key_map = PROVIDER_API_KEY_MAP
 
-    # No provider prefix - assume no key required or will be handled by LiteLLM
+        key_name = provider_api_key_map.get(provider)
+        if key_name:
+            return key_name, get_env_var(key_name)
+
+    # No provider prefix - assume no key required
     return None, None
 
 
@@ -106,6 +195,7 @@ class EvaluationSandbox:
         """
         # Initialize telemetry collector
         telemetry = TelemetryCollector()
+        telemetry.start()
 
         # Resolve model from llm.yaml config
         if model is None:
@@ -115,12 +205,8 @@ class EvaluationSandbox:
         # Provider-aware API key check
         env_var, api_key = get_required_api_key(model)
         if env_var and not api_key:
-            telemetry.record_error(
-                "config_check",
-                ToolErrorType.PERMISSION_DENIED,
-                f"{env_var} not set in environment",
-            )
-            telemetry_fields = telemetry.get_result_fields()
+            telemetry.record_tool_call("config_check", success=False, duration_ms=0.0)
+            telemetry_fields = _telemetry_fields(telemetry)
             return EvaluationResult(
                 task_id=task.task_id,
                 success=False,
@@ -134,61 +220,69 @@ class EvaluationSandbox:
             )
 
         # Track package resolution
-        with telemetry.time_call("package_resolution") as ctx:
-            # Determine package path
-            if package_dir is None:
-                # Try source_package first, then derive from source.repo
-                source_package = getattr(task, "source_package", None)
-                if source_package is None:
-                    # Try to get from source.repo (format: "owner/repo")
-                    source = getattr(task, "source", {})
-                    if isinstance(source, dict):
-                        repo = source.get("repo", "")
-                    else:
-                        repo = getattr(source, "repo", "")
-                    source_package = repo.split("/")[-1] if "/" in str(repo) else str(repo)
+        package_resolution_start = time.perf_counter()
+        package_resolution_success = True
+        # Determine package path
+        if package_dir is None:
+            # Try source_package first, then derive from source.repo
+            source_package = getattr(task, "source_package", None)
+            if source_package is None:
+                # Try to get from source.repo (format: "owner/repo")
+                source = getattr(task, "source", {})
+                if isinstance(source, dict):
+                    repo = source.get("repo", "")
+                else:
+                    repo = getattr(source, "repo", "")
+                source_package = repo.split("/")[-1] if "/" in str(repo) else str(repo)
 
-                package_dir = Path(f"packages/{source_package}")
+            package_dir = Path(f"packages/{source_package}")
 
-            if not package_dir.exists():
-                ctx.failure(ToolErrorType.NOT_FOUND)
-                telemetry_fields = telemetry.get_result_fields()
-                return EvaluationResult(
-                    task_id=task.task_id,
-                    success=False,
-                    score=0.0,
-                    error_message=f"Package directory not found: {package_dir}",
-                    failure_category=FailureCategory.PACKAGE_NOT_FOUND,
-                    execution_time=time.time() - start_time,
-                    tool_call_counts=telemetry_fields["tool_call_counts"],
-                    tool_errors=telemetry_fields["tool_errors"],
-                    tool_total_time_ms=telemetry_fields["tool_total_time_ms"],
-                )
-            ctx.success()
-
-        # Run evaluation in Docker with telemetry
-        with telemetry.time_call("docker_evaluation") as ctx:
-            result = self.runner.run_evaluation(
-                skill_content=skill_prompt,
-                task_instruction=task.instruction,
-                task_context=task.context,
-                package_dir=package_dir,
-                model=model,
-                task=task,  # Pass task for repo/commit info
+        if not package_dir.exists():
+            package_resolution_success = False
+        telemetry.record_tool_call(
+            "package_resolution",
+            success=package_resolution_success,
+            duration_ms=(time.perf_counter() - package_resolution_start) * 1000.0,
+        )
+        if not package_resolution_success:
+            telemetry_fields = _telemetry_fields(telemetry)
+            return EvaluationResult(
+                task_id=task.task_id,
+                success=False,
+                score=0.0,
+                error_message=f"Package directory not found: {package_dir}",
+                failure_category=FailureCategory.PACKAGE_NOT_FOUND,
+                execution_time=time.time() - start_time,
+                tool_call_counts=telemetry_fields["tool_call_counts"],
+                tool_errors=telemetry_fields["tool_errors"],
+                tool_total_time_ms=telemetry_fields["tool_total_time_ms"],
             )
 
-            # Check for errors in the result
-            if result.get("error"):
-                error_msg = result.get("error", "")
-                error_type = classify_error_type(error_msg)
-                ctx.failure(error_type)
-            else:
-                ctx.success()
+        # Run evaluation in Docker with telemetry
+        docker_eval_start = time.perf_counter()
+        result = self.runner.run_evaluation(
+            skill_content=skill_prompt,
+            task_instruction=task.instruction,
+            task_context=task.context,
+            package_dir=package_dir,
+            model=model,
+            task=task,  # Pass task for repo/commit info
+        )
+        docker_success = not bool(result.get("error"))
+        telemetry.record_tool_call(
+            "docker_evaluation",
+            success=docker_success,
+            duration_ms=(time.perf_counter() - docker_eval_start) * 1000.0,
+        )
 
         # Track test parsing
-        with telemetry.time_call("test_parsing") as ctx:
-            test_results = self._parse_test_results(result)
-            ctx.success()
+        test_parsing_start = time.perf_counter()
+        test_results = self._parse_test_results(result)
+        telemetry.record_tool_call(
+            "test_parsing",
+            success=True,
+            duration_ms=(time.perf_counter() - test_parsing_start) * 1000.0,
+        )
 
         success = result.get("success", False)
 
@@ -197,7 +291,7 @@ class EvaluationSandbox:
             failure_category = self._classify_failure(result)
 
         # Get telemetry fields
-        telemetry_fields = telemetry.get_result_fields()
+        telemetry_fields = _telemetry_fields(telemetry)
 
         return EvaluationResult(
             task_id=task.task_id,

@@ -1,0 +1,110 @@
+# First benchmark: one task across three providers
+# Goal: verify end-to-end benchmark path with one model per provider.
+
+name: "first_benchmark"
+description: "Single-task benchmark across OpenRouter, OpenCode, and z.ai"
+schema_version: "1.0"
+
+models:
+  names:
+    - gpt-5-nano
+    - zai/glm-5
+    - minimax-m2.5
+    - step-3.5-flash
+    - trinity-large-preview
+    - trinity-mini
+    - zai/glm-4.7
+    - nemotron-3-nano
+    - kimi-k2.5
+    - qwen3-next-80b-a3b
+
+tasks:
+  selection: "files"
+  dir: "tasks"
+  files:
+    # Synthetic tasks with quality >= 0.6 (10)
+    - dev/task-be5c90a4.json
+    - dev/task-f1e6ef29.json
+    - dev/task-3a1b0dc5.json
+    - dev/task-2ed68905.json
+    - dev/task-5919e74f.json
+    - dev/task-a60753de.json
+    - dev/task-e9f7d3b8.json
+    - dev/task-b7fd2d4e.json
+    - dev/task-17e63c69.json
+    - dev/task-491ef596.json
+    # Mined tasks (17)
+    - mined/mlr-org_mlr3_1442.json
+    - mined/r-lib_httr2_818.json
+    - mined/r-lib_httr2_832.json
+    - mined/r-lib_testthat_2298.json
+    - mined/r-lib_testthat_2303.json
+    - mined/r-lib_vctrs_2135.json
+    - mined/rstudio_renv_2200.json
+    - mined/stan-dev_cmdstanr_1125.json
+    - mined/stan-dev_posterior_426.json
+    - mined/tidymodels_parsnip_1317.json
+    - mined/tidymodels_parsnip_1326.json
+    - mined/tidymodels_yardstick_615.json
+    - mined/tidymodels_yardstick_619.json
+    - mined/tidyverse_dplyr_7795.json
+    - mined/tidyverse_ggplot2_6747.json
+    - mined/tidyverse_readr_1613.json
+    - mined/tidyverse_readr_1615.json
+    # Kaggle Competitions (12)
+    - kaggle/kaggle_competitive-data-science-predict-future-sales_predict-future-sales-r.json
+    - kaggle/kaggle_h-and-m-personalized-fashion-recommendations_h-m-product-recommendations-eda.json
+    - kaggle/kaggle_home-credit-default-risk_tidy-xgb-all-tables-0-796.json
+    - kaggle/kaggle_house-prices-advanced-regression-techniques_house-prices-lasso-xgboost-and-a-detailed-eda.json
+    - kaggle/kaggle_ieee-fraud-detection_lightgbm-starter-with-r-0-9493-lb.json
+    - kaggle/kaggle_porto-seguro-safe-driver-prediction_steering-wheel-of-fortune-porto-seguro-eda.json
+    - kaggle/kaggle_santander-customer-transaction-prediction_nothing-works.json
+    - kaggle/kaggle_store-sales-time-series-forecasting_store-sales-time-series-forecasting.json
+    - kaggle/kaggle_tabular-playground-series-feb-2022_augmented-eda-correlations-emphasize.json
+    - kaggle/kaggle_talkingdata-adtracking-fraud-detection_talkingdata-eda-and-class-imbalance.json
+    - kaggle/kaggle_titanic_exploring-survival-on-the-titanic.json
+    - kaggle/kaggle_walmart-recruiting-store-sales-forecasting_walmart-store-sales-forecasting-in-r.json
+skill:
+  no_skill: true
+
+execution:
+  harness: "pi_docker"
+  sandbox_profile: "networked"
+  auth_policy: "env"
+  timeout: 1800
+  docker_image: "posit-gskill-eval:latest"
+  repeats: 1
+  parallel_workers: 4
+  provider_parallel_limits:
+    openrouter: 1
+    opencode: 1
+    zai_coding_plan: 1
+    kimi_coding_plan: 1
+  provider_min_interval_s:
+    openrouter: 5
+    opencode: 5
+    zai_coding_plan: 5
+    kimi_coding_plan: 5
+  provider_max_requests_per_second:
+    openrouter: 1.0
+    opencode: 1.0
+    zai_coding_plan: 0.5
+    kimi_coding_plan: 0.5
+  rate_limit_cooldown_s: 1800  # 30 minutes for free tier quotas
+  save_trajectories: true
+  save_traces: true
+
+retry:
+  strategy: "exponential"
+  max_retries: 3
+  base_delay: 10.0
+  max_delay: 3600.0
+
+output:
+  dir: "results/experiments"
+  save_intermediate: true
+
+determinism:
+  seed: 42
+  freeze_model_resolution: true
+  freeze_config: true

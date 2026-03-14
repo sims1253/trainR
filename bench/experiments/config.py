@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 import yaml
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, PrivateAttr, field_validator
 
 from bench.provider import AuthPolicy
 from bench.sandbox import SandboxProfile
@@ -146,10 +146,16 @@ class ExecutionConfig(BaseModel):
             - developer: Relaxed local-debug settings
         timeout: Maximum time per task in seconds
         docker_image: Docker image for evaluation containers
+        forward_github_token: Whether to forward GITHUB_TOKEN/GITHUB_PAT into containers
         repeats: Number of times to repeat each task
         parallel_workers: Number of parallel workers
+        provider_parallel_limits: Optional per-provider concurrency caps
+        provider_min_interval_s: Optional per-provider minimum spacing between run starts
+        provider_max_requests_per_second: Optional per-provider run-start rate cap
         save_trajectories: Whether to save agent trajectories
         save_traces: Whether to save LLM request/response traces
+        save_container_logs: Whether to persist raw container stdout/stderr logs
+        keep_workspace_on_failure: Keep failed Docker workspaces for debugging
     """
 
     harness: HarnessType = Field(
@@ -169,6 +175,10 @@ class ExecutionConfig(BaseModel):
         default="posit-gskill-eval:latest",
         description="Docker image for evaluation",
     )
+    forward_github_token: bool = Field(
+        default=False,
+        description="Whether to forward GITHUB_TOKEN/GITHUB_PAT into evaluation containers",
+    )
     repeats: int = Field(
         default=1,
         ge=1,
@@ -179,6 +189,27 @@ class ExecutionConfig(BaseModel):
         ge=1,
         description="Number of parallel workers",
     )
+    provider_parallel_limits: dict[str, int] = Field(
+        default_factory=dict,
+        description=(
+            "Per-provider concurrency caps (e.g. {'openrouter': 1, 'zai': 2}). "
+            "Applied in addition to parallel_workers."
+        ),
+    )
+    provider_min_interval_s: dict[str, float] = Field(
+        default_factory=dict,
+        description=(
+            "Per-provider minimum spacing in seconds between starting runs "
+            "(e.g. {'zai_coding_plan': 1.0})."
+        ),
+    )
+    provider_max_requests_per_second: dict[str, float] = Field(
+        default_factory=dict,
+        description=(
+            "Per-provider run-start rate cap in requests per second "
+            "(e.g. {'zai_coding_plan': 0.5})."
+        ),
+    )
     save_trajectories: bool = Field(
         default=True,
         description="Save agent trajectories",
@@ -187,9 +218,23 @@ class ExecutionConfig(BaseModel):
         default=False,
         description="Save LLM request/response traces",
     )
+    save_container_logs: bool = Field(
+        default=False,
+        description="Persist raw container stdout/stderr logs to output artifacts",
+    )
+    keep_workspace_on_failure: bool = Field(
+        default=False,
+        description="Keep failed Docker workspaces for debugging",
+    )
     auth_policy: AuthPolicy = Field(
         default=AuthPolicy.ENV,
         description="Authentication policy: env or mounted_file",
+    )
+    rate_limit_cooldown_s: float = Field(
+        default=300.0,  # 5 minutes default
+        ge=10.0,
+        le=7200.0,  # Max 2 hours
+        description="Cooldown period in seconds when a rate limit (429) is detected",
     )
 
     @field_validator("sandbox_profile", mode="before")
@@ -201,9 +246,11 @@ class ExecutionConfig(BaseModel):
         if isinstance(v, str):
             try:
                 return SandboxProfile(v.lower())
-            except ValueError:
+            except ValueError as err:
                 allowed = [p.value for p in SandboxProfile]
-                raise ValueError(f"Invalid sandbox_profile: {v}. Must be one of: {allowed}")
+                raise ValueError(
+                    f"Invalid sandbox_profile: {v}. Must be one of: {allowed}"
+                ) from err
         raise ValueError(f"Invalid sandbox_profile type: {type(v)}")
 
     @field_validator("auth_policy", mode="before")
@@ -215,36 +262,109 @@ class ExecutionConfig(BaseModel):
         if isinstance(v, str):
             try:
                 return AuthPolicy(v.lower())
-            except ValueError:
+            except ValueError as err:
                 allowed = [p.value for p in AuthPolicy]
-                raise ValueError(f"Invalid auth_policy: {v}. Must be one of: {allowed}")
+                raise ValueError(f"Invalid auth_policy: {v}. Must be one of: {allowed}") from err
         raise ValueError(f"Invalid auth_policy type: {type(v)}")
+
+    @field_validator("provider_parallel_limits", mode="before")
+    @classmethod
+    def validate_provider_parallel_limits(cls, v: dict[str, int] | None) -> dict[str, int]:
+        """Normalize and validate per-provider concurrency limits."""
+        if v is None:
+            return {}
+        if not isinstance(v, dict):
+            raise ValueError("provider_parallel_limits must be a mapping of provider -> int")
+
+        normalized: dict[str, int] = {}
+        for raw_provider, raw_limit in v.items():
+            provider = str(raw_provider).strip().lower()
+            if not provider:
+                raise ValueError("provider_parallel_limits keys must be non-empty strings")
+            if isinstance(raw_limit, bool) or not isinstance(raw_limit, int):
+                raise ValueError(f"provider_parallel_limits['{provider}'] must be an integer >= 1")
+            if raw_limit < 1:
+                raise ValueError(
+                    f"provider_parallel_limits['{provider}'] must be >= 1 (got {raw_limit})"
+                )
+            normalized[provider] = raw_limit
+        return normalized
+
+    @staticmethod
+    def _validate_numeric_provider_map(
+        v: dict[str, int | float] | None,
+        *,
+        field_name: str,
+    ) -> dict[str, float]:
+        """Normalize provider keyed numeric mappings with positive values."""
+        if v is None:
+            return {}
+        if not isinstance(v, dict):
+            raise ValueError(f"{field_name} must be a mapping of provider -> number")
+
+        normalized: dict[str, float] = {}
+        for raw_provider, raw_value in v.items():
+            provider = str(raw_provider).strip().lower()
+            if not provider:
+                raise ValueError(f"{field_name} keys must be non-empty strings")
+            if isinstance(raw_value, bool) or not isinstance(raw_value, int | float):
+                raise ValueError(f"{field_name}['{provider}'] must be a number > 0")
+            value = float(raw_value)
+            if value <= 0:
+                raise ValueError(f"{field_name}['{provider}'] must be > 0 (got {raw_value})")
+            normalized[provider] = value
+        return normalized
+
+    @field_validator("provider_min_interval_s", mode="before")
+    @classmethod
+    def validate_provider_min_interval_s(cls, v: dict[str, int | float] | None) -> dict[str, float]:
+        """Normalize and validate per-provider minimum run-start spacing."""
+        return cls._validate_numeric_provider_map(v, field_name="provider_min_interval_s")
+
+    @field_validator("provider_max_requests_per_second", mode="before")
+    @classmethod
+    def validate_provider_max_requests_per_second(
+        cls, v: dict[str, int | float] | None
+    ) -> dict[str, float]:
+        """Normalize and validate per-provider run-start rate caps."""
+        return cls._validate_numeric_provider_map(v, field_name="provider_max_requests_per_second")
+
+    @field_validator("harness")
+    @classmethod
+    def validate_harness_registered(cls, v: HarnessType) -> HarnessType:
+        """Require harness to be currently registered."""
+        from bench.harness import HarnessRegistry
+
+        if not HarnessRegistry.is_registered(v):
+            available = HarnessRegistry.list_available()
+            raise ValueError(f"Harness '{v}' is not registered. Available harnesses: {available}")
+        return v
 
 
 class RetryConfig(BaseModel):
     """Retry configuration for failed evaluations."""
 
     strategy: RetryStrategy = Field(
-        default=RetryStrategy.NONE,
+        default=RetryStrategy.EXPONENTIAL,
         description="Retry strategy",
     )
     max_retries: int = Field(
-        default=0,
+        default=2,
         ge=0,
         description="Maximum number of retries",
     )
     base_delay: float = Field(
-        default=1.0,
+        default=30.0,
         ge=0.0,
         description="Base delay in seconds (for exponential backoff)",
     )
     max_delay: float = Field(
-        default=60.0,
+        default=300.0,
         ge=0.0,
         description="Maximum delay in seconds",
     )
     retry_on: list[str] = Field(
-        default_factory=lambda: ["TIMEOUT", "LLM_ERROR", "SANDBOX_ERROR"],
+        default_factory=lambda: ["TIMEOUT", "LLM_ERROR", "SANDBOX_ERROR", "AUTH_ERROR", "RATE_LIMIT"],
         description="Error categories to retry on",
     )
 
@@ -377,6 +497,7 @@ class ExperimentConfig(BaseModel):
         default_factory=dict,
         description="Additional experiment settings",
     )
+    _generated_run_id: str | None = PrivateAttr(default=None)
 
     @field_validator("schema_version")
     @classmethod
@@ -436,10 +557,13 @@ class ExperimentConfig(BaseModel):
         """Generate a unique run ID."""
         if self.output.run_id:
             return self.output.run_id
+        if self._generated_run_id:
+            return self._generated_run_id
 
         timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
         seed_suffix = f"_{self.determinism.seed}" if self.determinism.seed else ""
-        return f"{self.name}_{timestamp}{seed_suffix}"
+        self._generated_run_id = f"{self.name}_{timestamp}{seed_suffix}"
+        return self._generated_run_id
 
     def get_output_dir(self) -> Path:
         """Get the output directory path."""

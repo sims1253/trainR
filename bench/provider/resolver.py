@@ -1,5 +1,6 @@
 """Provider resolution from configuration."""
 
+import warnings
 from pathlib import Path
 from typing import Any
 
@@ -10,7 +11,8 @@ from .models import ModelInfo, ProviderInfo
 # Canonical provider to API key environment variable mappings
 PROVIDER_API_KEY_MAP = {
     "openrouter": "OPENROUTER_API_KEY",
-    "zai": "Z_AI_API_KEY",  # Note: Z_AI_API_KEY not ZAI_API_KEY
+    "zai": "Z_AI_API_KEY",  # Canonical key name (ZAI_API_KEY alias is normalized)
+    "zai_coding_plan": "Z_AI_API_KEY",
     "gemini": "GEMINI_API_KEY",
     "openai": "OPENAI_API_KEY",
     "anthropic": "ANTHROPIC_API_KEY",
@@ -18,14 +20,29 @@ PROVIDER_API_KEY_MAP = {
     "kimi": "KIMI_API_KEY",
 }
 
-# Canonical provider to LiteLLM prefix mappings
+# Canonical provider to API style mappings
+PROVIDER_API_STYLE = {
+    "openrouter": "openai_compat",
+    "zai": "openai_compat",
+    "zai_coding_plan": "openai_compat",
+    "gemini": "gemini",
+    "openai": "openai_native",
+    "anthropic": "anthropic",
+    "opencode": "openai_compat",  # OpenAI-compatible API
+    "kimi": "openai_compat",
+}
+
+# Backward compatibility - deprecated
+# Note: These are stored WITHOUT trailing slash to match old YAML format
 PROVIDER_LITELLM_PREFIX = {
-    "openrouter": "openrouter/",
-    "zai": "zai/",
-    "gemini": "gemini/",
+    "openrouter": "openrouter",
+    "zai": "openai",  # zai uses OpenAI-compatible API format
+    "zai_coding_plan": "openai",
+    "gemini": "gemini",
     "openai": "",
-    "anthropic": "anthropic/",
-    "opencode": "openai/",  # opencode uses OpenAI-compatible API
+    "anthropic": "anthropic",
+    "opencode": "openai",  # opencode uses OpenAI-compatible API
+    "kimi": "openai",  # kimi uses OpenAI-compatible API
 }
 
 
@@ -93,24 +110,21 @@ class ProviderResolver:
                 name, f"{name.upper()}_API_KEY"
             )
 
-            # Get LiteLLM prefix from config or canonical map
-            litellm_prefix_raw = prov_config.get("litellm_prefix", "")
-            # Normalize prefix with trailing slash
-            if litellm_prefix_raw and not litellm_prefix_raw.endswith("/"):
-                litellm_prefix = f"{litellm_prefix_raw}/"
-            else:
-                litellm_prefix = litellm_prefix_raw
+            # Get API style from config or canonical map
+            api_style = prov_config.get("api_style") or PROVIDER_API_STYLE.get(
+                name, "openai_compat"
+            )
 
-            # Override with canonical map if available
-            if name in PROVIDER_LITELLM_PREFIX:
-                litellm_prefix = PROVIDER_LITELLM_PREFIX[name]
+            # Backward compatibility: compute litellm_prefix from canonical map
+            litellm_prefix = PROVIDER_LITELLM_PREFIX.get(name, "")
 
             self._providers[name] = ProviderInfo(
                 name=name,
-                litellm_prefix=litellm_prefix,
+                api_style=api_style,
                 api_key_env=api_key_env,
                 base_url=prov_config.get("base_url"),
                 supports_response_format=prov_config.get("supports_response_format", True),
+                litellm_prefix=litellm_prefix,
             )
 
         return self._providers
@@ -138,8 +152,10 @@ class ProviderResolver:
                 provider_name = model_config.get("provider", "")
 
             provider_info = providers.get(provider_name)
-            if provider_info:
-                litellm_model = f"{provider_info.litellm_prefix}{model_id}"
+
+            # Backward compatibility: compute litellm_model
+            if provider_info and provider_info.litellm_prefix:
+                litellm_model = f"{provider_info.litellm_prefix}/{model_id}"
             else:
                 litellm_model = model_id
 
@@ -147,8 +163,10 @@ class ProviderResolver:
                 id=model_id,
                 provider=provider_name,
                 name=name,
+                model_id=model_id,
                 litellm_model=litellm_model,
                 capabilities=model_config.get("capabilities", {}),
+                _provider_info=provider_info,
             )
 
         return self._models
@@ -229,8 +247,25 @@ class ProviderResolver:
         provider_info = self.get_provider_info(provider_name)
         return provider_info.api_key_env
 
+    def get_api_style(self, provider_name: str) -> str:
+        """Get the API style for a provider.
+
+        Args:
+            provider_name: The provider name (e.g., 'opencode', 'openrouter').
+
+        Returns:
+            The API style (e.g., 'openai_compat', 'anthropic', 'gemini').
+
+        Raises:
+            KeyError: If the provider is not found.
+        """
+        provider_info = self.get_provider_info(provider_name)
+        return provider_info.api_style
+
     def get_litellm_prefix(self, provider_name: str) -> str:
         """Get the LiteLLM prefix for a provider.
+
+        DEPRECATED: Use get_api_style() instead.
 
         Args:
             provider_name: The provider name (e.g., 'opencode', 'openrouter').
@@ -241,11 +276,33 @@ class ProviderResolver:
         Raises:
             KeyError: If the provider is not found.
         """
+        warnings.warn(
+            "get_litellm_prefix() is deprecated. Use get_api_style() instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         provider_info = self.get_provider_info(provider_name)
         return provider_info.litellm_prefix
 
+    def get_model_id(self, model_name: str) -> str:
+        """Get the raw model ID to send to the API.
+
+        Args:
+            model_name: The short model name (e.g., 'glm-5', 'gpt-oss-120b').
+
+        Returns:
+            The raw model ID (e.g., 'glm-5-free', 'openai/gpt-oss-120b:free').
+
+        Raises:
+            KeyError: If the model is not found.
+        """
+        model_info = self.get_model_info(model_name)
+        return model_info.model_id or model_info.id
+
     def get_litellm_model(self, model_name: str) -> str:
         """Get the full LiteLLM model string for a model name.
+
+        DEPRECATED: Use get_model_id() instead.
 
         Args:
             model_name: The short model name (e.g., 'glm-5', 'gpt-oss-120b').
@@ -256,6 +313,11 @@ class ProviderResolver:
         Raises:
             KeyError: If the model is not found.
         """
+        warnings.warn(
+            "get_litellm_model() is deprecated. Use get_model_id() instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         model_info = self.get_model_info(model_name)
         return model_info.litellm_model
 
@@ -284,8 +346,22 @@ class ProviderResolver:
         provider = self.resolve_provider(model_name)
         return self.get_api_key_env(provider)
 
+    def resolve_api_style(self, model_name: str) -> str:
+        """Resolve the API style for a model.
+
+        Args:
+            model_name: The short model name.
+
+        Returns:
+            The API style for the model's provider.
+        """
+        provider = self.resolve_provider(model_name)
+        return self.get_api_style(provider)
+
     def resolve_litellm_prefix(self, model_name: str) -> str:
         """Resolve the LiteLLM prefix for a model.
+
+        DEPRECATED: Use resolve_api_style() instead.
 
         Args:
             model_name: The short model name.
@@ -293,6 +369,11 @@ class ProviderResolver:
         Returns:
             The LiteLLM prefix for the model's provider.
         """
+        warnings.warn(
+            "resolve_litellm_prefix() is deprecated. Use resolve_api_style() instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         provider = self.resolve_provider(model_name)
         return self.get_litellm_prefix(provider)
 
@@ -340,8 +421,28 @@ def resolve_api_key_env(model_or_provider: str) -> str:
         return resolver.resolve_api_key_env(model_or_provider)
 
 
+def resolve_api_style(model_or_provider: str) -> str:
+    """Resolve the API style. Uses singleton resolver.
+
+    Args:
+        model_or_provider: Either a model name or provider name.
+
+    Returns:
+        The API style (e.g., 'openai_compat', 'anthropic', 'gemini').
+    """
+    resolver = get_provider_resolver()
+    # Try as provider first
+    try:
+        return resolver.get_api_style(model_or_provider)
+    except KeyError:
+        # Try as model
+        return resolver.resolve_api_style(model_or_provider)
+
+
 def resolve_litellm_prefix(model_or_provider: str) -> str:
     """Resolve the LiteLLM prefix. Uses singleton resolver.
+
+    DEPRECATED: Use resolve_api_style() instead.
 
     Args:
         model_or_provider: Either a model name or provider name.
@@ -349,6 +450,11 @@ def resolve_litellm_prefix(model_or_provider: str) -> str:
     Returns:
         The LiteLLM prefix.
     """
+    warnings.warn(
+        "resolve_litellm_prefix() is deprecated. Use resolve_api_style() instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     resolver = get_provider_resolver()
     # Try as provider first
     try:

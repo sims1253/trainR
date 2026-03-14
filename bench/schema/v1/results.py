@@ -12,6 +12,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
 
+from bench.telemetry import TelemetrySchema
+
 
 class ErrorCategoryV1(str, Enum):
     """Error categories for failed evaluations."""
@@ -27,6 +29,7 @@ class ErrorCategoryV1(str, Enum):
     SNAPSHOT_MISMATCH = "SNAPSHOT_MISMATCH"
     LLM_ERROR = "LLM_ERROR"
     SANDBOX_ERROR = "SANDBOX_ERROR"
+    AUTH_ERROR = "AUTH_ERROR"  # Authentication/authorization failures (not retriable)
     UNKNOWN = "UNKNOWN"
 
 
@@ -110,6 +113,12 @@ class ResultV1(BaseModel):
 
     # Additional metadata
     metadata: dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
+
+    # Canonical unified telemetry payload
+    telemetry: TelemetrySchema | None = Field(
+        default=None,
+        description="Canonical unified telemetry payload",
+    )
 
     # Telemetry fields (tool-level metrics)
     tool_call_counts: dict[str, int] = Field(

@@ -5,13 +5,12 @@ GitHub PR Mining System for R Testing Tasks
 This script mines merged PRs from target R packages to extract
 high-quality testing tasks. It uses:
 - gh CLI for GitHub API access
-- LiteLLM/OpenAI for LLM-based task evaluation
+- Provider-native inference for LLM-based task evaluation
 - Pydantic for structured outputs
 """
 
 import argparse
 import json
-import os
 import re
 import subprocess
 import sys
@@ -19,7 +18,7 @@ import warnings
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, ClassVar, cast
+from typing import Any, ClassVar, cast
 
 import yaml
 from pydantic import BaseModel
@@ -27,6 +26,8 @@ from pydantic import BaseModel
 # Add parent to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from bench.provider import get_env_var
+from bench.provider.inference import embed_schema_in_messages, generate_structured
 from config import get_llm_config
 from task_generator.mined_task import (
     Difficulty,
@@ -34,9 +35,6 @@ from task_generator.mined_task import (
     PRAnalysisInput,
     TaskType,
 )
-
-if TYPE_CHECKING:
-    from openai.types.chat import ChatCompletionMessageParam
 
 
 @dataclass
@@ -459,41 +457,37 @@ Provide a structured evaluation of this PR as a potential testing task.
         # Get full model config from llm.yaml
         try:
             model_cfg = config.get_model_config(model_name)
-            provider = model_cfg.get("provider", "")
-            self.provider = provider
-
-            # Get LiteLLM-compatible model string
-            self._litellm_model = config.get_litellm_model(model_name)
-
-            # Get base_url if needed
-            base_url = config.get_model_base_url(model_name)
-            self._litellm_kwargs = {"base_url": base_url} if base_url else {}
+            self.provider = model_cfg.get("provider", "")
 
             # Get API key from config
             self.api_key = api_key or config.get_model_api_key(model_name)
 
+            # Store model_id for inference gateway
+            self._model_id = model_cfg.get("id") or model_cfg.get("model_id", model_name)
+            self._base_url = config.get_model_base_url(model_name)
+            self._json_mode = model_cfg.get("capabilities", {}).get("json_mode", "native")
+
         except ValueError:
             # Model not in llm.yaml - treat as raw model ID with provider prefix
             # Fallback for models like "opencode/glm-5-free" passed directly
-            self._litellm_model = model_name
+            self._model_id = model_name
             if model_name.startswith("opencode/") or model_name.startswith("zai/"):
-                self._litellm_model = "openai/" + model_name.split("/", 1)[1]
+                self._model_id = model_name.split("/", 1)[1]
                 self.provider = model_name.split("/", 1)[0]
             elif model_name.startswith("openrouter/"):
+                self._model_id = model_name.split("/", 1)[1]
                 self.provider = "openrouter"
             else:
-                self.provider = "litellm"
+                self.provider = "unknown"
 
-            # Try to get base_url from legacy method
-            base_url = config.get_base_url(model_name)
-            self._litellm_kwargs = {"base_url": base_url} if base_url else {}
-
-            # Fallback API key detection for provider prefix format
-            # Use central resolver first, then fallback to direct env var lookup
+            # Fallback API key detection
             if api_key:
                 self.api_key = api_key
             else:
                 self.api_key = self._resolve_api_key_for_model(model_name, config)
+
+            self._base_url = config.get_base_url(model_name)
+            self._json_mode = "native"
 
         if not self.api_key:
             print(f"Warning: No API key found for model '{model_name}'. Check llm.yaml config.")
@@ -508,7 +502,7 @@ Provide a structured evaluation of this PR as a potential testing task.
             if "/" in model_name:
                 provider = model_name.split("/", 1)[0]
                 key_name = resolve_api_key_env(provider)
-                key = os.environ.get(key_name)
+                key = get_env_var(key_name)
                 if key:
                     return key
         except (ImportError, KeyError):
@@ -522,72 +516,34 @@ Provide a structured evaluation of this PR as a potential testing task.
             stacklevel=3,
         )
         if model_name.startswith("opencode/"):
-            return os.environ.get("OPENCODE_API_KEY")
+            return get_env_var("OPENCODE_API_KEY")
         elif model_name.startswith("zai/"):
-            return os.environ.get("Z_AI_API_KEY")
+            return get_env_var("Z_AI_API_KEY")
         elif model_name.startswith("openrouter/"):
-            return os.environ.get("OPENROUTER_API_KEY")
+            return get_env_var("OPENROUTER_API_KEY")
         else:
             return config.get_api_key()
 
-    def _call_openai(
+    def _call_inference_gateway(
         self, messages: list[dict[str, Any]], response_format: type[BaseModel]
     ) -> BaseModel:
-        """Call OpenAI API with structured output"""
-        from openai import OpenAI
+        """Call inference gateway for structured output."""
 
-        client = OpenAI(api_key=self.api_key)
-        response = client.beta.chat.completions.parse(
-            model=self.model,
-            messages=cast("list[ChatCompletionMessageParam]", messages),
-            response_format=response_format,
-            temperature=0.3,
-        )
-        parsed = response.choices[0].message.parsed
-        if parsed is None:
-            raise ValueError("OpenAI returned no parsed response")
-        return parsed
-
-    def _call_litellm(
-        self, messages: list[dict[str, Any]], response_format: type[BaseModel]
-    ) -> BaseModel:
-        """Call LiteLLM for model-agnostic access"""
-        import json
-
-        import litellm
-
-        # Build schema instruction to include in prompt (some models ignore response_format.schema)
-        schema_json = response_format.model_json_schema()
-        schema_instruction = f"""
-You MUST respond with valid JSON matching this schema:
-{json.dumps(schema_json, indent=2)}
-
-Required fields:
-- task_type: one of "bug_fix", "feature_impl", "test_writing", "refactor", "documentation", "performance", "security", "dependency"
-- difficulty: one of "easy", "medium", "hard"
-- quality_score: integer 1-10 (7+ is good)
-- instruction: string describing the task
-- is_good_task: boolean"""
-
-        # Append schema instruction to last user message
-        enhanced_messages = []
-        for i, msg in enumerate(messages):
-            if msg.get("role") == "user" and i == len(messages) - 1:
-                # Last user message - append schema instruction
-                enhanced_messages.append(
-                    {"role": "user", "content": msg["content"] + schema_instruction}
-                )
-            else:
-                enhanced_messages.append(msg)
+        # For models that need schema in prompt (json_mode: "prompt"), embed it
+        if self._json_mode == "prompt":
+            messages = embed_schema_in_messages(messages, response_format)
 
         if self.verbose:
             print("\n" + "=" * 60)
             print("LLM INPUT:")
-            print(f"Model: {self._litellm_model}")
-            print(f"Base URL: {self._litellm_kwargs.get('base_url', 'default')}")
+            print(f"Model: {self.model}")
+            print(f"Model ID: {self._model_id}")
+            print(f"Provider: {self.provider}")
+            print(f"Base URL: {self._base_url}")
+            print(f"JSON Mode: {self._json_mode}")
             print(f"API Key: {self.api_key[:15]}..." if self.api_key else "No API key")
             print("Messages:")
-            for msg in enhanced_messages:
+            for msg in messages:
                 role = msg.get("role", "unknown")
                 content = msg.get("content", "")
                 # Truncate long content
@@ -595,45 +551,31 @@ Required fields:
                     content = content[:500] + "... (truncated)"
                 print(f"  [{role}]: {content}")
 
-        # Drop unsupported params for compatibility (e.g., gpt-5 doesn't support temperature!=1)
-        litellm.drop_params = True
-
-        response = litellm.completion(
-            model=self._litellm_model,  # Use transformed model name for LiteLLM
-            messages=enhanced_messages,  # Use enhanced messages with schema in prompt
-            response_format={"type": "json_object"},  # Just JSON mode, no schema
-            temperature=0.3,  # Will be dropped automatically for models that don't support it
-            api_key=self.api_key,
-            max_tokens=2000,  # Increased for reasoning models
-            **self._litellm_kwargs,  # Passes api_base for custom endpoints
-        )
-
-        raw_content = response.choices[0].message.content
-
-        # Handle reasoning models (e.g., glm-5-free) that put content in reasoning_content
-        if not raw_content:
-            # Try reasoning_content field (used by some reasoning models)
-            raw_content = getattr(response.choices[0].message, "reasoning_content", None)
-            # Also check provider_specific_fields
-            if not raw_content:
-                provider_fields = getattr(
-                    response.choices[0].message, "provider_specific_fields", None
-                )
-                if provider_fields:
-                    raw_content = provider_fields.get("reasoning_content")
-
-        if not raw_content:
-            raise ValueError("LLM returned empty content")
+        try:
+            result = generate_structured(
+                messages=messages,
+                response_schema=response_format,
+                model_name=self.model,
+                api_key=self.api_key,
+                verbose=self.verbose,
+            )
+        except Exception as e:
+            if self.verbose:
+                print(f"\n[LLM ERROR] {type(e).__name__}: {e}")
+            raise
 
         if self.verbose:
-            content_source = (
-                "reasoning_content" if not response.choices[0].message.content else "content"
+            print("\nLLM OUTPUT:")
+            content_preview = (
+                result.content[:1000] if len(result.content) > 1000 else result.content
             )
-            print(f"\nLLM OUTPUT (from {content_source}):")
-            print(raw_content[:1000] if len(raw_content) > 1000 else raw_content)
+            print(content_preview)
+            if result.reasoning:
+                print(f"\nReasoning: {result.reasoning[:500]}...")
             print("=" * 60 + "\n")
 
-        return response_format.model_validate_json(raw_content)
+        # Parse the validated JSON content back to the Pydantic model
+        return response_format.model_validate_json(result.content)
 
     def evaluate_task_quality(self, pr_details: PRDetails) -> MinedTaskSchema:
         """
@@ -663,10 +605,7 @@ Required fields:
         ]
 
         try:
-            if self.provider == "openai":
-                return cast("MinedTaskSchema", self._call_openai(messages, MinedTaskSchema))
-            else:
-                return cast("MinedTaskSchema", self._call_litellm(messages, MinedTaskSchema))
+            return cast("MinedTaskSchema", self._call_inference_gateway(messages, MinedTaskSchema))
         except Exception as e:
             if self.verbose:
                 print(f"\n[LLM ERROR] {type(e).__name__}: {e}")

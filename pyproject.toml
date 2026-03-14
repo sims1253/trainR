@@ -34,7 +34,6 @@ classifiers = [
 
 dependencies = [
     "gepa",
-    "litellm",
     "docker",
     "pyyaml",
     "tree-sitter-language-pack",
@@ -104,3 +103,7 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
 addopts = "-v --tb=short"
+markers = [
+    "integration_local: Integration tests requiring Docker (skipped if Docker unavailable)",
+    "integration_provider: Integration tests requiring real provider credentials",
+]

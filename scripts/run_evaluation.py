@@ -4,7 +4,6 @@
 import argparse
 import json
 import logging
-import os
 import sys
 from pathlib import Path
 
@@ -16,6 +15,7 @@ from rich.panel import Panel
 from rich.syntax import Syntax
 from rich.table import Table
 
+from bench.provider import get_env_var
 from evaluation import DockerPiRunnerConfig, EvaluationSandbox
 from task_generator.models import TestingTask
 
@@ -74,10 +74,10 @@ def main() -> None:
     skill_prompt = skill_path.read_text()
 
     # Check API key is in environment
-    if not os.environ.get("Z_AI_API_KEY"):
+    if not get_env_var("Z_AI_API_KEY"):
         console.print(
             "[red]Z_AI_API_KEY not set in environment. "
-            "Set it in your shell config (e.g. ~/.config/fish/conf.d/secrets.fish).[/red]"
+            "Set it in .env or shell config.[/red]"
         )
         sys.exit(1)
 

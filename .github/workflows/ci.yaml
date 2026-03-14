@@ -104,10 +104,20 @@ jobs:
 
       - name: Run harness integration tests
         run: uv run pytest tests/test_harness_integration.py -v --tb=short
-        continue-on-error: true  # Graceful if file doesn't exist yet
+        # No continue-on-error - failures should block
 
-      - name: Validate Docker image exists
-        run: docker images posit-gskill-eval:latest || echo "Docker image not found - skipping container tests"
+      - name: Run sandbox/tooling integration tests
+        run: uv run pytest tests/integration/ -v --tb=short -m "integration_local or not integration_local"
+        # Run both marked and unmarked integration tests
+        # integration_local tests will skip if Docker is unavailable
+
+      - name: Check Docker image availability
+        run: |
+          if ! docker image inspect posit-gskill-eval:latest &>/dev/null; then
+            echo "::error::Docker image posit-gskill-eval:latest not found. Build it first."
+            exit 1
+          fi
+        continue-on-error: true  # Keep this as optional check
 
   # ===========================================================================
   # Integration-provider: Real provider tests (secrets-gated)
@@ -139,15 +149,30 @@ jobs:
       - name: Install dependencies
         run: uv sync --dev
 
-      - name: Validate provider credentials
+      - name: Provider integration tests (first benchmark)
         env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
           Z_AI_API_KEY: ${{ secrets.Z_AI_API_KEY }}
         run: |
-          if [ -z "$Z_AI_API_KEY" ]; then
-            echo "No provider secrets configured - skipping"
+          missing=()
+          for key in OPENROUTER_API_KEY OPENCODE_API_KEY Z_AI_API_KEY; do
+            if [ -z "${!key:-}" ]; then
+              missing+=("$key")
+            fi
+          done
+
+          if [ "${#missing[@]}" -eq 3 ]; then
+            echo "No provider secrets configured - skipping provider integration tests"
             exit 0
           fi
-          uv run python -c "from bench.provider import run_preflight; r = run_preflight(['glm-5'], strict=True); print('Preflight:', r.is_valid)"
+
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "::error::Provider integration requires all three secrets. Missing: ${missing[*]}"
+            exit 1
+          fi
+
+          uv run pytest tests/integration/test_first_benchmark_integration.py -v --tb=short -m integration_provider
 
   # ===========================================================================
   # Visualizer CI (conditional)

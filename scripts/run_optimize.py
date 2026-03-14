@@ -154,7 +154,7 @@ Examples:
     parser.add_argument(
         "--reflection-lm",
         default=None,
-        help="LiteLLM model for reflection",
+        help="Model for GEPA reflection (uses inference gateway)",
     )
     parser.add_argument(
         "--model",

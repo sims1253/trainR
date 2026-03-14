@@ -3,16 +3,22 @@
 Single source of truth for all LLM settings in trainR.
 Reads from configs/llm.yaml
 
-LiteLLM providers: https://docs.litellm.ai/docs/providers
+Provider-native inference is used for mining/judging via bench.provider.inference.
 """
 
-import os
 import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 import yaml
+
+
+def get_env_var(name: str, default: str | None = None) -> str | None:
+    """Lazily load provider env helper to avoid import-time package cycles."""
+    from bench.provider import get_env_var as provider_get_env_var
+
+    return provider_get_env_var(name, default)
 
 
 @dataclass
@@ -71,7 +77,11 @@ class LLMConfig:
 
     @staticmethod
     def _resolve_model_to_litellm(config: dict, model_name: str) -> str:
-        """Resolve a model name to its LiteLLM model string."""
+        """Resolve a model name to its LiteLLM model string.
+
+        DEPRECATED: This method is kept for backward compatibility.
+        Use get_model_id() instead for new code.
+        """
         models = config.get("models", {})
         providers = config.get("providers", {})
 
@@ -98,8 +108,14 @@ class LLMConfig:
         if provider_name and provider_name in providers:
             provider_cfg = providers[provider_name]
             prefix = provider_cfg.get("litellm_prefix")
+            if prefix is None:
+                # Fallback to canonical map when llm.yaml omits deprecated prefix fields.
+                from bench.provider.resolver import PROVIDER_LITELLM_PREFIX
+
+                prefix = PROVIDER_LITELLM_PREFIX.get(provider_name, "")
             if prefix:
-                return f"{prefix}/{model_id}"
+                normalized_prefix = str(prefix).rstrip("/")
+                return f"{normalized_prefix}/{model_id}"
 
         return model_id
 
@@ -129,6 +145,14 @@ class LLMConfig:
 
         provider_cfg = providers.get(provider_name, {}) if provider_name else {}
 
+        # Compute litellm_prefix from canonical map for backward compatibility
+        litellm_prefix = provider_cfg.get("litellm_prefix")
+        if litellm_prefix is None and provider_name:
+            # Fallback to canonical map (stored without trailing slash)
+            from bench.provider.resolver import PROVIDER_LITELLM_PREFIX
+
+            litellm_prefix = PROVIDER_LITELLM_PREFIX.get(provider_name, "")
+
         # Merge model and provider config
         return {
             "name": model_name,
@@ -136,7 +160,8 @@ class LLMConfig:
             "provider": provider_name,
             "base_url": provider_cfg.get("base_url"),
             "api_key_env": provider_cfg.get("api_key_env"),
-            "litellm_prefix": provider_cfg.get("litellm_prefix"),
+            "api_style": provider_cfg.get("api_style", "openai_compat"),
+            "litellm_prefix": litellm_prefix,  # Backward compat (no trailing slash)
             "capabilities": model_cfg.get("capabilities", []),
         }
 
@@ -167,7 +192,16 @@ class LLMConfig:
         return [{"id": cfg.get("id", model_name), "provider": cfg.get("provider")}]
 
     def get_litellm_model(self, model_name: str) -> str:
-        """Get the LiteLLM-compatible model string."""
+        """Get the LiteLLM-compatible model string.
+
+        DEPRECATED: Use get_model_id() instead.
+        """
+        warnings.warn(
+            "get_litellm_model() is deprecated. Use get_model_id() instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        # Maintain backward compatibility - return prefixed string if prefix exists
         cfg = self.get_model_config(model_name)
         model_id: str = cfg.get("id", model_name)
         prefix = cfg.get("litellm_prefix")
@@ -176,12 +210,36 @@ class LLMConfig:
             return f"{prefix}/{model_id}"
         return model_id
 
+    def get_model_id(self, model_name: str) -> str:
+        """Get the raw model ID to send to the API.
+
+        Args:
+            model_name: The short model name from llm.yaml
+
+        Returns:
+            The raw model ID (e.g., 'glm-5-free', 'openai/gpt-oss-120b:free').
+        """
+        cfg = self.get_model_config(model_name)
+        return cfg.get("id", model_name)
+
+    def get_api_style(self, model_name: str) -> str:
+        """Get the API style for a model's provider.
+
+        Args:
+            model_name: The short model name from llm.yaml
+
+        Returns:
+            The API style (e.g., 'openai_compat', 'anthropic', 'gemini').
+        """
+        cfg = self.get_model_config(model_name)
+        return cfg.get("api_style", "openai_compat")
+
     def get_model_api_key(self, model_name: str) -> str | None:
         """Get the API key for a model."""
         cfg = self.get_model_config(model_name)
         env_var = cfg.get("api_key_env")
         if env_var:
-            return os.environ.get(env_var)
+            return get_env_var(env_var)
         return None
 
     def get_model_base_url(self, model_name: str) -> str | None:
@@ -204,10 +262,10 @@ class LLMConfig:
         key_name = self._get_api_key_env(self.provider)
         if not key_name:
             return None
-        key = os.environ.get(key_name)
+        key = get_env_var(key_name)
         # Gemini fallback
         if self.provider == "gemini" and not key:
-            key = os.environ.get("GOOGLE_API_KEY")
+            key = get_env_var("GOOGLE_API_KEY")
         return key
 
     def _get_api_key_env(self, provider: str) -> str | None:
@@ -227,27 +285,61 @@ class LLMConfig:
             DeprecationWarning,
             stacklevel=3,
         )
-        mapping = {
-            "openrouter": "OPENROUTER_API_KEY",
-            "zai": "Z_AI_API_KEY",
-            "gemini": "GEMINI_API_KEY",
-            "openai": "OPENAI_API_KEY",
-            "anthropic": "ANTHROPIC_API_KEY",
-            "opencode": "OPENCODE_API_KEY",
-            "zai_coding_plan": "Z_AI_API_KEY",
-        }
+        from bench.provider.resolver import PROVIDER_API_KEY_MAP
+
+        mapping = {**PROVIDER_API_KEY_MAP, "zai_coding_plan": PROVIDER_API_KEY_MAP["zai"]}
         return mapping.get(provider)
 
     def get_model_for_litellm(self, model: str | None = None) -> str:
-        """Get model name with LiteLLM prefix."""
+        """Get model name with LiteLLM prefix.
+
+        DEPRECATED: Use get_model_id() instead.
+        """
         model = model or self.task_agent
         if "/" in model:
             return model
         prefix = self._get_litellm_prefix(self.provider)
         return f"{prefix}{model}" if prefix else model
 
+    def _get_api_style(self, provider: str) -> str:
+        """Get the API style for a provider."""
+        # Try central resolver first
+        try:
+            from bench.provider import resolve_api_style
+
+            return resolve_api_style(provider)
+        except (ImportError, KeyError):
+            pass
+
+        # Fallback to local mapping (deprecated)
+        warnings.warn(
+            f"Using fallback mapping in config._get_api_style(). "
+            f"Prefer bench.provider.resolve_api_style() for provider '{provider}'.",
+            DeprecationWarning,
+            stacklevel=3,
+        )
+        mapping: dict[str, str] = {
+            "openrouter": "openai_compat",
+            "zai": "openai_compat",
+            "gemini": "gemini",
+            "openai": "openai_native",
+            "anthropic": "anthropic",
+            "opencode": "openai_compat",
+            "kimi": "openai_compat",
+            "zai_coding_plan": "openai_compat",
+        }
+        return mapping.get(provider, "openai_compat")
+
     def _get_litellm_prefix(self, provider: str) -> str:
-        """Get the LiteLLM prefix for a provider."""
+        """Get the LiteLLM prefix for a provider.
+
+        DEPRECATED: Use _get_api_style() instead.
+        """
+        warnings.warn(
+            "_get_litellm_prefix() is deprecated. Use _get_api_style() instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         # Try central resolver first
         try:
             from bench.provider import resolve_litellm_prefix
@@ -259,7 +351,7 @@ class LLMConfig:
         # Fallback to local mapping (deprecated)
         warnings.warn(
             f"Using fallback mapping in config._get_litellm_prefix(). "
-            f"Prefer bench.provider.resolve_litellm_prefix() for provider '{provider}'.",
+            f"Prefer bench.provider.resolve_api_style() for provider '{provider}'.",
             DeprecationWarning,
             stacklevel=3,
         )
@@ -301,7 +393,10 @@ class LLMConfig:
         return endpoint_config.get("base_url")
 
     def get_litellm_kwargs(self, model: str | None = None) -> dict[str, Any]:
-        """Get kwargs for litellm.completion()."""
+        """Get base_url for OpenAI-compatible API calls.
+
+        Deprecated: Use get_model_base_url() directly instead.
+        """
         base_url = self.get_base_url(model)
         if base_url:
             return {"base_url": base_url}
@@ -341,10 +436,10 @@ def list_available_providers() -> list[str]:
         available = []
         for provider_name in resolver.providers:
             key_name = resolver.get_api_key_env(provider_name)
-            key = os.environ.get(key_name)
+            key = get_env_var(key_name)
             # Gemini fallback
             if provider_name == "gemini" and not key:
-                key = os.environ.get("GOOGLE_API_KEY")
+                key = get_env_var("GOOGLE_API_KEY")
             if key and provider_name not in available:
                 available.append(provider_name)
         return available
@@ -358,21 +453,15 @@ def list_available_providers() -> list[str]:
         DeprecationWarning,
         stacklevel=2,
     )
-    provider_keys = {
-        "openrouter": "OPENROUTER_API_KEY",
-        "zai": "Z_AI_API_KEY",
-        "gemini": "GEMINI_API_KEY",
-        "openai": "OPENAI_API_KEY",
-        "anthropic": "ANTHROPIC_API_KEY",
-        "opencode": "OPENCODE_API_KEY",
-        "zai_coding_plan": "Z_AI_API_KEY",
-    }
+    from bench.provider.resolver import PROVIDER_API_KEY_MAP
+
+    provider_keys = {**PROVIDER_API_KEY_MAP, "zai_coding_plan": PROVIDER_API_KEY_MAP["zai"]}
 
     available = []
     for provider, key_name in provider_keys.items():
-        key = os.environ.get(key_name)
+        key = get_env_var(key_name)
         if provider == "gemini" and not key:
-            key = os.environ.get("GOOGLE_API_KEY")
+            key = get_env_var("GOOGLE_API_KEY")
         if key and provider not in available:
             available.append(provider)
     return available

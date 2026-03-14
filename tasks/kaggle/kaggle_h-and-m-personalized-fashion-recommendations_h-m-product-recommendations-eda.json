@@ -1,0 +1,53 @@
+{
+  "task_id": "kaggle_h-and-m-personalized-fashion-recommendations_h-m-product-recommendations-eda",
+  "source": {
+    "type": "kaggle_kernel",
+    "competition": "https://www.kaggle.com/competitions/h-and-m-personalized-fashion-recommendations",
+    "competition_title": "H&M Personalized Fashion Recommendations",
+    "kernel_slug": "h-m-product-recommendations-eda",
+    "kernel_ref": "blackpouh/h-m-product-recommendations-eda",
+    "author": "blackpouh",
+    "votes": 26,
+    "url": "https://www.kaggle.com/code/blackpouh/h-m-product-recommendations-eda",
+    "language": "r",
+    "kernel_type": "script"
+  },
+  "problem_statement": {
+    "title": "H&M Personalized Fashion Recommendations",
+    "description": "Provide product recommendations based on previous purchases",
+    "evaluation_metric": "MAP@{K}",
+    "problem_type": "unknown",
+    "instruction": "Complete the H&M Personalized Fashion Recommendations competition task.",
+    "context": "Provide product recommendations based on previous purchases"
+  },
+  "grading": {
+    "metric": "MAP@{K}",
+    "metric_description": "Provide product recommendations based on previous purchases",
+    "problem_type": "ranking",
+    "competition_slug": "h-and-m-personalized-fashion-recommendations",
+    "data_available": true,
+    "grading_method": "metric",
+    "baseline_score": null
+  },
+  "reference_solution": {
+    "code": "---\ntitle: 'H&M Product Recommendations'\nauthor: 'Mohamed Yacine Smail'\ndate: '`r Sys.Date()`'\noutput:\n  html_document:\n    number_sections: true\n    toc: true\n    code_folding: hide\n---\n\n```{r message=FALSE, warning=FALSE}\nlibrary(tidyverse)\nlibrary(patchwork)\n```\n\n```{r message=FALSE, warning=FALSE}\ncustomers <- vroom::vroom(\"../input/h-and-m-personalized-fashion-recommendations/customers.csv\", \n                          .name_repair = janitor::make_clean_names)\narticles <- vroom::vroom(\"../input/h-and-m-personalized-fashion-recommendations/articles.csv\", \n                         .name_repair = janitor::make_clean_names)\ntransactions_train <- vroom::vroom(\"../input/h-and-m-personalized-fashion-recommendations/transactions_train.csv\", \n                                   .name_repair = janitor::make_clean_names)\nsample_submission <- vroom::vroom(\"../input/h-and-m-personalized-fashion-recommendations/sample_submission.csv\", \n                                  .name_repair = janitor::make_clean_names)\n```\n# Data Overview\n\n## Customers\n```{r message=FALSE, warning=FALSE}\nskimr::skim(customers)\n```\n```{r}\np1 <- customers %>% \n  count(fashion_news_frequency, sort = T) %>% \n  ggplot(aes(fashion_news_frequency, n, fill = fashion_news_frequency)) +\n  geom_col(show.legend = F) +\n  geom_label(aes(label = scales::comma(n)), fill = \"white\", size = 3) +\n  scale_fill_brewer(palette = \"Set1\", na.value = \"grey50\") + \n  scale_y_continuous(labels = scales::comma_format()) +\n  theme_bw() +\n  theme(axis.text.x = element_text(angle = 35, hjust = 1)) +\n  labs(x = 'Fashion News Frequency', y = '# of customers')\n\np2 <- customers %>% \n  count(club_member_status, sort = T) %>% \n  ggplot(aes(club_member_status, n, fill = club_member_status)) +\n  geom_col(show.legend = F) +\n  geom_label(aes(label = scales::comma(n)), fill = \"white\", size = 3) +\n  scale_fill_brewer(palette = \"Set1\", na.value = \"grey50\") +\n  scale_y_continuous(labels = scales::comma_format()) +\n  theme_bw() +\n  theme(axis.text.x = element_text(angle = 35, hjust = 1)) +\n  labs(x = 'Club Member Status', y = '# of customers')\n\np3 <- customers %>% \n  count(fn, sort = T) %>% \n  mutate(fn = factor(fn)) %>% \n  ggplot(aes(fn, n, fill = fn)) +\n  geom_col(show.legend = F) +\n  geom_label(aes(label = scales::comma(n)), fill = \"white\", size = 3) +\n  scale_fill_brewer(palette = \"Set1\", na.value = \"grey50\") +\n  scale_y_continuous(labels = scales::comma_format()) +\n  theme_bw() +\n  labs(x = 'FN', y = '# of customers')\n\np4 <- customers %>% \n  count(active, sort = T) %>% \n  mutate(active = factor(active)) %>% \n  ggplot(aes(active, n, fill = active)) +\n  geom_col(show.legend = F) +\n  geom_label(aes(label = scales::comma(n)), fill = \"white\", size = 3) +\n  scale_fill_brewer(palette = \"Set1\", na.value = \"grey50\") +\n  scale_y_continuous(labels = scales::comma_format()) +\n  theme_bw() +\n  labs(x = 'Active', y = '# of customers')\n\np5 <- customers %>% \n  count(fn, active, sort = T) %>% \n  mutate(active = factor(active), fn = factor(fn)) %>% \n  ggplot(aes(fn, active, fill = n)) +\n  geom_tile(show.legend = F, color = \"white\", size = 2) +\n  ggplot2::scale_fill_continuous(type = \"viridis\", direction = -1) +\n  geom_label(aes(label = scales::comma(n)), fill = \"white\") +\n  theme_bw()\n\np6 <- customers %>% \n  ggplot(aes(age)) +\n  geom_histogram(binwidth = 5, fill = \"darkgreen\", color = \"white\") +\n  scale_x_continuous(breaks = seq(0, 100, 5), minor_breaks = NULL) +\n  scale_y_continuous(labels = scales::label_comma()) +\n  theme_bw() +\n  labs(x = \"Age\", y = \"# of customers\")\n```\n\n```{r}\n(p1 + p2) / (p3 + p4)\n```\n```{r}\np5 / p6\n```\n\n**Comments**\n\n- We have 1,371,980 unique customer IDs which corresponds to the number of rows of this dataset\n- The `club_member_status` variable has very low missing values, **ACTIVE** is the most dominant category, followed by **PRE-CREATE**\n- The `fashion_news_frequency` variable has also low missing value rate (*1%*), **NONE** is the most dominant category, \nfollowed by **Regularly**. **NONE** might be grouped with **None** and missing values **NA**\n- The `fn` variable has a single value **\"1\"**, 75% of values are missing. My guess is that it is a binary variable.\n- The `active` variable has a single value **\"1\"**, 76% of values are missing. My guess is that it is a binary variable.\n- A good portion of customers are young people, 1% of values are missing, could be imputed with median or using other techniques\n\n## Articles\n\n```{r message=FALSE, warning=FALSE}\nskimr::skim(articles)\n```\n\nSome variables have many unique values, so let's create a function that calculate the frequency of the top 20 values and display the corresponding bar plots.\n\n```{r}\nplot_top20 <- function(dataset, column, column_label){\n  dataset %>% \n    count({{column}}, sort = TRUE) %>% \n    mutate(column_reordered = fct_reorder({{column}}, -n, .fun = min)) %>% \n    slice(1:20) %>% \n    ggplot(aes(column_reordered, n, fill = column_reordered)) +\n    geom_col(show.legend = FALSE, color = \"black\") +\n    scale_y_continuous(labels = scales::comma_format()) +\n    theme_bw() +\n    theme(axis.text.x = element_text(angle = 45, hjust = 1)) +\n    labs(x = NULL, y = \"# of Articles\", title = paste(\"TOP\", column_label))\n}\n```\n\n```{r}\np7 <- plot_top20(articles, product_type_name, \"Product Types\") +\n  scale_fill_viridis_d(direction = -1)\n\np8 <- plot_top20(articles, product_group_name, \"Product Groups\") +\n  scale_fill_viridis_d(option = \"magma\", direction = -1)\n\np9 <- plot_top20(articles, department_name, \"Departments\") +\n  scale_fill_viridis_d(option = \"inferno\", direction = -1)\n\np10 <- plot_top20(articles, index_group_name, \"Index Groups\") +\n  scale_fill_viridis_d(option = \"plasma\", direction = -1)\n\np11 <- plot_top20(articles, section_name, \"Sections\") +\n  scale_fill_viridis_d(option = \"cividis\", direction = -1)\n\np12 <- plot_top20(articles, garment_group_name, \"Garment Groups\") +\n  scale_fill_viridis_d(direction = -1)\n```\n\n```{r}\np7\np8\np9\np10\np11\np12\n```\n\nLet's see how long are the descriptions of these articles\n\n```{r}\narticles %>% \n  transmute(description_length = str_length(detail_desc)) %>% \n  ggplot(aes(description_length)) +\n  geom_histogram(binwidth = 25, fill = \"navy\", color = \"white\") +\n  scale_x_continuous(breaks = seq(0, 800, 50)) +\n  scale_y_continuous(labels = scales::comma_format()) +\n  theme_bw() +\n  labs(x = \"Description Length (# of characters)\", y = \"# of Articles\",\n       title = \"Distribution of the length of the detailed description of articles\")\n```\n\n**Comments**\n\n- This dataset has 25 variables, most of them come in (id, name) pairs.\n- Numerical variables are IDs that correspond to the associated categorical variables.\n- **Trousers, Dresses, Sweaters and T-shirts** are the dominant product types in this dataset.\n\n## Transactions\n```{r message=FALSE, warning=FALSE}\nskimr::skim(transactions_train)\n```\n\n```{r}\np13 <- transactions_train %>% \n  count(t_dat) %>% \n  ggplot(aes(t_dat, n)) +\n  geom_line(color = \"red\") +\n  scale_y_continuous(labels = scales::comma_format()) +\n  theme_bw() +\n  labs(x = \"\", y = \"# of Transactions\",\n       title = \"Transactions Volume Daily Evolution\")\n\np14 <- transactions_train %>% \n  count(t_dat, sales_channel_id) %>% \n  mutate(sales_channel_id = factor(sales_channel_id)) %>% \n  ggplot(aes(t_dat, n, color = sales_channel_id)) +\n  geom_line() +\n  scale_y_continuous(labels = scales::comma_format()) +\n  scale_color_brewer(name = \"Sales Channel\", palette = \"Accent\", labels = c(\"Store\", \"Online\")) +\n  theme_bw() +\n  labs(x = \"\", y = \"# of Transactions\",\n       title = \"Transactions Volume Daily Evolution By Channel\")\n```\n\n```{r}\np13 / p14\n```\n\n```{r}\np15 <- transactions_train %>% \n  ggplot(aes(price)) +\n  geom_histogram(fill = \"brown\") +\n  scale_x_log10() +\n  scale_y_continuous(labels = scales::comma_format()) +\n  theme_bw() +\n  labs(x = \"Log Price\", y = \"# of Transactions\", title = \"Price Distribution\")\n```\n\n```{r}\np16 <- transactions_train %>% \n  count(customer_id) %>% \n  ggplot(aes(n)) +\n  geom_histogram(binwidth = 10, fill = \"black\", color = \"white\") +\n  scale_y_continuous(labels = scales::comma_format()) +\n  xlim(0, 300) +\n  theme_bw() +\n  labs(x = \"# of Transactions\", y = \"# of Customers\", title = \"Buying Frequency Distribution\")\n```\n\n```{r}\np15 + p16\n```\n\nWork in progress, *Stay tuned!*\n",
+    "format": "r_markdown",
+    "key_techniques": []
+  },
+  "metadata": {
+    "task_type": "feature_impl",
+    "difficulty": "medium",
+    "quality_score": 5,
+    "mined_at": "2026-02-27T00:17:26.100779+00:00",
+    "competition_type": null,
+    "tags": [
+      "recommender systems",
+      "retail and shopping",
+      "map@{k}"
+    ],
+    "evaluation_criteria": "MAP@{K}",
+    "key_techniques": [],
+    "potential_improvements": [],
+    "code_format": "r_markdown"
+  }
+}

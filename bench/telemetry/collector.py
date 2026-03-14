@@ -71,6 +71,9 @@ class TelemetryCollector:
             self._tools.failed_calls += 1
             self._tools.errors[tool] = self._tools.errors.get(tool, 0) + 1
         self._tools.by_tool[tool] = self._tools.by_tool.get(tool, 0) + 1
+        self._tools.duration_ms_by_tool[tool] = self._tools.duration_ms_by_tool.get(tool, 0.0) + (
+            duration_ms
+        )
         self._tools.total_duration_ms += duration_ms
 
     def record_turn(self) -> None:

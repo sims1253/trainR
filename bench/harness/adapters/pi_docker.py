@@ -4,9 +4,18 @@ from __future__ import annotations
 
 import time
 import uuid
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from bench.telemetry import (
+    LatencyBreakdown,
+    TelemetrySchema,
+    ToolCallMetrics,
+)
+from bench.telemetry import (
+    TokenUsage as TelemetryTokenUsage,
+)
 from evaluation.models import FailureCategory
 from evaluation.pi_runner import DockerPiRunner, DockerPiRunnerConfig
 
@@ -38,6 +47,17 @@ FAILURE_TO_ERROR_CATEGORY: dict[FailureCategory, ErrorCategory] = {
 }
 
 
+@dataclass
+class TaskLike:
+    """Task shim with the attributes expected by DockerPiRunner."""
+
+    source_package: str = ""
+    test_patch: str = ""
+    patch: str = ""
+    tests: dict[str, Any] = field(default_factory=dict)
+    source: dict[str, Any] = field(default_factory=dict)
+
+
 @register_harness("pi_docker")
 class PiDockerHarness(AgentHarness):
     """Harness that runs Pi CLI inside Docker container.
@@ -60,6 +80,13 @@ class PiDockerHarness(AgentHarness):
         docker_image = getattr(self.config, "docker_image", "posit-gskill-eval:latest")
         api_keys = getattr(self.config, "api_keys", None)
         sandbox_profile = getattr(self.config, "sandbox_profile", "networked")
+        forward_github_token = bool(getattr(self.config, "forward_github_token", False))
+        auth_policy = getattr(self.config, "auth_policy", "env")
+        if hasattr(auth_policy, "value"):
+            auth_policy = auth_policy.value
+
+        save_traces = bool(getattr(self.config, "save_traces", False))
+        trace_dir = getattr(self.config, "trace_dir", "container_logs")
 
         runner_config = DockerPiRunnerConfig(
             model=model,
@@ -67,7 +94,14 @@ class PiDockerHarness(AgentHarness):
             timeout=int(self.config.timeout),
             docker_image=docker_image,
             api_keys=api_keys,
+            forward_github_token=forward_github_token,
             sandbox_profile=sandbox_profile,
+            auth_policy=str(auth_policy),
+            keep_workspace_on_failure=bool(
+                getattr(self.config, "keep_workspace_on_failure", False)
+            ),
+            save_traces=save_traces,
+            trace_dir=Path(trace_dir),
         )
         self._runner = DockerPiRunner(runner_config)
 
@@ -118,6 +152,9 @@ class PiDockerHarness(AgentHarness):
         """Execute task using DockerPiRunner."""
         if self._runner is None:
             self.setup()
+        runner = self._runner
+        if runner is None:
+            raise RuntimeError("PiDockerHarness runner failed to initialize")
 
         run_id = str(uuid.uuid4())[:8]
 
@@ -139,7 +176,7 @@ class PiDockerHarness(AgentHarness):
         # Execute
         start_time = time.time()
         try:
-            result_dict = self._runner.run_evaluation(
+            result_dict = runner.run_evaluation(
                 skill_content=skill_content,
                 task_instruction=request.prompt,
                 task_context=task_context,
@@ -160,21 +197,31 @@ class PiDockerHarness(AgentHarness):
                 error_message=str(e),
                 error_category=ErrorCategory.from_exception(e),
                 execution_time=execution_time,
+                telemetry=TelemetrySchema(
+                    tokens=TelemetryTokenUsage(
+                        prompt=0,
+                        completion=0,
+                        total=0,
+                    ),
+                    turns=0,
+                    tools=ToolCallMetrics(),
+                    latency=LatencyBreakdown(
+                        total_s=execution_time,
+                        execution_s=execution_time,
+                    ),
+                    provider=self._infer_provider(model),
+                    model=model,
+                    harness="pi_docker",
+                ),
             )
 
     def _build_task(self, request: HarnessRequest) -> Any:
         """Build task-like object for DockerPiRunner."""
-
-        # Create object with expected attributes
-        class TaskLike:
-            pass
-
-        task = TaskLike()
-        task.source_package = request.metadata.get("source_package", "")
-        task.test_patch = getattr(request, "test_patch", "") or request.metadata.get(
-            "test_patch", ""
+        task = TaskLike(
+            source_package=request.metadata.get("source_package", ""),
+            test_patch=getattr(request, "test_patch", "") or request.metadata.get("test_patch", ""),
+            patch=getattr(request, "gold_patch", "") or request.metadata.get("gold_patch", ""),
         )
-        task.patch = getattr(request, "gold_patch", "") or request.metadata.get("gold_patch", "")
         tests = getattr(request, "tests", {}) or request.metadata.get("tests", {})
         if isinstance(tests, dict):
             task.tests = tests
@@ -243,14 +290,87 @@ class PiDockerHarness(AgentHarness):
             cache_write=token_usage_dict.get("cache_write_tokens", 0),
         )
 
+        tool_call_counts = {
+            str(tool): int(count)
+            for tool, count in result_dict.get("tool_call_counts", {}).items()
+            if isinstance(count, int | float)
+        }
+        tool_errors = {
+            str(tool): int(count)
+            for tool, count in result_dict.get("tool_errors", {}).items()
+            if isinstance(count, int | float)
+        }
+        tool_total_time_ms = {
+            str(tool): float(duration)
+            for tool, duration in result_dict.get("tool_total_time_ms", {}).items()
+            if isinstance(duration, int | float)
+        }
+        total_calls = sum(tool_call_counts.values())
+        failed_calls = sum(tool_errors.values())
+        successful_calls = max(0, total_calls - failed_calls)
+        total_duration_ms = sum(tool_total_time_ms.values())
+
         # Map error category
         error_category = ErrorCategory.NONE
         error_message = result_dict.get("error")
         if not result_dict.get("success", True):
             if error_message:
                 # Try to classify based on error message
-                if "timeout" in error_message.lower():
+                lower_error = error_message.lower()
+                if "timeout" in lower_error or "timed out" in lower_error:
                     error_category = ErrorCategory.TIMEOUT
+                elif any(
+                    marker in lower_error
+                    for marker in (
+                        "429",
+                        "rate limit",
+                        "insufficient balance",
+                        "no resource package",
+                        "recharge",
+                    )
+                ):
+                    error_category = ErrorCategory.RATE_LIMIT
+                elif any(
+                    marker in lower_error
+                    for marker in (
+                        "authentication_error",
+                        "oidc",
+                        "api key",
+                        "no api key found",
+                        "unauthorized",
+                        "user not found",
+                        "balance",
+                        '"status":401',
+                        '"status": 401',
+                        '"code":401',
+                        '"code": 401',
+                        '"status_code":401',
+                        '"status_code": 401',
+                        '"status":403',
+                        '"status": 403',
+                        '"code":403',
+                        '"code": 403',
+                        '"status_code":403',
+                        '"status_code": 403',
+                    )
+                ):
+                    error_category = ErrorCategory.AUTH_ERROR
+                elif (
+                    ("model" in lower_error and "not found" in lower_error)
+                    or "model not available" in lower_error
+                    or "no such model" in lower_error
+                    or "invalid model" in lower_error
+                    or "--list-models" in lower_error
+                ):
+                    error_category = ErrorCategory.MODEL_ERROR
+                elif (
+                    "error ('test-" in lower_error
+                    or "testthat" in lower_error
+                    or "expected `" in lower_error
+                    or "failed ──" in lower_error
+                    or (test_results_data and not test_results_data.get("passed", True))
+                ):
+                    error_category = ErrorCategory.TEST_ERROR
                 else:
                     error_category = ErrorCategory.TASK_ERROR
             else:
@@ -260,6 +380,34 @@ class PiDockerHarness(AgentHarness):
         tests_passed = result_dict.get("success", False)
         if test_results:
             tests_passed = all(tr.passed for tr in test_results)
+
+        model_name = result_dict.get("model")
+        telemetry = TelemetrySchema(
+            tokens=TelemetryTokenUsage(
+                prompt=token_usage.prompt,
+                completion=token_usage.completion,
+                total=token_usage.total,
+                cache_read=token_usage.cache_read,
+                cache_write=token_usage.cache_write,
+            ),
+            turns=int(token_usage_dict.get("turn_count", 0) or 0),
+            tools=ToolCallMetrics(
+                total_calls=total_calls,
+                successful_calls=successful_calls,
+                failed_calls=failed_calls,
+                total_duration_ms=total_duration_ms,
+                by_tool=tool_call_counts,
+                errors=tool_errors,
+                duration_ms_by_tool=tool_total_time_ms,
+            ),
+            latency=LatencyBreakdown(
+                total_s=execution_time,
+                execution_s=execution_time,
+            ),
+            provider=self._infer_provider(model_name),
+            model=model_name,
+            harness="pi_docker",
+        )
 
         return HarnessResult(
             task_id=request.task_id,
@@ -273,11 +421,16 @@ class PiDockerHarness(AgentHarness):
             error_category=error_category,
             execution_time=execution_time,
             token_usage=token_usage,
-            model=result_dict.get("model"),
-            metadata={
-                "raw_result": result_dict,
-                "tool_call_counts": result_dict.get("tool_call_counts", {}),
-                "tool_errors": result_dict.get("tool_errors", {}),
-                "tool_total_time_ms": result_dict.get("tool_total_time_ms", {}),
-            },
+            model=model_name,
+            telemetry=telemetry,
+            metadata={"raw_result": result_dict},
         )
+
+    @staticmethod
+    def _infer_provider(model: str | None) -> str | None:
+        """Infer provider name from model identifier."""
+        if not model:
+            return None
+        if "/" not in model:
+            return None
+        return model.split("/", 1)[0]

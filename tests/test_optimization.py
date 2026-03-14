@@ -122,9 +122,12 @@ class TestOptimizeSkill:
         for key in [
             "OPENROUTER_API_KEY",
             "Z_AI_API_KEY",
+            "ZAI_API_KEY",
             "OPENCODE_API_KEY",
+            "OPENCODE_API_TOKEN",
             "OPENAI_API_KEY",
             "ANTHROPIC_API_KEY",
+            "ANTHROPIC_AUTH_TOKEN",
             "GEMINI_API_KEY",
             "GOOGLE_API_KEY",
         ]:

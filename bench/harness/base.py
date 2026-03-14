@@ -9,9 +9,9 @@ from __future__ import annotations
 import os
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 if TYPE_CHECKING:
     from bench.telemetry import TelemetrySchema
@@ -137,6 +137,19 @@ class HarnessConfig(BaseModel):
     # Sandbox settings
     sandbox_enabled: bool = Field(default=True, description="Whether to use sandboxing")
     network_access: bool = Field(default=False, description="Whether to allow network access")
+    sandbox_profile: str = Field(default="strict", description="Sandbox security profile")
+    forward_github_token: bool = Field(
+        default=False, description="Whether to forward GitHub token into runner"
+    )
+    auth_policy: Literal["env", "mounted_file"] = Field(
+        default="env", description="Credential resolution policy"
+    )
+    keep_workspace_on_failure: bool = Field(
+        default=False, description="Keep failed workspaces for debugging"
+    )
+    docker_image: str = Field(default="posit-gskill-eval:latest", description="Docker image")
+    default_model: str | None = Field(default=None, description="Default model override")
+    api_keys: dict[str, str] | None = Field(default=None, description="Explicit API key map")
 
     # Telemetry
     trace_enabled: bool = Field(default=False, description="Whether to enable detailed tracing")
@@ -147,10 +160,7 @@ class HarnessConfig(BaseModel):
     api_base: str | None = Field(default=None, description="API base URL override")
     api_key: str | None = Field(default=None, description="API key (use env var preferred)")
 
-    class Config:
-        """Pydantic model configuration."""
-
-        extra = "allow"  # Allow additional fields for harness-specific config
+    model_config = ConfigDict(extra="allow")
 
 
 class HarnessRequest(BaseModel):
@@ -182,10 +192,7 @@ class HarnessRequest(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
     tags: list[str] = Field(default_factory=list, description="Tags for categorization")
 
-    class Config:
-        """Pydantic model configuration."""
-
-        extra = "allow"
+    model_config = ConfigDict(extra="allow")
 
 
 class HarnessResult(BaseModel):
@@ -230,10 +237,7 @@ class HarnessResult(BaseModel):
     model: str | None = Field(default=None, description="Model used for execution")
     metadata: dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
 
-    class Config:
-        """Pydantic model configuration."""
-
-        extra = "allow"
+    model_config = ConfigDict(extra="allow")
 
     def model_post_init(self, __context: Any) -> None:
         """Sync telemetry with legacy fields if telemetry is set."""
@@ -299,7 +303,7 @@ class AgentHarness(ABC):
         """
         ...
 
-    def setup(self) -> None:
+    def setup(self) -> None:  # noqa: B027
         """Set up the harness before execution.
 
         Override this method to perform any necessary initialization
@@ -307,9 +311,9 @@ class AgentHarness(ABC):
 
         This is a no-op by default.
         """
-        pass
+        ...
 
-    def teardown(self) -> None:
+    def teardown(self) -> None:  # noqa: B027
         """Tear down the harness after execution.
 
         Override this method to perform any necessary cleanup
@@ -317,7 +321,7 @@ class AgentHarness(ABC):
 
         This is a no-op by default.
         """
-        pass
+        ...
 
     def get_environment(self) -> dict[str, str]:
         """Get the environment variables for execution.
@@ -365,9 +369,11 @@ class AgentHarness(ABC):
 # Resolve forward references after all classes are defined
 # This is required for Pydantic to validate TelemetrySchema in HarnessResult
 def _rebuild_models() -> None:
+    """Rebuild Pydantic models to resolve forward references."""
     try:
         from bench.telemetry import TelemetrySchema
 
+        _ = TelemetrySchema  # reference to satisfy linters
         HarnessResult.model_rebuild()
     except ImportError:
         # TelemetrySchema may not be available during initial import

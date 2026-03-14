@@ -38,6 +38,7 @@ from rich.panel import Panel
 from rich.progress import BarColumn, Progress, SpinnerColumn, TaskProgressColumn, TextColumn
 from rich.table import Table
 
+from bench.provider import get_env_var
 from task_generator import TaskGenerator, TaskQualityGate, TestingTask
 
 console = Console()
@@ -58,8 +59,6 @@ class PackageCloneError(Exception):
 
 def clone_package(owner: str, package_name: str, packages_dir: Path) -> Path:
     """Clone an R package from GitHub if not already present."""
-    import os
-
     package_path = packages_dir / package_name
 
     if package_path.exists():
@@ -76,7 +75,7 @@ def clone_package(owner: str, package_name: str, packages_dir: Path) -> Path:
     packages_dir.mkdir(parents=True, exist_ok=True)
 
     # Use GitHub token if available for authentication
-    github_token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GITHUB_PAT")
+    github_token = get_env_var("GITHUB_TOKEN") or get_env_var("GITHUB_PAT")
     if github_token:
         repo_url = f"https://{github_token}@github.com/{owner}/{package_name}.git"
     else:

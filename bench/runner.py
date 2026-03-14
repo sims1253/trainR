@@ -44,6 +44,7 @@ def run(
     workers: int | None = None,
     dry_run: bool = False,
     validate_only: bool = False,
+    progress_callback: Any = None,
     **kwargs: Any,
 ) -> ManifestV1:
     """
@@ -65,10 +66,19 @@ def run(
             executing any tasks. Returns a minimal manifest with setup info.
         validate_only: If True, only validate the configuration without
             setting up or running anything. Returns an empty manifest.
+        progress_callback: Optional callback function that receives progress updates
+            during experiment execution. Called with a dict containing:
+            - type: "start" or "result"
+            - For "start": total_runs, models, task_count
+            - For "result": model, task_id, passed, tokens, latency_s
         **kwargs: Additional override options. Supported keys:
             - timeout: Override per-task timeout in seconds
             - repeats: Override number of task repeats
             - save_trajectories: Override trajectory saving setting
+            - save_container_logs: Persist raw container stdout/stderr logs
+            - provider_parallel_limits: Override per-provider concurrency caps
+            - provider_min_interval_s: Override per-provider run-start spacing
+            - provider_max_requests_per_second: Override per-provider run-start rate cap
 
     Returns:
         ManifestV1 with run results and metadata. Contains:
@@ -133,7 +143,7 @@ def run(
         return _create_dry_run_manifest(experiment_config)
 
     # Create runner and execute
-    runner = ExperimentRunner(experiment_config)
+    runner = ExperimentRunner(experiment_config, progress_callback=progress_callback)
 
     # Setup phase
     logger.info("Setting up experiment...")
@@ -177,11 +187,22 @@ def _apply_overrides(
         ValueError: If unknown override keys are provided
     """
     # Validate kwargs - only known override keys are allowed
-    KNOWN_OVERRIDES = {"timeout", "repeats", "save_trajectories"}
-    unknown = set(kwargs.keys()) - KNOWN_OVERRIDES
+    known_overrides = {
+        "timeout",
+        "repeats",
+        "save_trajectories",
+        "save_container_logs",
+        "provider_parallel_limits",
+        "provider_min_interval_s",
+        "provider_max_requests_per_second",
+    }
+    unknown = set(kwargs.keys()) - known_overrides
     if unknown:
         raise ValueError(
-            f"Unknown override keys: {unknown}. Supported: timeout, repeats, save_trajectories"
+            "Unknown override keys: "
+            f"{unknown}. Supported: timeout, repeats, save_trajectories, "
+            "save_container_logs, provider_parallel_limits, "
+            "provider_min_interval_s, provider_max_requests_per_second"
         )
 
     # Create a copy to avoid mutating the original
@@ -212,6 +233,33 @@ def _apply_overrides(
     if "save_trajectories" in kwargs:
         config_data["execution"]["save_trajectories"] = kwargs["save_trajectories"]
         logger.debug(f"Override: save_trajectories = {kwargs['save_trajectories']}")
+
+    if "save_container_logs" in kwargs:
+        config_data["execution"]["save_container_logs"] = kwargs["save_container_logs"]
+        logger.debug(f"Override: save_container_logs = {kwargs['save_container_logs']}")
+
+    if "provider_parallel_limits" in kwargs:
+        config_data["execution"]["provider_parallel_limits"] = kwargs["provider_parallel_limits"]
+        logger.debug(
+            "Override: provider_parallel_limits = %s",
+            kwargs["provider_parallel_limits"],
+        )
+
+    if "provider_min_interval_s" in kwargs:
+        config_data["execution"]["provider_min_interval_s"] = kwargs["provider_min_interval_s"]
+        logger.debug(
+            "Override: provider_min_interval_s = %s",
+            kwargs["provider_min_interval_s"],
+        )
+
+    if "provider_max_requests_per_second" in kwargs:
+        config_data["execution"]["provider_max_requests_per_second"] = kwargs[
+            "provider_max_requests_per_second"
+        ]
+        logger.debug(
+            "Override: provider_max_requests_per_second = %s",
+            kwargs["provider_max_requests_per_second"],
+        )
 
     return ExperimentConfig.from_dict(config_data)
 

@@ -1,0 +1,54 @@
+{
+  "task_id": "kaggle_santander-customer-transaction-prediction_nothing-works",
+  "source": {
+    "type": "kaggle_kernel",
+    "competition": "https://www.kaggle.com/competitions/santander-customer-transaction-prediction",
+    "competition_title": "Santander Customer Transaction Prediction",
+    "kernel_slug": "nothing-works",
+    "kernel_ref": "brandenkmurray/nothing-works",
+    "author": "brandenkmurray",
+    "votes": 368,
+    "url": "https://www.kaggle.com/code/brandenkmurray/nothing-works",
+    "language": "r",
+    "kernel_type": "script"
+  },
+  "problem_statement": {
+    "title": "Santander Customer Transaction Prediction",
+    "description": "Can you identify who will make a transaction?",
+    "evaluation_metric": "Area Under Receiver Operating Characteristic Curve",
+    "problem_type": "unknown",
+    "instruction": "Complete the Santander Customer Transaction Prediction competition task.",
+    "context": "Can you identify who will make a transaction?"
+  },
+  "grading": {
+    "metric": "Area Under Receiver Operating Characteristic Curve",
+    "metric_description": "Can you identify who will make a transaction?",
+    "problem_type": "classification",
+    "competition_slug": "santander-customer-transaction-prediction",
+    "data_available": true,
+    "grading_method": "metric",
+    "baseline_score": null
+  },
+  "reference_solution": {
+    "code": "library(data.table)\nlibrary(lightgbm)\nlibrary(caret)\n\nLGB_CV_Predict <- function(lgb_cv, data, num_iteration = NULL, folds=NULL, type=c(\"cv\", \"test\")) {\n  require(foreach)\n  if (is.null(num_iteration)) {\n    num_iteration <- lgb_cv$best_iter\n  }\n  if (type==\"cv\"){\n    print(\"create cross validation predictions\")\n    pred_mat <- foreach::foreach(i = seq_along(lgb_cv$boosters), .combine = \"c\", .packages=c(\"data.table\",\"lightgbm\")) %do% {\n      lgb_tree <- lgb_cv$boosters[[i]][[1]]\n      predict(lgb_tree, \n              data[folds[[i]],], \n              num_iteration = num_iteration, \n              rawscore = FALSE, predleaf = FALSE, header = FALSE, reshape = FALSE)\n    }\n    \n    as.double(pred_mat)[order(unlist(folds))]\n    \n  } else if (type==\"test\"){\n    print(\"create test set predictions\")\n    pred_mat <- foreach::foreach(i = seq_along(lgb_cv$boosters), .combine = \"+\", .packages=c(\"data.table\",\"lightgbm\")) %do% {\n      lgb_tree <- lgb_cv$boosters[[i]][[1]]\n      predict(lgb_tree, \n              data, \n              num_iteration = lgb_cv$best_iter, \n              rawscore = FALSE, predleaf = FALSE, header = FALSE, reshape = FALSE)\n    }\n    as.double(pred_mat)/length(lgb_cv$boosters)\n  }\n}\n\n\nt1 <- fread(\"../input/train.csv\")\ns1 <- fread(\"../input/test.csv\")\nt1[,filter:=0]\ns1[,\":=\"(target=-1,\n         filter=2)]\n\nts1 <- rbind(t1, s1)\nset.seed(500)\ncvFoldsList <- createFolds(ts1[filter==0, target], k=10)\n\nvarnames <- setdiff(colnames(ts1), c(\"ID_code\",\"target\", \"filter\"))\ndtrain <- lgb.Dataset(data.matrix(ts1[filter==0,varnames,with=F]), label=ts1[filter==0, target], free_raw_data = FALSE)\n\nparams <- list(objective = \"binary\", \n               boost=\"gbdt\",\n               metric=\"auc\",\n               boost_from_average=\"false\",\n               num_threads=28,\n               learning_rate = 0.01,\n               num_leaves = 13,\n               max_depth=-1,\n               tree_learner = \"serial\",\n               feature_fraction = 0.05,\n               bagging_freq = 5,\n               bagging_fraction = 0.4,\n               min_data_in_leaf = 80,\n               min_sum_hessian_in_leaf = 10.0,\n               verbosity = 1)\n\ntme <- Sys.time()\nlgb1 <- lgb.cv(params,\n               dtrain,\n               nrounds=1000000,\n               folds=cvFoldsList,\n               early_stopping_rounds = 3000,\n               eval_freq=1000,\n               seed=44000)\nSys.time() - tme\n\ntest_preds <- LGB_CV_Predict(lgb1, data.matrix(ts1[filter==2, varnames, with=F]), type=\"test\")\ndt <- data.table(ID_code=ts1[filter==2, ID_code], target=test_preds)\nfwrite(dt, \"./submission.csv\")\n\n\n\n\n",
+    "format": "r_script",
+    "key_techniques": []
+  },
+  "metadata": {
+    "task_type": "feature_impl",
+    "difficulty": "medium",
+    "quality_score": 5,
+    "mined_at": "2026-02-27T00:23:21.079649+00:00",
+    "competition_type": null,
+    "tags": [
+      "banking",
+      "tabular",
+      "binary classification",
+      "auc"
+    ],
+    "evaluation_criteria": "Area Under Receiver Operating Characteristic Curve",
+    "key_techniques": [],
+    "potential_improvements": [],
+    "code_format": "r_script"
+  }
+}

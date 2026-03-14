@@ -44,15 +44,25 @@ def run_preflight(
     required_providers = set()
 
     for model in models:
-        model_info = resolver.get_model_info(model)
-        if model_info:
-            required_providers.add(model_info.provider)
-        else:
-            result.warnings.append(f"Unknown model: {model}")
+        try:
+            model_info = resolver.get_model_info(model)
+        except KeyError:
+            if strict:
+                result.errors.append(f"Unknown model: {model}")
+                result.is_valid = False
+            else:
+                result.warnings.append(f"Unknown model: {model}")
+            continue
+        required_providers.add(model_info.provider)
 
     # Validate credentials for each provider
     for provider in required_providers:
-        api_key_env = resolver.get_api_key_env(provider)
+        try:
+            api_key_env = resolver.get_api_key_env(provider)
+        except KeyError:
+            result.warnings.append(f"No API key mapping for provider: {provider}")
+            continue
+
         if not api_key_env:
             result.warnings.append(f"No API key mapping for provider: {provider}")
             continue
@@ -86,8 +96,9 @@ def validate_model_provider_config(model: str, provider: str | None = None) -> P
     resolver = get_provider_resolver()
 
     # Check model is known
-    model_info = resolver.get_model_info(model)
-    if not model_info:
+    try:
+        model_info = resolver.get_model_info(model)
+    except KeyError:
         result.errors.append(f"Unknown model: {model}")
         result.is_valid = False
         return result

@@ -45,10 +45,17 @@ ENV PATH="/home/trainr/.bun/bin:${PATH}"
 # ── Layer 6: Pi CLI (pinned version) ───────────────────────────────────────
 # Install Pi CLI globally with pinned version for reproducibility
 USER trainr
-RUN /home/trainr/.bun/bin/bun install -g @mariozechner/pi-coding-agent@0.54.1
+RUN /home/trainr/.bun/bin/bun install -g @mariozechner/pi-coding-agent@0.56
 USER root
 
-# ── Layer 7: Workspace + entrypoint (changes most often) ───────────────────
+COPY docker/models.json /home/trainr/models.json
+
+# ── Layer 7: Pi tool trace extension ───────────────────────────────────────
+# Install extension for logging tool execution events to stdout
+COPY docker/pi-tool-trace-extension.ts /opt/pi-extensions/pi-tool-trace-extension.ts
+RUN chmod 644 /opt/pi-extensions/pi-tool-trace-extension.ts
+
+# ── Layer 8: Workspace + entrypoint (changes most often) ───────────────────
 ENV PATH="/home/trainr/.local/bin:${PATH}"
 
 COPY docker/entrypoint.sh /entrypoint.sh

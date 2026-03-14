@@ -1,7 +1,6 @@
 """GEPA adapter for skill optimization."""
 
 import logging
-import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, Literal
@@ -12,6 +11,7 @@ from gepa.optimize_anything import EngineConfig, GEPAConfig, ReflectionConfig
 
 from config import get_llm_config
 from evaluation import DockerPiRunnerConfig, EvaluationSandbox
+from evaluation.sandbox import get_required_api_key
 from task_generator.models import TestingTask
 
 logger = logging.getLogger(__name__)
@@ -298,11 +298,27 @@ def optimize_skill(
     """
     config = get_llm_config()
 
-    if not os.environ.get("OPENROUTER_API_KEY"):
-        raise ValueError("OPENROUTER_API_KEY not set in environment.")
-
     if reflection_lm is None:
         reflection_lm = config.reflection
+
+    # Validate credentials for all models used by optimization.
+    models_to_check = {reflection_lm}
+    if models and len(models) > 0:
+        models_to_check.update(models)
+    else:
+        models_to_check.add(model)
+
+    missing_keys: list[tuple[str, str]] = []
+    for model_name in sorted(models_to_check):
+        env_var, api_key = get_required_api_key(model_name)
+        if env_var and not api_key:
+            missing_keys.append((model_name, env_var))
+
+    if missing_keys:
+        missing_detail = ", ".join(
+            f"{model_name} -> {env_var}" for model_name, env_var in missing_keys
+        )
+        raise ValueError(f"Missing required API key(s): {missing_detail}")
 
     # Create evaluator(s)
     if models and len(models) > 1:

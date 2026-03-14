@@ -285,6 +285,7 @@ def load_tasks(config: ExperimentConfig) -> list[TaskSpec]:
                         "split": data.get("split", "custom"),
                         "difficulty": data.get("difficulty", "unknown"),
                         "task_type": data.get("task_type", "unknown"),
+                        "task_path": str(path),
                         **data,
                     },
                 )()

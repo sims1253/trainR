@@ -1,0 +1,46 @@
+# First benchmark variant without z.ai dependency.
+# Goal: quick auth/throughput validation while z.ai OIDC requirements are unresolved.
+
+name: "first_benchmark_no_zai"
+description: "Single-task benchmark across OpenRouter and OpenCode"
+schema_version: "1.0"
+
+models:
+  names:
+    - gpt-oss-120b   # openrouter
+    - gpt-5-nano     # opencode
+
+tasks:
+  selection: "task_id"
+  task_id: "task-c742880b"
+  dir: "tasks"
+
+skill:
+  no_skill: true
+
+execution:
+  harness: "pi_docker"
+  sandbox_profile: "networked"
+  auth_policy: "env"
+  timeout: 900
+  docker_image: "posit-gskill-eval:latest"
+  repeats: 1
+  parallel_workers: 2
+  provider_parallel_limits:
+    openrouter: 1
+    opencode: 1
+  save_trajectories: true
+  save_traces: false
+
+retry:
+  strategy: "none"
+  max_retries: 0
+
+output:
+  dir: "results/experiments"
+  save_intermediate: true
+
+determinism:
+  seed: 42
+  freeze_model_resolution: true
+  freeze_config: true

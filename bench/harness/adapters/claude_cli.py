@@ -52,9 +52,11 @@ class ClaudeCliHarness(CliHarnessBase):
     def parse_output(self, output: str, request: HarnessRequest) -> HarnessResult:
         """Parse Claude CLI output."""
         run_id = str(uuid.uuid4())
+        model_name = request.metadata.get("model") or self.config.model
 
         try:
             data = json.loads(output)
+            model_name = data.get("model") or model_name
 
             # Extract test results from Claude's output
             test_results = []
@@ -89,6 +91,7 @@ class ClaudeCliHarness(CliHarnessBase):
                 test_results=test_results,
                 error_message=data.get("error"),
                 error_category=ErrorCategory.NONE if success else ErrorCategory.TASK_ERROR,
+                model=model_name,
                 metadata={"score": score, "raw_response": data},
             )
         except json.JSONDecodeError:
@@ -104,4 +107,5 @@ class ClaudeCliHarness(CliHarnessBase):
                 success=passed,
                 output=output,
                 error_category=ErrorCategory.NONE if passed else ErrorCategory.TASK_ERROR,
+                model=model_name,
             )

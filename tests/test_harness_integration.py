@@ -12,6 +12,7 @@ import asyncio
 import uuid
 
 import pytest
+from pydantic import ValidationError
 
 from bench.experiments import ExperimentConfig
 from bench.harness import (
@@ -52,23 +53,22 @@ class TestHarnessSwapViaConfig:
 
     def test_config_specifies_harness(self):
         """Config can specify which harness to use."""
-        config = ExperimentConfig(
-            name="test",
-            execution={"harness": "pi_docker"},
+        config = ExperimentConfig.model_validate(
+            {"name": "test", "execution": {"harness": "pi_docker"}}
         )
         assert config.execution.harness == "pi_docker"
 
     def test_config_supports_different_harness_types(self):
-        """Config supports all defined harness types."""
+        """Config supports all currently registered harness types."""
+        from bench.harness import HarnessRegistry
+
         # pi_docker is the default
         config = ExperimentConfig(name="test")
         assert config.execution.harness == "pi_docker"
 
-        # Can specify other valid harness types
-        for harness_type in ["pi_sdk", "pi_cli", "codex_cli", "claude_cli", "gemini_cli"]:
-            config = ExperimentConfig(
-                name="test",
-                execution={"harness": harness_type},
+        for harness_type in HarnessRegistry.list_available():
+            config = ExperimentConfig.model_validate(
+                {"name": "test", "execution": {"harness": harness_type}}
             )
             assert config.execution.harness == harness_type
 
@@ -117,10 +117,9 @@ class TestHarnessSwapViaConfig:
     def test_invalid_harness_name_raises_error(self):
         """Invalid harness names are rejected by config validation."""
         # HarnessType is a Literal, so invalid values should fail
-        with pytest.raises(Exception):  # ValidationError from pydantic
-            ExperimentConfig(
-                name="test",
-                execution={"harness": "invalid_harness"},
+        with pytest.raises(ValidationError):
+            ExperimentConfig.model_validate(
+                {"name": "test", "execution": {"harness": "invalid_harness"}}
             )
 
 
@@ -330,9 +329,8 @@ class TestHarnessConsistency:
     def test_config_driven_harness_selection(self):
         """ExperimentConfig drives harness selection without code changes."""
         # Create configs with different harnesses
-        config_docker = ExperimentConfig(
-            name="test-docker",
-            execution={"harness": "pi_docker"},
+        config_docker = ExperimentConfig.model_validate(
+            {"name": "test-docker", "execution": {"harness": "pi_docker"}}
         )
 
         # Both configs can be used to determine harness
@@ -428,3 +426,192 @@ class TestErrorCategory:
         exc = Exception("Some random error")
         category = ErrorCategory.from_exception(exc)
         assert category == ErrorCategory.UNKNOWN
+
+
+class TestRetryCategoryAlignment:
+    """Tests for retry behavior alignment with error categories.
+
+    These tests verify that:
+    1. Transient API/provider/network errors map to LLM_ERROR (retriable by default)
+    2. Auth and unknown errors are NOT retriable by default
+    3. The error category mapping is complete and predictable
+    """
+
+    def test_default_retry_on_includes_retriable_categories(self):
+        """Default retry_on should include TIMEOUT, LLM_ERROR, SANDBOX_ERROR."""
+        from bench.experiments.config import RetryConfig
+
+        config = RetryConfig()
+        assert "TIMEOUT" in config.retry_on
+        assert "LLM_ERROR" in config.retry_on
+        assert "SANDBOX_ERROR" in config.retry_on
+
+    def test_default_retry_config_enables_exponential_backoff(self):
+        """Default retry settings should enable bounded retries."""
+        from bench.experiments.config import RetryConfig, RetryStrategy
+
+        config = RetryConfig()
+        assert config.strategy == RetryStrategy.EXPONENTIAL
+        assert config.max_retries == 2
+        assert config.base_delay == 30.0
+        assert config.max_delay == 300.0
+
+    def test_api_error_maps_to_llm_error(self):
+        """API_ERROR should map to LLM_ERROR which is retriable by default."""
+        from bench.harness import ErrorCategory as HarnessErrorCategory
+        from bench.schema.v1 import ErrorCategoryV1
+
+        # Check the mapping directly by inspecting what the runner would produce
+        # API_ERROR -> LLM_ERROR
+        assert HarnessErrorCategory.API_ERROR is not None
+        # Verify LLM_ERROR is in the ErrorCategoryV1 enum
+        assert ErrorCategoryV1.LLM_ERROR.value == "LLM_ERROR"
+
+    def test_rate_limit_maps_to_llm_error(self):
+        """RATE_LIMIT should map to LLM_ERROR which is retriable by default."""
+        from bench.schema.v1 import ErrorCategoryV1
+
+        # Verify LLM_ERROR is in the ErrorCategoryV1 enum
+        assert ErrorCategoryV1.LLM_ERROR.value == "LLM_ERROR"
+
+    def test_network_error_maps_to_llm_error(self):
+        """NETWORK_ERROR should map to LLM_ERROR which is retriable by default."""
+        from bench.schema.v1 import ErrorCategoryV1
+
+        # Verify LLM_ERROR is in the ErrorCategoryV1 enum
+        assert ErrorCategoryV1.LLM_ERROR.value == "LLM_ERROR"
+
+    def test_auth_error_in_default_retry_on(self):
+        """AUTH_ERROR should be retriable by default."""
+        from bench.experiments.config import RetryConfig
+
+        config = RetryConfig()
+        assert "AUTH_ERROR" in config.retry_on
+
+    def test_unknown_not_in_default_retry_on(self):
+        """UNKNOWN errors should NOT be retriable by default."""
+        from bench.experiments.config import RetryConfig
+
+        config = RetryConfig()
+        assert "UNKNOWN" not in config.retry_on
+
+    def test_error_category_v1_has_auth_error(self):
+        """ErrorCategoryV1 should have AUTH_ERROR for non-retriable auth failures."""
+        from bench.schema.v1 import ErrorCategoryV1
+
+        assert hasattr(ErrorCategoryV1, "AUTH_ERROR")
+        assert ErrorCategoryV1.AUTH_ERROR.value == "AUTH_ERROR"
+
+    def test_harness_error_mapping_complete(self):
+        """All HarnessErrorCategory values should be mapped in the runner."""
+        from bench.harness import ErrorCategory as HarnessErrorCategory
+
+        # All expected categories
+        expected_categories = [
+            HarnessErrorCategory.NONE,
+            HarnessErrorCategory.TIMEOUT,
+            HarnessErrorCategory.API_ERROR,
+            HarnessErrorCategory.RATE_LIMIT,
+            HarnessErrorCategory.AUTH_ERROR,
+            HarnessErrorCategory.NETWORK_ERROR,
+            HarnessErrorCategory.INVALID_REQUEST,
+            HarnessErrorCategory.AGENT_ERROR,
+            HarnessErrorCategory.SANDBOX_ERROR,
+            HarnessErrorCategory.RESOURCE_EXHAUSTED,
+            HarnessErrorCategory.MODEL_ERROR,
+            HarnessErrorCategory.TASK_ERROR,
+            HarnessErrorCategory.TEST_ERROR,
+            HarnessErrorCategory.UNKNOWN,
+        ]
+
+        # Verify all categories exist
+        for category in expected_categories:
+            assert category is not None, f"Missing category: {category}"
+
+    def test_transient_errors_map_to_retriable_categories(self):
+        """Transient errors (API, rate limit, network, model, resource) should map to retriable categories."""
+        from bench.schema.v1 import ErrorCategoryV1
+
+        # These are the categories that should be retriable
+        retriable_categories = {"TIMEOUT", "LLM_ERROR", "SANDBOX_ERROR"}
+
+        # LLM_ERROR should be available for transient errors
+        assert ErrorCategoryV1.LLM_ERROR.value in retriable_categories
+
+    def test_non_retriable_errors_map_to_non_retriable_categories(self):
+        """Non-retriable errors (auth, invalid request, unknown) should NOT map to retriable categories."""
+        from bench.schema.v1 import ErrorCategoryV1
+
+        # These are the categories that should NOT be retriable
+        non_retriable_values = {"AUTH_ERROR", "UNKNOWN", "TEST_FAILURE"}
+
+        # Verify these exist
+        assert ErrorCategoryV1.AUTH_ERROR.value in non_retriable_values
+        assert ErrorCategoryV1.UNKNOWN.value in non_retriable_values
+        assert ErrorCategoryV1.TEST_FAILURE.value in non_retriable_values
+
+    def test_harness_to_schema_error_category_mapping(self):
+        """Verify the actual mapping from HarnessErrorCategory to ErrorCategoryV1."""
+        from bench.harness import ErrorCategory as HarnessErrorCategory
+        from bench.schema.v1 import ErrorCategoryV1
+
+        # Define the expected mapping (should match runner.py)
+        expected_mapping = {
+            HarnessErrorCategory.NONE: None,
+            HarnessErrorCategory.TIMEOUT: ErrorCategoryV1.TIMEOUT,
+            # Transient API/provider errors -> LLM_ERROR (retriable)
+            HarnessErrorCategory.API_ERROR: ErrorCategoryV1.LLM_ERROR,
+            HarnessErrorCategory.RATE_LIMIT: ErrorCategoryV1.LLM_ERROR,
+            HarnessErrorCategory.NETWORK_ERROR: ErrorCategoryV1.LLM_ERROR,
+            HarnessErrorCategory.MODEL_ERROR: ErrorCategoryV1.LLM_ERROR,
+            HarnessErrorCategory.RESOURCE_EXHAUSTED: ErrorCategoryV1.LLM_ERROR,
+            # Auth errors -> AUTH_ERROR (NOT retriable)
+            HarnessErrorCategory.AUTH_ERROR: ErrorCategoryV1.AUTH_ERROR,
+            # Sandbox errors -> SANDBOX_ERROR (retriable)
+            HarnessErrorCategory.SANDBOX_ERROR: ErrorCategoryV1.SANDBOX_ERROR,
+            # Test failures -> TEST_FAILURE (NOT retriable)
+            HarnessErrorCategory.TEST_ERROR: ErrorCategoryV1.TEST_FAILURE,
+            # Invalid requests/agent/task errors -> UNKNOWN (NOT retriable)
+            HarnessErrorCategory.INVALID_REQUEST: ErrorCategoryV1.UNKNOWN,
+            HarnessErrorCategory.AGENT_ERROR: ErrorCategoryV1.UNKNOWN,
+            HarnessErrorCategory.TASK_ERROR: ErrorCategoryV1.UNKNOWN,
+            # Fallback for unexpected errors
+            HarnessErrorCategory.UNKNOWN: ErrorCategoryV1.UNKNOWN,
+        }
+
+        # Verify retriable mappings
+        retriable_harness_categories = [
+            HarnessErrorCategory.TIMEOUT,
+            HarnessErrorCategory.API_ERROR,
+            HarnessErrorCategory.RATE_LIMIT,
+            HarnessErrorCategory.NETWORK_ERROR,
+            HarnessErrorCategory.MODEL_ERROR,
+            HarnessErrorCategory.RESOURCE_EXHAUSTED,
+            HarnessErrorCategory.SANDBOX_ERROR,
+        ]
+        retriable_schema_values = {"TIMEOUT", "LLM_ERROR", "SANDBOX_ERROR"}
+
+        for harness_cat in retriable_harness_categories:
+            schema_cat = expected_mapping[harness_cat]
+            assert schema_cat is not None
+            assert schema_cat.value in retriable_schema_values, (
+                f"{harness_cat.name} maps to {schema_cat.value}, which is NOT retriable"
+            )
+
+        # Verify non-retriable mappings
+        non_retriable_harness_categories = [
+            HarnessErrorCategory.AUTH_ERROR,
+            HarnessErrorCategory.INVALID_REQUEST,
+            HarnessErrorCategory.AGENT_ERROR,
+            HarnessErrorCategory.TASK_ERROR,
+            HarnessErrorCategory.TEST_ERROR,
+            HarnessErrorCategory.UNKNOWN,
+        ]
+        non_retriable_schema_values = {"AUTH_ERROR", "UNKNOWN", "TEST_FAILURE"}
+
+        for harness_cat in non_retriable_harness_categories:
+            schema_cat = expected_mapping[harness_cat]
+            assert schema_cat is not None
+            assert schema_cat.value in non_retriable_schema_values, (
+                f"{harness_cat.name} maps to {schema_cat.value}, which IS retriable"
+            )

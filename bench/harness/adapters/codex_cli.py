@@ -49,10 +49,12 @@ class CodexCliHarness(CliHarnessBase):
     def parse_output(self, output: str, request: HarnessRequest) -> HarnessResult:
         """Parse Codex CLI output."""
         run_id = str(uuid.uuid4())
+        model_name = request.metadata.get("model") or self.config.model
 
         # Parse JSON output if available
         try:
             data = json.loads(output)
+            model_name = data.get("model") or model_name
 
             # Extract test results
             test_results = []
@@ -83,6 +85,7 @@ class CodexCliHarness(CliHarnessBase):
                 test_results=test_results,
                 error_message=data.get("error"),
                 error_category=ErrorCategory.NONE if success else ErrorCategory.TASK_ERROR,
+                model=model_name,
                 metadata={"score": score, "raw_response": data},
             )
         except json.JSONDecodeError:
@@ -94,4 +97,5 @@ class CodexCliHarness(CliHarnessBase):
                 success=passed,
                 output=output,
                 error_category=ErrorCategory.NONE if passed else ErrorCategory.TASK_ERROR,
+                model=model_name,
             )

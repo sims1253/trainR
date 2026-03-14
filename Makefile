@@ -8,7 +8,7 @@
 # 1. BENCHMARK: Evaluate a skill on tasks
 # =============================================================================
 
-# Usage: make benchmark [CONFIG=configs/experiments/r_bench_smoke.yaml]
+# Usage: make benchmark [CONFIG=configs/experiments/first_benchmark.yaml]
 #       make benchmark-smoke  # Quick test with smoke config
 #       make benchmark-all    # Full benchmark run
 #
@@ -20,7 +20,7 @@
 #   --validate       Validate config without running
 #   --dry-run        Show experiment matrix without running
 #   --verbose        Enable verbose output
-CONFIG ?= configs/experiments/r_bench_smoke.yaml
+CONFIG ?= configs/experiments/first_benchmark.yaml
 
 benchmark:
 	@echo "=== BENCHMARK: $(CONFIG) ==="
