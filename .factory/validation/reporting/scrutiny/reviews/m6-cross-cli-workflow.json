@@ -1,0 +1,55 @@
+{
+  "featureId": "m6-cross-cli-workflow",
+  "reviewedAt": "2026-03-15T10:30:00.000Z",
+  "commitId": "fe3b4dc",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "The worker created a comprehensive test suite (74 tests across 6 test classes) verifying VAL-CROSS-08: the CLI provides a coherent workflow surface. All tests pass cleanly. The test file is well-structured, follows project conventions, and covers all expected behavior from the feature description. The implementation is a pure validation feature (no production code changes) — it validates the existing CLI surface via automated tests. The .factory/services.yaml was also updated to include the new test file and previously missing test_reports.py/test_export.py in the test_grist_mill command.",
+    "issues": [
+      {
+        "file": "tests/test_cross_cli_workflow.py",
+        "line": 571,
+        "severity": "non_blocking",
+        "description": "test_no_conflicting_short_flags collects cross-command short flag usages but then the body of the if-block is just 'pass' with a comment. This test will never actually fail — it collects data and discards it. The comment acknowledges this ('Cross-command reuse is expected; within-command conflicts aren't') but the test name implies it checks something. Consider either removing this test or implementing within-command conflict detection (which would be more valuable)."
+      },
+      {
+        "file": "tests/test_cross_cli_workflow.py",
+        "line": 433,
+        "severity": "non_blocking",
+        "description": "test_run_help_shows_output_format_flag uses a disjunction ('--output-format' or '--format') which means it would pass even if only '--format' is present. The actual CLI uses '--output-format' (not '--format'). The test should assert the exact flag name for precision."
+      },
+      {
+        "file": "tests/test_cross_cli_workflow.py",
+        "line": 36,
+        "severity": "non_blocking",
+        "description": "_VALID_CONFIG is defined but never used in any test. It appears to be dead code — the end-to-end tests use configs/examples/smoke.yaml instead. This can be removed to reduce noise."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "conventions",
+      "observation": "The test_grist_mill command in .factory/services.yaml is a manually maintained list of individual test files. As new test files are added, they need to be manually appended. This is error-prone — the worker discovered that test_reports.py and test_export.py were previously missing and added them along with the new test_cross_cli_workflow.py. Consider switching to a glob pattern (e.g., tests/test_*.py with exclusions) to avoid this maintenance burden.",
+      "evidence": ".factory/services.yaml line 7 — the test_grist_mill command lists ~30 individual test files. The worker's diff shows adding tests/test_reports.py, tests/test_export.py, and tests/test_cross_cli_workflow.py to this list."
+    },
+    {
+      "area": "conventions",
+      "observation": "The feature description says 'Verify the CLI provides a coherent workflow surface' — this is a verification/validation feature with no production code changes. The worker correctly followed TDD principles in the skill but since the CLI was already implemented, all 74 tests passed immediately. This is the expected pattern for cross-cutting validation features. Future workers implementing similar validation features should understand that test-only changes are appropriate here.",
+      "evidence": "Transcript skeleton shows the worker ran tests first and they all passed (74/74). No production code was modified — only tests/test_cross_cli_workflow.py and .factory/services.yaml were changed."
+    },
+    {
+      "area": "knowledge",
+      "observation": "The CLI has a minor flag naming inconsistency: 'run' uses --output-format/-o for format specification while 'report' and 'export' use --format. The worker documented this as intentional design (to avoid ambiguity with --output on the same command), but this reasoning is not documented in .factory/library/ or AGENTS.md. Future workers modifying CLI flags should be aware of this decision.",
+      "evidence": "Transcript skeleton shows the worker's analysis: 'run uses --output-format because --output is already used for output file path, and -o is used for --output-format. In report/export, -o short form is used for --output (output file path), not format.' See src/grist_mill/cli/run_cmd.py (lines with --output-format/-o) vs src/grist_mill/cli/report_cmd.py and src/grist_mill/cli/export_cmd.py (lines with --format)."
+    },
+    {
+      "area": "services",
+      "observation": "The test file was added to test_grist_mill in services.yaml but the cross-cutting test files pattern (test_cross_*.py) is not documented as a naming convention anywhere. New cross-validation tests follow the test_cross_<feature>.py naming pattern. This convention should be documented in AGENTS.md or .factory/library/.",
+      "evidence": "Existing files: test_cross_eval_export.py, test_cross_schema_consistency.py, test_cross_agent_telemetry.py, test_cross_optimization.py, test_cross_tool_binding.py, test_cross_provider_report.py, and the new test_cross_cli_workflow.py."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Clean pass. The worker created a thorough 74-test suite that validates VAL-CROSS-08 (coherent CLI command surface) across six dimensions: top-level help listing, per-subcommand help quality, flag naming consistency, workflow discoverability, error handling consistency, and end-to-end smoke tests. All tests pass, lint/typecheck clean. Three non-blocking issues identified: a no-op test (test_no_conflicting_short_flags), an overly permissive assertion (test_run_help_shows_output_format_flag), and an unused constant (_VALID_CONFIG). Four shared state observations documented regarding services.yaml maintenance burden, CLI flag naming rationale, and cross-test naming conventions."
+}

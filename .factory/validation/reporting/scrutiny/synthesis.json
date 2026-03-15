@@ -1,0 +1,185 @@
+{
+  "milestone": "reporting",
+  "round": 1,
+  "status": "pass",
+  "validatorsRun": {
+    "test": {
+      "passed": true,
+      "command": "uv run pytest -m \"not integration_local and not integration_provider\" -x -q",
+      "exitCode": 0,
+      "observation": "1264 passed, 1 skipped in 70.95s"
+    },
+    "typecheck": {
+      "passed": true,
+      "command": "uv run ty check .",
+      "exitCode": 0,
+      "observation": "109 warnings (all non-blocking), 0 errors. Warnings include invalid-argument-type in test files, unresolved-attribute on BaseAgent.max_turns, unresolved-import for pandas, and not-subscriptable on Optional returns. All in test code, not production code."
+    },
+    "lint": {
+      "passed": true,
+      "command": "uv run ruff check .",
+      "exitCode": 0,
+      "observation": "All checks passed."
+    }
+  },
+  "reviewsSummary": {
+    "total": 6,
+    "passed": 6,
+    "failed": 0,
+    "failedFeatures": []
+  },
+  "blockingIssues": [],
+  "nonBlockingIssues": [
+    {
+      "featureId": "m6-llm-providers",
+      "severity": "non_blocking",
+      "description": "Dead code: _PROVIDER_ENV_KEYS dict in registry.py is defined but never referenced"
+    },
+    {
+      "featureId": "m6-llm-providers",
+      "severity": "non_blocking",
+      "description": "Implicit httpx dependency via openai package — httpx should be declared directly"
+    },
+    {
+      "featureId": "m6-llm-providers",
+      "severity": "non_blocking",
+      "description": "New httpx.Client created per request (no connection pooling)"
+    },
+    {
+      "featureId": "m6-llm-providers",
+      "severity": "non_blocking",
+      "description": "Pricing database has hardcoded rates 'as of early 2024', several models outdated"
+    },
+    {
+      "featureId": "m6-reporting-and-export",
+      "severity": "non_blocking",
+      "description": "Helper functions duplicated between rollup.py and aggregation.py (DRY violation)"
+    },
+    {
+      "featureId": "m6-reporting-and-export",
+      "severity": "non_blocking",
+      "description": "Custom statistical implementation (chi-squared) could use scipy, but scipy is intentionally not a dependency"
+    },
+    {
+      "featureId": "m6-reporting-and-export",
+      "severity": "non_blocking",
+      "description": "_load_results() duplicated between report_cmd.py and export_cmd.py"
+    },
+    {
+      "featureId": "m6-reporting-and-export",
+      "severity": "non_blocking",
+      "description": "avg_duration_ms computation semantics could be clearer (divides equally among tools)"
+    },
+    {
+      "featureId": "m6-reporting-and-export",
+      "severity": "non_blocking",
+      "description": "HTML export uses string.format() — future string fields could be missed in HTML escaping"
+    },
+    {
+      "featureId": "m6-package-polish",
+      "severity": "non_blocking",
+      "description": "README links to LICENSE file that does not exist in the repository"
+    },
+    {
+      "featureId": "m6-package-polish",
+      "severity": "non_blocking",
+      "description": "Empty 'synthesis' optional dependency group in pyproject.toml — leftover from tree-sitter move"
+    },
+    {
+      "featureId": "m6-cross-cli-workflow",
+      "severity": "non_blocking",
+      "description": "test_no_conflicting_short_flags is a no-op test (body is just 'pass')"
+    },
+    {
+      "featureId": "m6-cross-cli-workflow",
+      "severity": "non_blocking",
+      "description": "test_run_help_shows_output_format_flag uses disjunction that is overly permissive"
+    },
+    {
+      "featureId": "m6-cross-cli-workflow",
+      "severity": "non_blocking",
+      "description": "_VALID_CONFIG constant defined but never used in test_cross_cli_workflow.py"
+    },
+    {
+      "featureId": "m6-cross-multi-provider-aggregation",
+      "severity": "non_blocking",
+      "description": "import io at bottom of file instead of top-level imports section"
+    },
+    {
+      "featureId": "m6-cross-multi-provider-aggregation",
+      "severity": "non_blocking",
+      "description": "test_no_provider_specific_fields_in_report uses exact field matching — brittle if new fields added"
+    },
+    {
+      "featureId": "m6-cross-error-propagation",
+      "severity": "non_blocking",
+      "description": "InterruptibleExperiment uses 'agent: Any' and 'env: Any' consistent with pre-existing Harness pattern"
+    },
+    {
+      "featureId": "m6-cross-error-propagation",
+      "severity": "non_blocking",
+      "description": "SIGTERM handler logs total_tasks as len(self._results) instead of actual total"
+    },
+    {
+      "featureId": "m6-cross-error-propagation",
+      "severity": "non_blocking",
+      "description": "features.json declares fulfills VAL-CROSS-06/VAL-CROSS-11 but tests also cover VAL-CROSS-10"
+    }
+  ],
+  "appliedUpdates": [],
+  "suggestedGuidanceUpdates": [
+    {
+      "target": "AGENTS.md",
+      "suggestion": "Document that 'dict[str, Any]' is an accepted pattern for heterogeneous result/telemetry dicts in reporting and export modules, despite the general guidance to avoid Any types. The type erasure is intentional since these modules process dynamic data from multiple sources.",
+      "evidence": "m6-reporting-and-export and m6-cross-error-propagation reviews both note extensive use of dict[str, Any] in reporting/aggregation/comparison/export code. This is architecturally appropriate for heterogeneous data processing but conflicts with AGENTS.md anti-Any guidance.",
+      "isSystemic": true
+    },
+    {
+      "target": "AGENTS.md",
+      "suggestion": "Document the cross-cutting test naming convention: test_cross_<feature>.py for integration/validation tests that verify behavior across multiple subsystems. This pattern is well-established with 7+ files but not documented.",
+      "evidence": "m6-cross-cli-workflow review identified the naming pattern across test_cross_eval_export.py, test_cross_schema_consistency.py, test_cross_agent_telemetry.py, test_cross_optimization.py, test_cross_tool_binding.py, test_cross_provider_report.py, test_cross_cli_workflow.py, and test_cross_error_propagation.py.",
+      "isSystemic": true
+    },
+    {
+      "target": "AGENTS.md",
+      "suggestion": "Clarify that the harness intentionally runs test commands after agent errors for non-TIMEOUT/SKIPPED statuses — the test result is authoritative over the agent error. Workers writing error propagation tests should know this design decision.",
+      "evidence": "m6-cross-error-propagation review: the worker had to adjust test expectations after discovering agent exception + passing test = SUCCESS. Harness code: should_run_tests = agent_result.status not in (TIMEOUT, SKIPPED).",
+      "isSystemic": false
+    },
+    {
+      "target": ".factory/skills/backend-worker/SKILL.md",
+      "suggestion": "Add a note in TDD procedure that cross-cutting validation features (which verify pre-existing code rather than implementing new code) may skip the 'red phase' since tests will often pass on first run.",
+      "evidence": "Both m6-cross-cli-workflow and m6-cross-multi-provider-aggregation reviews noted this deviation from TDD procedure. Workers correctly identified that validation features test existing code, so tests pass immediately.",
+      "isSystemic": true
+    },
+    {
+      "target": "library",
+      "suggestion": "Document the CLI flag naming inconsistency: 'run' uses --output-format/-o for format specification while 'report' and 'export' use --format. This is intentional (to avoid ambiguity with --output on run), but the rationale is not documented.",
+      "evidence": "m6-cross-cli-workflow review documented that run uses --output-format because --output is already used for output file path. In report/export, -o short form is used for --output (output file path), not format.",
+      "isSystemic": false
+    }
+  ],
+  "rejectedObservations": [
+    {
+      "observation": "Worker scoped type checking to src/grist_mill/providers/ instead of full repo (m6-llm-providers review)",
+      "reason": "already-documented: AGENTS.md already instructs workers to scope ty check to src/grist_mill/ only. The m6-package-polish feature already configured ty.src in pyproject.toml to handle this globally."
+    },
+    {
+      "observation": "Reports and export modules use subpackage structure (reports/, export/) which conflicts with AGENTS.md flat module guidance (m6-reporting-and-export review)",
+      "reason": "already-documented: The AGENTS.md architecture diagram already shows reports/ as a directory. This is an accepted exception for modules with clear internal cohesion."
+    },
+    {
+      "observation": "Worker deviated from skill by moving openai from optional extras to core dependencies (m6-llm-providers review)",
+      "reason": "already-addressed: This was a justified deviation documented by the worker. The openai package is needed for its transitive httpx dependency."
+    },
+    {
+      "observation": "Worker added filterwarnings = ['ignore::DeprecationWarning'] to pytest config (m6-package-polish review)",
+      "reason": "duplicate: This is a minor config addition already in place. Not significant enough to warrant a guidance update."
+    },
+    {
+      "observation": "services.yaml test_grist_mill command uses manually maintained list of test files (m6-cross-cli-workflow review)",
+      "reason": "ambiguous: The test_all command already uses the marker-based pattern. The test_grist_mill manual list exists for a specific subset but maintenance burden is low since the test_all command covers the standard case."
+    }
+  ],
+  "previousRound": null
+}

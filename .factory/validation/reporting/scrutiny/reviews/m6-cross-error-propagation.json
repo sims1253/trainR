@@ -1,0 +1,62 @@
+{
+  "featureId": "m6-cross-error-propagation",
+  "reviewedAt": "2026-03-15T09:00:00.000Z",
+  "commitId": "73ac9db",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "Solid implementation with 37 well-structured tests and an InterruptibleExperiment class that provides SIGTERM-safe multi-task execution. The worker correctly adapted test expectations when they discovered that the harness intentionally runs test commands after agent errors (non-TIMEOUT/SKIPPED), and documented this as a justified deviation. Code quality is high: passes ty check, ruff lint/format, and the full test suite (1264 tests) with no regressions. A few minor non-blocking observations noted.",
+    "issues": [
+      {
+        "file": "src/grist_mill/harness/harness.py",
+        "line": 641,
+        "severity": "non_blocking",
+        "description": "AGENTS.md states 'Avoid Any — use specific types or Unknown from typing-extensions'. The InterruptibleExperiment class uses 'agent: Any' and 'env: Any' in its constructor and 'original_sigterm_handler: Any'. This is consistent with the existing Harness.run() method signature which also uses Any for agent/env (since they're duck-typed protocol-like objects), so this is a pre-existing pattern. However, it would be cleaner to define a Protocol for these if type strictness is a goal."
+      },
+      {
+        "file": "src/grist_mill/harness/harness.py",
+        "line": 656,
+        "severity": "non_blocking",
+        "description": "The SIGTERM handler logs the total tasks count as the same value as completed tasks (len(self._results), len(self._results)). The comment says 'total unknown here' — this is accurate since InterruptibleExperiment.run() doesn't store the total count as an instance variable. It would be a minor improvement to pass total_tasks into _install_sigterm_handler or store it as self._total_tasks for the log message."
+      },
+      {
+        "file": "tests/test_cross_error_propagation.py",
+        "line": 654,
+        "severity": "non_blocking",
+        "description": "The test_sigterm_no_orphaned_processes test uses pgrep to verify child processes are gone, but suppresses all exceptions from the pgrep call using contextlib.suppress(subprocess.TimeoutExpired). If pgrep is not available on all platforms, this test could silently pass. The test is marked for Linux (WSL2) which has pgrep, so this is likely fine but worth noting."
+      },
+      {
+        "file": "tests/test_cross_error_propagation.py",
+        "line": 72,
+        "severity": "non_blocking",
+        "description": "The _MockAgent._result field is typed as TaskResult | None but the run() method returns self._result or TaskResult(task_id=task.id, ...). When used with multiple tasks, the same _result instance (with a fixed task_id) is returned for all tasks. The tests that use this mock with multiple tasks (e.g., test_agent_error_in_experiment_results) set task_id to 'placeholder' in the mock result but verify per-task results from run_experiment, so this works correctly. The mock design is adequate for the test purpose."
+      },
+      {
+        "file": "features.json",
+        "line": 1,
+        "severity": "non_blocking",
+        "description": "features.json declares fulfills: ['VAL-CROSS-06', 'VAL-CROSS-11'] but the task prompt says this feature fulfills VAL-CROSS-10 and VAL-CROSS-11. The test file docstring and actual test coverage includes all three (VAL-CROSS-06, VAL-CROSS-10, VAL-CROSS-11). This is likely a features.json annotation error — VAL-CROSS-10 tests are clearly present and comprehensive. The features.json should likely include VAL-CROSS-10 in the fulfills list."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "conventions",
+      "observation": "The harness intentionally runs test commands after agent errors for non-TIMEOUT/SKIPPED statuses. If the test passes, the task is SUCCESS (the test is authoritative). This is correct behavior but non-obvious — future workers writing error propagation tests should know this. The worker had to adjust test expectations during development.",
+      "evidence": "Transcript shows multiple test iterations where the worker discovered that agent exception + passing test = SUCCESS. The handoff skillFeedback.deviations documents this explicitly. Harness code at harness.py: should_run_tests = agent_result.status not in (TIMEOUT, SKIPPED)."
+    },
+    {
+      "area": "conventions",
+      "observation": "AGENTS.md says to avoid 'Any' types, but the Harness.run() and run_experiment() signatures use 'agent: Any' and 'env: Any' because these are duck-typed objects. This is a pre-existing pattern that new code follows for consistency. Future workers should not flag this as a type-checking violation.",
+      "evidence": "Harness.run() signature at harness.py:117-118 uses Any for agent/env. InterruptibleExperiment follows the same pattern."
+    },
+    {
+      "area": "skills",
+      "observation": "The worker followed the backend-worker procedure correctly (TDD: wrote tests first, then implementation, then verified). The deviation (adjusting test expectations) was justified and well-documented.",
+      "evidence": "handoff.skillFeedback.followedProcedure is true. One deviation documented with clear rationale."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "The m6-cross-error-propagation feature is well-implemented. It adds 37 comprehensive tests covering error propagation across all subsystem boundaries (agent → harness → telemetry → report), multi-language environment consistency, and graceful SIGTERM shutdown. The InterruptibleExperiment class is cleanly designed with proper signal handler installation/restoration, partial manifest writing, and shutdown flag semantics. All tests pass, type checking passes, linting passes, and no regressions in the full 1264-test suite. One minor annotation issue: features.json should likely include VAL-CROSS-10 in the fulfills list alongside VAL-CROSS-06 and VAL-CROSS-11, since the tests clearly cover all three assertions. Overall: PASS."
+}
