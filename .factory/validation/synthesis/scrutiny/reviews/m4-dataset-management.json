@@ -1,0 +1,86 @@
+{
+  "featureId": "m4-dataset-management",
+  "milestone": "synthesis",
+  "reviewedAt": "2026-03-15T05:30:00.000Z",
+  "commitId": "ea8b0694167b67c00478e757b859f34c275f391b",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "The dataset management module is a well-structured, comprehensive implementation that fully covers all 9 validation assertions (VAL-DATASET-01 through VAL-DATASET-06, VAL-TASKFMT-02 through VAL-TASKFMT-04). The code is clean, follows project conventions (Pydantic v2, ruff, ty, logging), and has excellent test coverage with 74 passing tests. A few minor non-blocking observations are noted below.",
+    "issues": [
+      {
+        "file": "src/grist_mill/dataset/yaml_import.py",
+        "line": 65,
+        "severity": "non_blocking",
+        "description": "The import_tasks_from_yaml function mutates the raw_task dict in-place when uppercasing difficulty (raw_task['difficulty'] = ...). Since raw_task comes from yaml.safe_load, this is a side effect on the parsed data. While functionally harmless here, it's not a great pattern if the caller were to inspect the raw data afterward.",
+        "suggestion": "Use a copy of raw_task before mutation: task_data = {**raw_task}; task_data['difficulty'] = str(task_data['difficulty']).upper(); task = Task.model_validate(task_data)"
+      },
+      {
+        "file": "src/grist_mill/dataset/difficulty.py",
+        "line": 133,
+        "severity": "non_blocking",
+        "description": "In estimate_dataset, when overwrite=False, only tasks with difficulty==EASY get estimated (line 133: if self.overwrite or task.difficulty == Difficulty.EASY). This means MEDIUM and HARD tasks are always skipped when overwrite=False, regardless of whether they were auto-estimated or manually set. This logic seems arbitrary — if the intent is 'only estimate tasks that haven't been manually set', a separate flag on the Task model would be more robust.",
+        "suggestion": "Consider either: (1) always preserving when overwrite=False (remove the Difficulty.EASY branch), or (2) documenting the rationale that EASY is the default and thus assumed auto-estimated."
+      },
+      {
+        "file": "src/grist_mill/dataset/decontamination.py",
+        "line": 72,
+        "severity": "non_blocking",
+        "description": "The O(n^2) pairwise comparison in the run method could be slow for large datasets (thousands of tasks). For the current use case this is acceptable, but for future scalability a locality-sensitive hashing (LSH) approach or MinHash would be more efficient.",
+        "suggestion": "Add a comment noting the O(n^2) complexity and that LSH could replace it for datasets > 1000 tasks."
+      },
+      {
+        "file": "src/grist_mill/dataset/splitting.py",
+        "line": 87,
+        "severity": "suggestion",
+        "description": "The language stratification is done implicitly through difficulty grouping (since tasks within each difficulty group are shuffled together). This preserves language distribution probabilistically but not by explicit language-based stratification. The validation contract says 'stratified' splitting which is satisfied via difficulty, but the feature description mentions 'difficulty/language stratification'.",
+        "suggestion": "The test test_stratification_preserves_language only asserts >= 2 languages per split (not all 3), suggesting this is a known limitation. Consider documenting that stratification is by difficulty first, language second."
+      },
+      {
+        "file": "src/grist_mill/dataset/export.py",
+        "line": 87,
+        "severity": "suggestion",
+        "description": "CSV export doesn't include the schema_version and generated_at metadata that JSON export includes. This is reasonable (CSV doesn't have a natural way to embed metadata) but could be mentioned in documentation.",
+        "suggestion": "Consider adding a comment in the to_csv method docstring noting the metadata difference from JSON export."
+      },
+      {
+        "file": "src/grist_mill/dataset/quality.py",
+        "line": 100,
+        "severity": "suggestion",
+        "description": "The quality report truncates task_ids lists to 10 or 20 items for issue descriptions. This is good for readability but means the full list of affected tasks requires checking the task_ids field of the DatasetQualityIssue.",
+        "suggestion": "Document in the DatasetQualityIssue docstring that the description may truncate the list but task_ids contains the full set."
+      }
+    ]
+  },
+  "assertionsChecked": [
+    "VAL-DATASET-01",
+    "VAL-DATASET-02",
+    "VAL-DATASET-03",
+    "VAL-DATASET-04",
+    "VAL-DATASET-05",
+    "VAL-DATASET-06",
+    "VAL-TASKFMT-02",
+    "VAL-TASKFMT-03",
+    "VAL-TASKFMT-04"
+  ],
+  "codeQuality": "good",
+  "sharedStateObservations": [
+    {
+      "target": "library",
+      "observation": "The DifficultyEstimator in difficulty.py uses heuristic scoring with specific thresholds (_EASY_THRESHOLD=3, _HARD_THRESHOLD=7) derived from prompt complexity keywords, timeout ranges, test command complexity, dependency count, and constraint count. Future workers extending difficulty estimation should be aware of these thresholds and the keyword lists used.",
+      "suggestedContent": "Add to library/architecture.md or a new library/dataset.md: Document the DifficultyEstimator heuristic scoring approach, thresholds, and keyword lists so future workers understand the algorithm without reading source."
+    },
+    {
+      "target": "library",
+      "observation": "The dataset module uses copy.deepcopy for versioning immutability, which works because Task is a Pydantic v2 BaseModel. The Dataset container is a plain class (not a Pydantic model), which is intentional — it holds mutable state for the working dataset while versions are immutable frozen dataclasses.",
+      "suggestedContent": "Add to library/architecture.md: Document that Dataset is a plain Python class (not Pydantic) by design — it represents mutable working state, while DatasetVersion is a frozen dataclass for immutable snapshots."
+    },
+    {
+      "target": "services.yaml",
+      "observation": "The services.yaml only has a 'test_all' command for the full test suite. The dataset tests are covered by this, but there's no specific command for running just dataset tests.",
+      "suggestedContent": "No change needed — the test_all command covers dataset tests adequately."
+    }
+  ],
+  "summary": "The m4-dataset-management feature is a thorough, well-tested implementation of the dataset management module. All 9 validation assertions are satisfied with clear test coverage (74 tests). The code follows project conventions, has proper type annotations, and passes type checking and linting. Several minor non-blocking observations were noted (in-place dict mutation in YAML import, the overwrite=False logic for difficulty estimation, O(n^2) decontamination complexity), but none are blocking. The feature is ready for integration."
+}

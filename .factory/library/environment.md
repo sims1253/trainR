@@ -28,8 +28,15 @@ Environment variables, external dependencies, and setup notes.
 | Extra | Packages | Use Case |
 |-------|----------|----------|
 | `optimization` | `gepa` | GEPA-based skill/artifact optimization |
-| `synthesis` | `tree-sitter-language-pack` | Task synthesis via AST analysis |
 | `providers` | `openai` | Additional LLM provider support |
+
+## Core Dependencies
+
+| Package | Use Case |
+|---------|----------|
+| `tree-sitter-language-pack` | Task synthesis via AST analysis (installed as core dependency, not optional) |
+
+> **Note:** Although the `synthesis` extra exists in pyproject.toml, `tree-sitter-language-pack` is listed as a core dependency. It is always available after `uv sync`. The synthesis features (AST parser, mutation pipeline, task pipeline) require it.
 
 ## Docker
 

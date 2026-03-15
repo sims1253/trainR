@@ -37,6 +37,23 @@ src/grist_mill/
 └── cli/              # CLI entrypoint
 ```
 
+## Synthesis Module Details (M4)
+
+### tasks/ — Task Synthesis
+- `ast_parser.py`: Tree-sitter based AST parser for Python, R, TypeScript/TSX. Auto-detects language from file extension or shebang. Returns structured AST nodes (functions, test blocks, imports, classes). Graceful error handling returns partial results.
+- `mutation.py`: Test mutation pipeline (1392 lines). 5 mutation types: logic_bug, missing_import, type_error, wrong_return_value, edge_case. Supports apply/revert via diff/patch. Generates natural-language task descriptions. Pluggable mutator registry.
+- `pipeline.py`: End-to-end `TaskPipeline` class orchestrating: source discovery → AST analysis → mutation → quality gates → difficulty estimation → dataset building → registry registration → export. CLI subcommand: `grist-mill tasks generate --repo <path>`.
+
+### dataset/ — Dataset Management
+- `core.py`: `Dataset` is a **plain Python class** (not Pydantic) by design — it represents mutable working state. `DatasetVersion` is a **frozen dataclass** for immutable snapshots. Versioning uses `copy.deepcopy`.
+- `splitting.py`: Stratified splitting by difficulty, with implicit language preservation (shuffled within difficulty groups).
+- `difficulty.py`: Heuristic scoring with thresholds: `_EASY_THRESHOLD=3`, `_HARD_THRESHOLD=7`. Factors: prompt complexity keywords, timeout ranges, test command complexity, dependency count, constraint count.
+- `decontamination.py`: O(n²) pairwise similarity comparison. Adequate for datasets < 1000 tasks; LSH/MinHash recommended for larger datasets.
+- `versioning.py`: Immutable version snapshots via frozen dataclasses.
+- `export.py`: JSON (with schema_version + generated_at metadata) and CSV export. CSV does not include metadata headers.
+- `quality.py`: Quality report with task counts by language/difficulty/category. Truncates issue descriptions for readability (full task_ids in DatasetQualityIssue.task_ids).
+- `yaml_import.py`: Manual task authoring via YAML import with Task model validation.
+
 ## Key Patterns
 
 - **Registry pattern**: `ArtifactRegistry`, `AgentRegistry`, `ProviderRegistry` — all use decorator-based registration

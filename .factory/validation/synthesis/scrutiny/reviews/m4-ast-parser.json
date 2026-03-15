@@ -1,0 +1,49 @@
+{
+  "featureId": "m4-ast-parser",
+  "reviewedAt": "2026-03-15T05:30:00.000Z",
+  "commitId": "913fec1",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "milestone": "synthesis",
+  "codeReview": {
+    "summary": "The implementation is well-structured, comprehensive, and fully satisfies VAL-SYNTH-01. The AST parser correctly parses Python, R, and TypeScript/TSX source files, extracting function definitions, test blocks, import statements, and class definitions. Language auto-detection works from file extensions (case-insensitive) and shebang lines. Error handling is graceful — partial results are returned alongside error information without crashing. All 53 tests pass, type checking is clean, and the code follows project conventions (Pydantic v2, snake_case, proper module structure). A few minor issues found: one dead utility function, a redundant shebang pattern, and one weak assertion in a test.",
+    "issues": [
+      {
+        "file": "src/grist_mill/tasks/ast_parser.py",
+        "line": 296,
+        "severity": "non_blocking",
+        "description": "_extract_parameters_text is dead code — defined but never called anywhere in the codebase (not in ast_parser.py or test_ast_parser.py).",
+        "suggestion": "Remove _extract_parameters_text or add tests that exercise it if parameter extraction is planned for future use."
+      },
+      {
+        "file": "src/grist_mill/tasks/ast_parser.py",
+        "line": 219,
+        "severity": "non_blocking",
+        "description": "Redundant entry in _SHEBANG_MAP: both r'rscript' and r'Rscript' are listed, but the search uses re.IGNORECASE, making the second entry a no-op duplicate.",
+        "suggestion": "Remove one of the duplicate shebang patterns. Keep only r'(?:python|rscript)' or just r'python' and r'rscript' with the IGNORECASE flag."
+      },
+      {
+        "file": "tests/test_ast_parser.py",
+        "line": 260,
+        "severity": "non_blocking",
+        "description": "In test_parse_class, the assertion checks for 'multiply' in the 'funcs' list (filtered by ASTNodeType.FUNCTION), but the class body extraction adds methods as FUNCTION nodes, not CLASS nodes. This works but the test intent is slightly misleading — the CLASS node itself is not checked.",
+        "suggestion": "Add an assertion for the CLASS node itself: classes = [n for n in result.nodes if n.node_type == ASTNodeType.CLASS]; assert len(classes) == 1; assert classes[0].name == 'Calculator'."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "services",
+      "observation": "The verification steps in features.json specify 'uv run ty check .' but the actual commands used by the worker were 'uv run ty check src/grist_mill/'. The services.yaml typecheck command is 'uv run ty check src/grist_mill/'. Workers should use the services.yaml commands rather than the feature verification steps when they differ.",
+      "evidence": "features.json verificationSteps says 'uv run ty check .', services.yaml says 'uv run ty check src/grist_mill/', handoff shows worker ran 'uv run ty check src/grist_mill/'."
+    },
+    {
+      "area": "knowledge",
+      "observation": "tree-sitter-language-pack is listed as a core dependency in pyproject.toml (line 50), not an optional extra. The feature description and preconditions mention it as 'optional extra' but it is actually required. Future features referencing AST parsing should know this dependency is always available.",
+      "evidence": "pyproject.toml line 50: \"tree-sitter-language-pack\" in core dependencies list."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "The m4-ast-parser feature passes review. The implementation fully satisfies VAL-SYNTH-01 with correct parsing for R, Python, and TypeScript, proper extraction of functions, test blocks, imports, and classes, language auto-detection from extensions and shebangs, and graceful error handling returning partial results. All 53 tests pass, type checking is clean, and code quality is good. Three minor non-blocking issues noted: one dead utility function (_extract_parameters_text), a redundant shebang pattern, and a slightly misleading test assertion for class parsing."
+}

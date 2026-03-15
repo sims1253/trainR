@@ -1,0 +1,55 @@
+{
+  "featureId": "m4-task-mutation-pipeline",
+  "reviewedAt": "2026-03-15T05:15:00.000Z",
+  "commitId": "2a3d92f",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "The mutation pipeline is well-structured and implements all four validation assertions (VAL-SYNTH-02, VAL-SYNTH-03, VAL-SYNTH-04, VAL-SYNTH-06). It supports 5 mutation types across Python, R, and TypeScript with clean apply/revert semantics, auto-generated task descriptions, pluggable mutator registry, and graceful failure handling. 38 tests pass, type checking and linting are clean. A few non-blocking code quality issues exist: dead code (apply_mutation_to_string), overlapping mutations between logic_bug and edge_case mutators, and an operator substring matching nuance in the logic_bug mutator.",
+    "issues": [
+      {
+        "file": "src/grist_mill/tasks/mutation.py",
+        "line": 411,
+        "severity": "non_blocking",
+        "description": "Dead code: apply_mutation_to_string is defined but never used, never exported, and never tested. It also doesn't handle the empty mutated_code case (import removal) that _apply_mutation_to_string_impl handles. Should either be removed or have its edge case fixed and be exported if intended for public use."
+      },
+      {
+        "file": "src/grist_mill/tasks/mutation.py",
+        "line": 517,
+        "severity": "non_blocking",
+        "description": "Operator overlap between _mutate_logic_bug and _mutate_edge_case: both produce mutations for comparison operators (>, <, >=, <=). For a line like 'return n > 0', both mutators will produce distinct mutations (logic_bug: 'return n < 0', edge_case: 'return n >= 0'), which leads to task redundancy. Consider scoping logic_bug to arithmetic operators only and edge_case to comparison operators only, or deduplicating in the pipeline."
+      },
+      {
+        "file": "src/grist_mill/tasks/mutation.py",
+        "line": 516,
+        "severity": "non_blocking",
+        "description": "Substring matching in operator_map: when iterating operators for a line containing '>=' (e.g., 'return a >= b'), the '>' key matches first (since it appears in the dict before '>='), changing it to '<='. Then '>=' never matches. This means the '>=' -> '<=' entry in the map is effectively dead code — the '>' -> '<' entry always handles '>=' inputs. The result is correct (still produces a valid mutation) but the redundancy is misleading."
+      },
+      {
+        "file": "src/grist_mill/tasks/mutation.py",
+        "line": 496,
+        "severity": "non_blocking",
+        "description": "Docstring for _get_function_nodes says 'Filter AST nodes to get only function definitions (not tests)' but the implementation doesn't explicitly filter tests — it relies on the AST parser classifying test functions as TEST_BLOCK rather than FUNCTION. This works correctly because the ast_parser module separates them, but the docstring could be clearer about this dependency."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "conventions",
+      "observation": "The worker ran 'ty check src/grist_mill/' instead of 'ty check .' as specified in the verification steps. The handoff notes this is due to pre-existing type errors in bench/, scripts/, and legacy test files. AGENTS.md says 'ty check . with strict settings' but the full-project check has pre-existing errors. Consider updating AGENTS.md to note that full-project ty check may have pre-existing errors in non-grist-mill directories.",
+      "evidence": "Handoff skillFeedback.deviations: 'Ran ty check src/grist_mill/ instead' because 'Pre-existing type errors in bench/, scripts/, and legacy test files are unrelated to this feature.'"
+    },
+    {
+      "area": "conventions",
+      "observation": "The feature adds 1392 lines of code in a single file (mutation.py) with all language-specific mutators. The AGENTS.md says 'Flat module structure under src/grist_mill/. No deeply nested packages. Group related functionality into modules, not subpackages.' The current approach of a single large file is acceptable but may become unwieldy as more languages are added. Future workers should be aware this file is already large.",
+      "evidence": "mutation.py: 1392 lines with Python, R, and TypeScript mutator implementations in the same file."
+    },
+    {
+      "area": "services",
+      "observation": "No changes needed to services.yaml — the worker used existing uv/pytest/ruff/ty commands as documented."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "PASS. The mutation pipeline implementation is solid, well-tested (38 tests), and fully covers all four validation assertions. Mutations are correctly targeted at non-test functions (relying on AST parser's TEST_BLOCK classification), revertable via diff/patch, auto-described in natural language, diverse (5 categories, 10+ tasks), and failed mutations are gracefully skipped with logging. Non-blocking issues include dead code (apply_mutation_to_string), overlapping mutation types between logic_bug and edge_case, operator substring matching nuance, and a misleading docstring. None of these affect correctness or the validation assertions."
+}

@@ -1,0 +1,73 @@
+{
+  "featureId": "m4-task-pipeline-end-to-end",
+  "milestone": "synthesis",
+  "reviewedAt": "2026-03-15T06:30:00Z",
+  "commitId": "02b6832",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "The implementation is well-structured, comprehensive, and fulfills all requirements. The pipeline correctly wires source discovery, AST analysis, mutation, quality gates, difficulty estimation, dataset building, artifact registry registration, and export. The CLI subcommand 'grist-mill tasks generate' is functional with appropriate options. 41 tests cover all expected behaviors including VAL-SYNTH-05 and VAL-TASKFMT-01 assertions. A few minor code quality issues were identified but none are blocking.",
+    "issues": [
+      {
+        "file": "src/grist_mill/tasks/pipeline.py",
+        "line": 393,
+        "severity": "non_blocking",
+        "description": "Dead code: a MutationPipeline instance is created at the top of run() and passed to _process_file(), but _process_file() creates its own MutationPipeline internally. The passed-in 'mutation_pipeline' parameter is never used. This is misleading and wastes resources.",
+        "suggestion": "Remove the unused MutationPipeline creation in run() and remove the mutation_pipeline parameter from _process_file(). The method already creates its own file_pipeline."
+      },
+      {
+        "file": "src/grist_mill/tasks/pipeline.py",
+        "line": 636,
+        "severity": "non_blocking",
+        "description": "Uses __import__('json') instead of a top-level import. The 'json' module is already standard library and should be imported normally at the top of the file for clarity and consistency with the rest of the codebase.",
+        "suggestion": "Add 'import json' to the top-level imports and replace __import__('json').dumps(...) with json.dumps(...)."
+      },
+      {
+        "file": "src/grist_mill/tasks/pipeline.py",
+        "line": 424,
+        "severity": "suggestion",
+        "description": "dataset.add_tasks(filtered_tasks) can raise DuplicateEntry if two mutations produce identical task IDs (extremely unlikely with UUID-based IDs but not caught). No error handling wraps this call.",
+        "suggestion": "Consider wrapping in a try/except for DuplicateEntry and logging a warning, or pre-deduplicating by task ID."
+      },
+      {
+        "file": "src/grist_mill/tasks/pipeline.py",
+        "line": 141,
+        "severity": "suggestion",
+        "description": "_infer_dependencies includes Python stdlib modules (e.g., 'math', 'typing') in the dependencies list. This is validated by tests but may not be desired for real-world use where dependencies should represent external packages.",
+        "suggestion": "Consider filtering out stdlib modules or documenting that this is intentional behavior."
+      },
+      {
+        "file": "src/grist_mill/cli/tasks_cmd.py",
+        "line": 40,
+        "severity": "non_blocking",
+        "description": "The --repo option uses exists=False, meaning Click won't validate the path exists before invoking the command. The command then validates manually. This is fine but means users don't get Click's automatic error formatting.",
+        "suggestion": "This is a reasonable design choice since the command provides richer error messages with rich console formatting. No change needed, just noting for awareness."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "target": "library",
+      "observation": "The synthesis extra (tree-sitter-language-pack) is optional but required for the mutation pipeline and end-to-end task pipeline to function. Workers need to install it manually via 'uv pip install tree-sitter-language-pack' for tests to pass. This is not documented in services.yaml or the library.",
+      "suggestedContent": "Add to environment.md or services.yaml: 'The synthesis extra requires tree-sitter-language-pack. Install with: uv pip install tree-sitter-language-pack. This is needed for task synthesis features (m4-ast-parser, m4-task-mutation-pipeline, m4-task-pipeline-end-to-end).'"
+    },
+    {
+      "target": "services.yaml",
+      "observation": "The existing test_all command ('uv run pytest tests/ -m \"not integration_local and not integration_provider\" -x -q') includes bench/ integration tests that fail with missing openai import. Workers have been running targeted grist-mill test suites instead. The test_all command should either be fixed or a new command should be added for grist-mill-only tests.",
+      "suggestedContent": "Add a new command to services.yaml: 'test_grist_mill: uv run pytest tests/test_package.py tests/test_schemas.py tests/test_artifact.py tests/test_interfaces.py tests/test_config.py tests/test_cli.py tests/test_registry.py tests/test_telemetry.py tests/test_result_parser.py tests/test_dataset.py tests/test_mutation.py tests/test_ast_parser.py tests/test_harness.py tests/test_agent.py tests/test_tools.py tests/test_binding.py tests/test_local_runner.py tests/test_environments.py tests/test_task_pipeline.py -x -q'"
+    },
+    {
+      "target": "AGENTS.md",
+      "observation": "AGENTS.md says 'Use Python logging module with structured context. No print statements in library code.' The CLI tasks_cmd.py correctly uses rich console for output. However, pipeline.py uses __import__('json') which is an unidiomatic pattern not mentioned in AGENTS.md conventions.",
+      "suggestedContent": "No change needed to AGENTS.md; this is a minor code quality issue covered in the review above."
+    },
+    {
+      "target": "skills",
+      "observation": "The backend-worker SKILL.md says to run 'uv run pytest tests/ -m \"not integration_local and not integration_provider\" -x -q' for the full test suite (step 6). This fails due to pre-existing bench/ integration tests. The worker correctly deviated by running a targeted test suite. The skill's verification commands should be updated.",
+      "suggestedContent": "Update SKILL.md step 6 to note: 'If the full test suite fails on pre-existing bench/ integration tests, run the grist-mill specific test files instead.'"
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "The m4-task-pipeline-end-to-end feature is well-implemented. It wires the full pipeline from source repository discovery through AST analysis, mutation, quality gates, difficulty estimation, dataset building, and artifact registry registration. The CLI subcommand 'grist-mill tasks generate --repo <path>' works correctly. 41 tests cover all expected behaviors including VAL-SYNTH-05 (end-to-end from source repo to task dataset) and VAL-TASKFMT-01 (multi-language task declaration with language, dependencies, and environment requirements). A few minor code quality issues were found (dead code, __import__ usage) but none are blocking. The feature passes review."
+}

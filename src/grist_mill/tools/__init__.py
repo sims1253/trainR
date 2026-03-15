@@ -18,6 +18,11 @@ Validates:
 - VAL-BIND-01 through VAL-BIND-06: Artifact binding
 """
 
+from grist_mill.tools.binding import (
+    ArtifactBinder,
+    ArtifactBindingError,
+    ArtifactValidationError,
+)
 from grist_mill.tools.exceptions import (
     MCPServerError,
     ToolError,
@@ -30,11 +35,6 @@ from grist_mill.tools.exceptions import (
 from grist_mill.tools.invocation import ToolInvoker
 from grist_mill.tools.mcp import MCPServerInfo, MCPServerManager
 from grist_mill.tools.models import ToolDefinition, ToolInvocationResult
-from grist_mill.tools.binding import (
-    ArtifactBinder,
-    ArtifactBindingError,
-    ArtifactValidationError,
-)
 from grist_mill.tools.registry import DEFAULT_TOOL_TIMEOUT, ToolRegistry
 
 __all__ = [

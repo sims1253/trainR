@@ -1,0 +1,180 @@
+{
+  "milestone": "synthesis",
+  "round": 1,
+  "status": "pass",
+  "validatorsRun": {
+    "test": {
+      "passed": true,
+      "command": "uv run pytest tests/test_artifact.py tests/test_ast_parser.py tests/test_binding.py tests/test_cli.py tests/test_config.py tests/test_dataset.py tests/test_docker_runner.py tests/test_environments.py tests/test_harness.py tests/test_interfaces.py tests/test_local_runner.py tests/test_agent.py tests/test_mutation.py tests/test_package.py tests/test_registry.py tests/test_result_parser.py tests/test_schemas.py tests/test_task_pipeline.py tests/test_telemetry.py tests/test_tools.py -x -q",
+      "exitCode": 0,
+      "note": "797 tests passed. Pre-existing bench/ integration tests excluded due to missing openai dependency (unrelated to synthesis features)."
+    },
+    "typecheck": {
+      "passed": true,
+      "command": "uv run ty check src/grist_mill/",
+      "exitCode": 0
+    },
+    "lint": {
+      "passed": true,
+      "command": "uv run ruff check src/grist_mill/ && uv run ruff format --check src/grist_mill/",
+      "exitCode": 0,
+      "note": "One import sorting issue in src/grist_mill/tools/__init__.py was auto-fixed with ruff --fix."
+    }
+  },
+  "reviewsSummary": {
+    "total": 4,
+    "passed": 4,
+    "failed": 0,
+    "failedFeatures": []
+  },
+  "blockingIssues": [],
+  "nonBlockingIssues": [
+    {
+      "featureId": "m4-ast-parser",
+      "severity": "non_blocking",
+      "description": "Dead code: _extract_parameters_text defined but never called",
+      "file": "src/grist_mill/tasks/ast_parser.py",
+      "line": 296
+    },
+    {
+      "featureId": "m4-ast-parser",
+      "severity": "non_blocking",
+      "description": "Redundant shebang pattern in _SHEBANG_MAP (rscript/Rscript with IGNORECASE)",
+      "file": "src/grist_mill/tasks/ast_parser.py",
+      "line": 219
+    },
+    {
+      "featureId": "m4-ast-parser",
+      "severity": "non_blocking",
+      "description": "test_parse_class checks methods in FUNCTION list but doesn't assert CLASS node",
+      "file": "tests/test_ast_parser.py",
+      "line": 260
+    },
+    {
+      "featureId": "m4-task-mutation-pipeline",
+      "severity": "non_blocking",
+      "description": "Dead code: apply_mutation_to_string defined but never used/exported/tested",
+      "file": "src/grist_mill/tasks/mutation.py",
+      "line": 411
+    },
+    {
+      "featureId": "m4-task-mutation-pipeline",
+      "severity": "non_blocking",
+      "description": "Operator overlap between logic_bug and edge_case mutators produces task redundancy",
+      "file": "src/grist_mill/tasks/mutation.py",
+      "line": 517
+    },
+    {
+      "featureId": "m4-task-mutation-pipeline",
+      "severity": "non_blocking",
+      "description": "Substring matching in operator_map makes '>=' entry effectively dead",
+      "file": "src/grist_mill/tasks/mutation.py",
+      "line": 516
+    },
+    {
+      "featureId": "m4-dataset-management",
+      "severity": "non_blocking",
+      "description": "In-place dict mutation in yaml_import.py when uppercasing difficulty",
+      "file": "src/grist_mill/dataset/yaml_import.py",
+      "line": 65
+    },
+    {
+      "featureId": "m4-dataset-management",
+      "severity": "non_blocking",
+      "description": "overwrite=False logic skips MEDIUM/HARD tasks regardless of origin",
+      "file": "src/grist_mill/dataset/difficulty.py",
+      "line": 133
+    },
+    {
+      "featureId": "m4-dataset-management",
+      "severity": "non_blocking",
+      "description": "O(n^2) decontamination complexity — acceptable now, LSH for >1000 tasks",
+      "file": "src/grist_mill/dataset/decontamination.py",
+      "line": 72
+    },
+    {
+      "featureId": "m4-task-pipeline-end-to-end",
+      "severity": "non_blocking",
+      "description": "Dead code: unused MutationPipeline instance in run()",
+      "file": "src/grist_mill/tasks/pipeline.py",
+      "line": 393
+    },
+    {
+      "featureId": "m4-task-pipeline-end-to-end",
+      "severity": "non_blocking",
+      "description": "Uses __import__('json') instead of top-level import",
+      "file": "src/grist_mill/tasks/pipeline.py",
+      "line": 636
+    }
+  ],
+  "appliedUpdates": [
+    {
+      "target": "services.yaml",
+      "description": "Added test_grist_mill command for running only grist-mill tests (excludes pre-existing bench/ tests that fail on missing openai dep)",
+      "sourceFeature": "multiple reviewers flagged test_all command failure"
+    },
+    {
+      "target": "library",
+      "description": "Updated environment.md to clarify tree-sitter-language-pack is a core dependency (not optional synthesis extra)",
+      "sourceFeature": "m4-ast-parser reviewer"
+    },
+    {
+      "target": "library",
+      "description": "Added synthesis module details to architecture.md: tasks/ module structure (ast_parser, mutation, pipeline), dataset/ module details (Dataset vs DatasetVersion design, difficulty thresholds, decontamination complexity notes)",
+      "sourceFeature": "m4-dataset-management reviewer, m4-task-mutation-pipeline reviewer"
+    }
+  ],
+  "suggestedGuidanceUpdates": [
+    {
+      "target": "AGENTS.md",
+      "suggestion": "Update type checking guidance: note that 'ty check .' has pre-existing errors in bench/, scripts/, and legacy test directories. Workers should use 'ty check src/grist_mill/' for grist-mill code.",
+      "evidence": "Multiple workers (m4-ast-parser, m4-task-mutation-pipeline) deviated from verification steps to run 'ty check src/grist_mill/' due to pre-existing errors outside grist-mill.",
+      "isSystemic": true
+    },
+    {
+      "target": "AGENTS.md",
+      "suggestion": "Update testing guidance: note that the full test suite (test_all) includes pre-existing bench/ tests that fail due to missing openai dependency. Workers should use test_grist_mill command for validation.",
+      "evidence": "All 4 synthesis feature reviewers and the scrutiny validator encountered failures with test_all due to pre-existing bench/ tests importing openai module which is not installed.",
+      "isSystemic": true
+    },
+    {
+      "target": "skills",
+      "suggestion": "Update backend-worker skill verification steps: if 'pytest tests/ -m ...' fails on pre-existing bench/ tests, fall back to test_grist_mill command or targeted test files.",
+      "evidence": "m4-task-pipeline-end-to-end reviewer noted worker had to deviate from SKILL.md step 6 to run targeted tests.",
+      "isSystemic": true
+    }
+  ],
+  "rejectedObservations": [
+    {
+      "observation": "No changes needed to services.yaml (m4-task-mutation-pipeline reviewer)",
+      "reason": "Superseded — we did add test_grist_mill command based on other reviewers' observations"
+    },
+    {
+      "observation": "No change needed to AGENTS.md for __import__ usage (m4-task-pipeline-end-to-end reviewer)",
+      "reason": "This is a minor code quality issue already captured in non-blocking issues, not a guidance gap"
+    },
+    {
+      "observation": "No change needed to services.yaml for dataset-specific test command (m4-dataset-management reviewer)",
+      "reason": "Superseded — test_grist_mill command covers all grist-mill tests including dataset"
+    }
+  ],
+  "previousRound": null,
+  "assertionsCoverage": {
+    "VAL-SYNTH-01": "covered",
+    "VAL-SYNTH-02": "covered",
+    "VAL-SYNTH-03": "covered",
+    "VAL-SYNTH-04": "covered",
+    "VAL-SYNTH-05": "covered",
+    "VAL-SYNTH-06": "covered",
+    "VAL-DATASET-01": "covered",
+    "VAL-DATASET-02": "covered",
+    "VAL-DATASET-03": "covered",
+    "VAL-DATASET-04": "covered",
+    "VAL-DATASET-05": "covered",
+    "VAL-DATASET-06": "covered",
+    "VAL-TASKFMT-01": "covered",
+    "VAL-TASKFMT-02": "covered",
+    "VAL-TASKFMT-03": "covered",
+    "VAL-TASKFMT-04": "covered"
+  }
+}
