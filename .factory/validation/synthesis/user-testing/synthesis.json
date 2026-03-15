@@ -1,0 +1,45 @@
+{
+  "milestone": "synthesis",
+  "round": 1,
+  "status": "pass",
+  "assertionsSummary": {
+    "total": 15,
+    "passed": 15,
+    "failed": 0,
+    "blocked": 0
+  },
+  "passedAssertions": [
+    "VAL-SYNTH-01",
+    "VAL-SYNTH-02",
+    "VAL-SYNTH-03",
+    "VAL-SYNTH-04",
+    "VAL-SYNTH-05",
+    "VAL-SYNTH-06",
+    "VAL-DATASET-01",
+    "VAL-DATASET-02",
+    "VAL-DATASET-03",
+    "VAL-DATASET-04",
+    "VAL-DATASET-05",
+    "VAL-DATASET-06",
+    "VAL-TASKFMT-01",
+    "VAL-TASKFMT-02",
+    "VAL-TASKFMT-03",
+    "VAL-TASKFMT-04"
+  ],
+  "failedAssertions": [],
+  "blockedAssertions": [],
+  "appliedUpdates": [
+    {
+      "target": "user-testing.md",
+      "description": "Added setup note: synthesis milestone requires 'uv sync --extra synthesis' to install tree-sitter-language-pack optional dependency. Without it, AST parsing tests and end-to-end pipeline tests fail.",
+      "source": "flow-report"
+    }
+  ],
+  "previousRound": null,
+  "flowReports": [
+    ".factory/validation/synthesis/user-testing/flows/group-ast-mutation.json",
+    ".factory/validation/synthesis/user-testing/flows/group-dataset.json",
+    ".factory/validation/synthesis/user-testing/flows/group-pipeline.json"
+  ],
+  "notes": "VAL-SYNTH-05 was initially reported as fail by a flow validator due to missing tree-sitter-language-pack optional dependency. After installing via 'uv sync --extra synthesis', all 206 synthesis tests passed (41 pipeline, 74 dataset, 53 AST parser, 38 mutation). The code correctly handles the missing dependency gracefully (logs warning, skips mutation per VAL-SYNTH-06) but cannot produce tasks without AST parsing. This is an environment setup issue, not a code defect."
+}

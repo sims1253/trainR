@@ -1,0 +1,87 @@
+{
+  "groupId": "group-pipeline",
+  "testedAt": "2026-03-15T00:00:00Z",
+  "isolation": {
+    "workingDirectory": "/home/m0hawk/Documents/trainR",
+    "packageManager": "uv",
+    "boundary": "test_task_pipeline.py and CLI tasks generate subcommand"
+  },
+  "toolsUsed": ["pytest", "cli"],
+  "assertions": [
+    {
+      "id": "VAL-SYNTH-05",
+      "title": "End-to-end task generation pipeline runs from source repo to task dataset",
+      "status": "fail",
+      "steps": [
+        {
+          "action": "Run full test suite: uv run pytest tests/test_task_pipeline.py -v",
+          "expected": "All pipeline tests pass including end-to-end dataset generation",
+          "observed": "37 passed, 4 failed. Failures all caused by missing tree-sitter-language-pack optional dependency. The mutation pipeline falls back gracefully (logs WARNING, does not crash) but produces 0 mutations, resulting in empty datasets."
+        },
+        {
+          "action": "Verify CLI subcommand: uv run grist-mill tasks generate --help",
+          "expected": "CLI subcommand exists and shows usage with required --repo option",
+          "observed": "CLI subcommand works correctly. Shows full help with options: --repo (required), --output, --max-mutations-per-type, --max-tasks-per-file, --timeout, --no-difficulty, --quiet."
+        },
+        {
+          "action": "Check end-to-end test class TestEndToEndNoManualIntervention",
+          "expected": "test_pipeline_produces_dataset_automatically passes (non-empty dataset)",
+          "observed": "FAILED: Dataset task_count == 0 because tree-sitter-language-pack is not installed, so AST parsing for mutations fails silently."
+        }
+      ],
+      "evidence": {
+        "testOutput": "synthesis/group-pipeline/VAL-SYNTH-05-pytest-output.txt",
+        "cliOutput": "synthesis/group-pipeline/VAL-SYNTH-05-cli-help.txt",
+        "summary": "4 tests failed (test_pipeline_on_python_repo, test_pipeline_on_multi_language_repo, test_pipeline_registers_tasks_in_artifact_registry, test_pipeline_produces_dataset_automatically). All 4 share the same root cause: tree-sitter-language-pack optional dependency is not installed. Warning logged: 'tree-sitter-language-pack is required for AST parsing. Install it with: uv pip install tree-sitter-language-pack'. Pipeline does not crash — it recovers gracefully per VAL-SYNTH-06 — but produces 0 tasks."
+      },
+      "command": "uv run pytest tests/test_task_pipeline.py -v",
+      "output": "4 failed, 37 passed in 0.28s",
+      "exitCode": 1,
+      "issues": "Missing optional dependency tree-sitter-language-pack prevents the mutation pipeline from generating tasks. The pipeline code handles this gracefully (logs a warning, skips the file) per VAL-SYNTH-06, but the end-to-end assertion requires a non-empty dataset which cannot be produced without the AST parsing capability."
+    },
+    {
+      "id": "VAL-TASKFMT-01",
+      "title": "Multi-language task declaration",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run language-specific tests: uv run pytest tests/test_task_pipeline.py -v -k \"TestMultiLanguageTaskDeclaration\"",
+          "expected": "All 3 tests in TestMultiLanguageTaskDeclaration pass",
+          "observed": "3 passed: test_task_has_language, test_task_has_dependencies, test_task_has_env_requirements"
+        },
+        {
+          "action": "Verify test_task_has_language",
+          "expected": "Task model accepts and stores language field correctly",
+          "observed": "PASSED: Task created with language='python', assertion task.language == 'python' succeeds"
+        },
+        {
+          "action": "Verify test_task_has_dependencies",
+          "expected": "Task model accepts and stores dependencies list",
+          "observed": "PASSED: Task with dependencies=['numpy', 'pandas'] stores both correctly"
+        },
+        {
+          "action": "Verify test_task_has_env_requirements",
+          "expected": "Task test_command and setup_command define execution environment",
+          "observed": "PASSED: test_command='pytest tests/ -v' and setup_command='pip install -r requirements.txt' both stored correctly"
+        }
+      ],
+      "evidence": {
+        "testOutput": "synthesis/group-pipeline/VAL-TASKFMT-01-language-tests.txt",
+        "summary": "All 3 multi-language task declaration tests pass. Tasks correctly declare language, dependencies, and environment requirements (test_command, setup_command). The Task schema properly supports multi-language task declarations."
+      },
+      "command": "uv run pytest tests/test_task_pipeline.py -v -k \"TestMultiLanguageTaskDeclaration\"",
+      "output": "3 passed, 38 deselected in 0.11s",
+      "exitCode": 0,
+      "issues": null
+    }
+  ],
+  "frictions": [],
+  "blockers": [
+    {
+      "description": "tree-sitter-language-pack optional dependency not installed in the environment. This prevents the mutation pipeline from generating any tasks, causing 4 test failures in VAL-SYNTH-05 (test_pipeline_on_python_repo, test_pipeline_on_multi_language_repo, test_pipeline_registers_tasks_in_artifact_registry, test_pipeline_produces_dataset_automatically). The pipeline handles this gracefully per VAL-SYNTH-06 (logs warning, skips mutation) but cannot produce a non-empty dataset without it.",
+      "affectedAssertions": ["VAL-SYNTH-05"],
+      "quickFixAttempted": "Did not install the dependency as it is outside isolation boundary. Install command suggested by the pipeline: uv pip install tree-sitter-language-pack"
+    }
+  ],
+  "summary": "Tested 2 assertions: VAL-TASKFMT-01 passed (3/3 tests, tasks correctly declare language, dependencies, and environment requirements), VAL-SYNTH-05 failed (4/4 end-to-end tests failed due to missing tree-sitter-language-pack optional dependency). CLI subcommand 'grist-mill tasks generate --help' works correctly. The pipeline code itself is correct and handles the missing dependency gracefully, but cannot produce tasks without AST parsing capability."
+}

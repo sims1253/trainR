@@ -1,0 +1,123 @@
+{
+  "groupId": "group-ast-mutation",
+  "testedAt": "2026-03-15T12:00:00Z",
+  "isolation": {
+    "workingDirectory": "/home/m0hawk/Documents/trainR",
+    "testFiles": ["tests/test_ast_parser.py", "tests/test_mutation.py"],
+    "packageManager": "uv",
+    "extrasRequired": ["synthesis"]
+  },
+  "toolsUsed": ["pytest"],
+  "assertions": [
+    {
+      "id": "VAL-SYNTH-01",
+      "title": "Tree-sitter AST parsing works for R, Python, and TypeScript",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Install synthesis extra dependency (tree-sitter-language-pack) via uv sync --extra synthesis",
+          "expected": "tree-sitter-language-pack installed",
+          "observed": "Installed tree-sitter==0.25.2, tree-sitter-language-pack==0.13.0 and 3 other packages"
+        },
+        {
+          "action": "Run: uv run pytest tests/test_ast_parser.py -v",
+          "expected": "All 53 AST parser tests pass covering R, Python, TypeScript parsing",
+          "observed": "53 passed in 0.16s — 11 language detection tests, 8 Python parsing tests, 10 R parsing tests, 11 TypeScript parsing tests, 7 file parsing tests, 3 error handling tests, 3 model tests"
+        }
+      ],
+      "evidence": {
+        "logFile": "evidence/synthesis/group-ast-mutation/VAL-SYNTH-01-ast-parser.log",
+        "summary": "53 passed, 0 failed. Tests cover: language detection (extension + shebang), Python function/import/test extraction, R function/library/require/source/testthat/describe extraction, TypeScript function/import/describe/it/test/arrow/class/TSX extraction, file parsing from disk, error handling with partial results, ParseResult model serialization."
+      },
+      "command": "uv run pytest tests/test_ast_parser.py -v",
+      "output": "53 passed in 0.16s",
+      "exitCode": 0
+    },
+    {
+      "id": "VAL-SYNTH-02",
+      "title": "Test mutation induces controlled failures and is revertable via diff/patch",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run: uv run pytest tests/test_mutation.py -v -k 'test_apply_mutation or test_revert_mutation or test_creates_diff or test_mutations_are_revertable'",
+          "expected": "All mutation apply/revert/diff tests pass",
+          "observed": "6 passed in 0.12s — diff creation (with changes, no changes, context), apply to string, apply to file, revert to string, revert to file, pipeline-level revert verification"
+        }
+      ],
+      "evidence": {
+        "logFile": "evidence/synthesis/group-ast-mutation/VAL-SYNTH-02-mutation-apply-revert.log",
+        "summary": "6 passed, 0 failed. Tests verify: mutations change source correctly, reverts restore original source exactly, file-level apply/revert works, pipeline-generated mutations are all revertable, diffs are created with proper context."
+      },
+      "command": "uv run pytest tests/test_mutation.py -v -k 'test_apply_mutation or test_revert_mutation or test_creates_diff or test_mutations_are_revertable'",
+      "output": "6 passed, 32 deselected in 0.12s",
+      "exitCode": 0
+    },
+    {
+      "id": "VAL-SYNTH-03",
+      "title": "Mutation pipeline generates task descriptions automatically",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run: uv run pytest tests/test_mutation.py -v -k 'test_description or test_pipeline_generates_task_descriptions'",
+          "expected": "All description generation tests pass",
+          "observed": "5 passed in 0.11s — descriptions reference mutation details, missing imports, type errors, expected fixes, and pipeline generates meaningful descriptions for all successful mutations"
+        }
+      ],
+      "evidence": {
+        "logFile": "evidence/synthesis/group-ast-mutation/VAL-SYNTH-03-description-gen.log",
+        "summary": "5 passed, 0 failed. Tests verify: descriptions reference specific mutations (e.g. 'add', 'subtraction'), mention missing imports by name ('math'), reference type-related terms ('type', 'string', 'str'), produce descriptions >20 chars with expected fix guidance, and pipeline generates task IDs and descriptions for all successful mutations."
+      },
+      "command": "uv run pytest tests/test_mutation.py -v -k 'test_description or test_pipeline_generates_task_descriptions'",
+      "output": "5 passed, 33 deselected in 0.11s",
+      "exitCode": 0
+    },
+    {
+      "id": "VAL-SYNTH-04",
+      "title": "Mutation diversity produces varied tasks (3+ categories, 10+ tasks)",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run: uv run pytest tests/test_mutation.py -v -k 'test_diverse_mutation_types or test_produces_10_plus_tasks or test_all_categories_exist or test_at_least_three_categories'",
+          "expected": "All diversity tests pass",
+          "observed": "4 passed in 0.11s — MutationType enum has 5 categories (LOGIC_BUG, MISSING_IMPORT, TYPE_ERROR, WRONG_RETURN_VALUE, EDGE_CASE), pipeline produces 3+ distinct categories and 10+ tasks from sample Python source"
+        }
+      ],
+      "evidence": {
+        "logFile": "evidence/synthesis/group-ast-mutation/VAL-SYNTH-04-diversity.log",
+        "summary": "4 passed, 0 failed. Tests verify: MutationType enum contains LOGIC_BUG, MISSING_IMPORT, TYPE_ERROR, WRONG_RETURN_VALUE, EDGE_CASE (5 categories >= 3 required), pipeline produces at least 3 distinct mutation type categories from sample code, and produces at least 10 successful mutations."
+      },
+      "command": "uv run pytest tests/test_mutation.py -v -k 'test_diverse_mutation_types or test_produces_10_plus_tasks or test_all_categories_exist or test_at_least_three_categories'",
+      "output": "4 passed, 34 deselected in 0.11s",
+      "exitCode": 0
+    },
+    {
+      "id": "VAL-SYNTH-06",
+      "title": "Failed mutations are recovered gracefully (skip with logging, not crashes)",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run: uv run pytest tests/test_mutation.py -v -k 'test_failed_mutations_gracefully_skipped or test_pipeline_with_invalid_source_does_not_crash or test_pipeline_with_empty_source'",
+          "expected": "All graceful recovery tests pass",
+          "observed": "3 passed in 0.10s — failed mutations produce error details in results with logging, invalid syntax source does not crash pipeline, empty source returns empty list without crash"
+        }
+      ],
+      "evidence": {
+        "logFile": "evidence/synthesis/group-ast-mutation/VAL-SYNTH-06-graceful-recovery.log",
+        "summary": "3 passed, 0 failed. Tests verify: failed mutations produce MutationResult with success=False and non-null error field, log messages contain 'skip'/'fail'/'error' keywords, pipeline handles invalid source code ('def broken(') without crashing, and handles empty source returning an empty list."
+      },
+      "command": "uv run pytest tests/test_mutation.py -v -k 'test_failed_mutations_gracefully_skipped or test_pipeline_with_invalid_source_does_not_crash or test_pipeline_with_empty_source'",
+      "output": "3 passed, 35 deselected in 0.10s",
+      "exitCode": 0
+    }
+  ],
+  "frictions": [
+    {
+      "description": "tree-sitter-language-pack is an optional dependency under [synthesis] extra. Initial test runs failed with ModuleNotFoundError until 'uv sync --extra synthesis' was run. The task prompt stated 'uv sync (already done)' but this only installs core deps.",
+      "resolved": true,
+      "resolution": "Ran 'uv sync --extra synthesis' to install the tree-sitter-language-pack and associated packages. All tests then passed.",
+      "affectedAssertions": ["VAL-SYNTH-01", "VAL-SYNTH-04"]
+    }
+  ],
+  "blockers": [],
+  "summary": "Tested 5 assertions for synthesis milestone: all 5 passed (VAL-SYNTH-01, VAL-SYNTH-02, VAL-SYNTH-03, VAL-SYNTH-04, VAL-SYNTH-06). Total test count across all assertions: 71 selected tests passed, 0 failed. One friction noted: the synthesis extra dependency was not pre-installed."
+}

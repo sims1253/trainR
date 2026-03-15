@@ -1,0 +1,97 @@
+{
+  "groupId": "group-dataset",
+  "testedAt": "2026-03-15T12:00:00Z",
+  "isolation": {
+    "workingDirectory": "/home/m0hawk/Documents/trainR",
+    "testFile": "tests/test_dataset.py",
+    "runner": "uv run pytest",
+    "boundary": "test_dataset.py only"
+  },
+  "toolsUsed": ["pytest"],
+  "assertions": [
+    {
+      "id": "VAL-DATASET-01",
+      "title": "Dataset splitting produces stratified train/dev/test splits",
+      "status": "pass",
+      "evidence": "11 tests passed: test_default_ratios, test_custom_ratios, test_invalid_ratios_raise, test_stratification_preserves_difficulty, test_stratification_preserves_language, test_reproducibility_with_seed, test_small_dataset_handled, test_single_task_dataset, test_split_returns_dataset_split_model, test_empty_dataset_raises, test_no_overlap_between_splits. Configurable ratios, difficulty/language stratification, seed reproducibility, and no-overlap between splits all verified.",
+      "command": "uv run pytest tests/test_dataset.py -v -k \"split\"",
+      "output": "11 passed, 63 deselected in 0.12s",
+      "exitCode": 0
+    },
+    {
+      "id": "VAL-DATASET-02",
+      "title": "Dataset versioning produces immutable snapshots",
+      "status": "pass",
+      "evidence": "9 tests passed (TestDatasetVersioning class): test_create_version, test_version_is_immutable, test_multiple_versions, test_get_version, test_get_nonexistent_version, test_list_versions, test_latest_version, test_version_preserves_task_data, test_version_snapshot_is_deep_copy. Version snapshots are immutable deep copies; modifying the original dataset does not affect stored versions. Sequential versioning with retrieval by number confirmed.",
+      "command": "uv run pytest tests/test_dataset.py -v -k \"version\"",
+      "output": "10 passed (9 versioning + 1 export), 64 deselected in 0.11s",
+      "exitCode": 0
+    },
+    {
+      "id": "VAL-DATASET-03",
+      "title": "Dataset decontamination detects duplicates",
+      "status": "pass",
+      "evidence": "8 tests passed: test_detect_exact_duplicates, test_detect_near_duplicates, test_no_duplicates_in_clean_dataset, test_threshold_parameter, test_result_contains_flagged_ids, test_empty_dataset, test_single_task, test_result_is_dataclass. Exact and near-duplicate detection works with configurable threshold. Clean datasets produce no false positives.",
+      "command": "uv run pytest tests/test_dataset.py -v -k \"decontam\"",
+      "output": "8 passed, 66 deselected in 0.10s",
+      "exitCode": 0
+    },
+    {
+      "id": "VAL-DATASET-04",
+      "title": "Dataset difficulty estimation produces meaningful labels",
+      "status": "pass",
+      "evidence": "6 tests passed (TestDifficultyEstimator): test_easy_task, test_hard_task, test_medium_task, test_estimate_dataset, test_distribution_reasonable, test_respects_existing_difficulty_when_skipped. Simple tasks get EASY, complex distributed-systems tasks get HARD, moderate tasks get MEDIUM. Distribution across a mixed dataset produces at least 2 difficulty levels.",
+      "command": "uv run pytest tests/test_dataset.py -v -k \"difficulty\"",
+      "output": "9 passed (6 estimator + 3 related), 65 deselected in 0.11s",
+      "exitCode": 0
+    },
+    {
+      "id": "VAL-DATASET-05",
+      "title": "Dataset export produces standard formats",
+      "status": "pass",
+      "evidence": "8 tests passed (TestDatasetExport): test_export_to_json, test_export_to_json_file, test_export_to_csv, test_export_to_csv_file, test_json_round_trip, test_export_empty_dataset, test_json_has_schema_version_and_timestamp, test_csv_preserves_list_fields. JSON export includes schema_version and generated_at. CSV preserves list fields (constraints, dependencies). Round-trip fidelity verified.",
+      "command": "uv run pytest tests/test_dataset.py -v -k \"export\"",
+      "output": "8 passed, 66 deselected in 0.11s",
+      "exitCode": 0
+    },
+    {
+      "id": "VAL-DATASET-06",
+      "title": "Quality report summarizes dataset health",
+      "status": "pass",
+      "evidence": "7 tests passed (TestQualityReport): test_basic_report, test_language_counts, test_difficulty_counts, test_flags_short_descriptions, test_flags_missing_setup_commands, test_empty_dataset_report, test_report_to_dict. Reports include counts by language and difficulty, flag short descriptions, flag missing setup commands, and provide to_dict serialization.",
+      "command": "uv run pytest tests/test_dataset.py -v -k \"quality\"",
+      "output": "7 passed, 67 deselected in 0.11s",
+      "exitCode": 0
+    },
+    {
+      "id": "VAL-TASKFMT-02",
+      "title": "Task metadata is complete and validated",
+      "status": "pass",
+      "evidence": "test_import_validates_task_fields passed: YAML import with invalid fields (empty prompt, negative timeout) raises ValueError. Task Pydantic model validates required fields (id, prompt, language, test_command, difficulty) on construction. The test_import_preserves_all_metadata test also validates that all metadata fields round-trip correctly through export.",
+      "command": "uv run pytest tests/test_dataset.py -v -k \"metadata\"",
+      "output": "1 passed (test_import_preserves_all_metadata), 73 deselected in 0.10s",
+      "exitCode": 0
+    },
+    {
+      "id": "VAL-TASKFMT-03",
+      "title": "Manual task authoring via YAML/TOML metadata",
+      "status": "pass",
+      "evidence": "10 tests passed (TestYAMLImport): test_import_single_task, test_import_multiple_tasks, test_import_with_optional_fields, test_import_defaults, test_import_validates_task_fields, test_import_from_file, test_import_empty_tasks_list, test_import_into_dataset, test_import_duplicate_ids_detected, test_import_preserves_all_metadata. YAML import supports single/multiple tasks, optional fields with defaults, file-based import, validation, and full metadata preservation.",
+      "command": "uv run pytest tests/test_dataset.py -v -k \"yaml or toml or import or author\"",
+      "output": "10 passed, 64 deselected in 0.11s",
+      "exitCode": 0
+    },
+    {
+      "id": "VAL-TASKFMT-04",
+      "title": "Task ID uniqueness enforcement",
+      "status": "pass",
+      "evidence": "6 tests passed: test_add_task_enforces_unique_id (raises DuplicateEntry with task ID), test_add_tasks_batch_rejects_duplicate, test_detect_exact_duplicates (decontamination layer), test_detect_near_duplicates, test_no_duplicates_in_clean_dataset, test_import_duplicate_ids_detected (YAML import raises ValueError for duplicate IDs). Uniqueness enforced at Dataset.add_task level and during YAML import.",
+      "command": "uv run pytest tests/test_dataset.py -v -k \"unique or duplicate\"",
+      "output": "6 passed, 68 deselected in 0.10s",
+      "exitCode": 0
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "Tested 9 assertions across dataset management and task format: all 9 passed. 74 tests total in test_dataset.py, all passing in 0.15s. Evidence files saved for each assertion group."
+}

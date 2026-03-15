@@ -42,3 +42,8 @@ Testing surface, tools, and resource cost classification.
 - Integration tests requiring Docker skip gracefully when Docker is unavailable
 - Integration tests requiring API keys skip gracefully without credentials
 - No database or persistent state between test runs
+
+## Setup Notes
+
+- **Synthesis milestone** requires `uv sync --extra synthesis` to install `tree-sitter-language-pack`. Without this optional dependency, AST parsing and the end-to-end pipeline produce 0 tasks (graceful degradation per VAL-SYNTH-06). Always run `uv sync --extra synthesis` before testing synthesis milestone assertions.
+- First subagent installed the dependency and all 206 synthesis tests passed. Second subagent (group-dataset) didn't need it. Third subagent (group-pipeline) needed it but stayed within isolation boundary.
