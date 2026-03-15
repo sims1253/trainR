@@ -1,0 +1,51 @@
+{
+  "featureId": "m1-artifact-schema-and-registry",
+  "reviewedAt": "2026-03-15T06:15:00.000Z",
+  "commitId": "c4c24bb",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "The implementation is thorough, well-structured, and fully satisfies all three validation assertions (VAL-FOUND-04, VAL-FOUND-09, VAL-FOUND-10). The Artifact discriminated union uses a clean RootModel wrapper pattern to enable Pydantic v2 discriminated union validation while providing a convenient constructor interface. The ArtifactRegistry provides all required functionality: registration with duplicate detection, lookup by name/type, filtered listing, and HarnessConfig wiring. All 65 tests pass, type checking is clean on src/grist_mill/, and linting passes.",
+    "issues": [
+      {
+        "file": "src/grist_mill/schemas/artifact.py",
+        "line": 199,
+        "severity": "non_blocking",
+        "description": "Artifact.__new__ accepts **kwargs and passes them directly to variant constructors. This means invalid kwargs for a given variant (e.g., passing 'command' to ToolArtifact) will raise a ValidationError from the variant, not from Artifact itself. The error message will reference the variant class, not Artifact. This is acceptable behavior but could be surprising to users expecting errors from Artifact directly."
+      },
+      {
+        "file": "src/grist_mill/schemas/artifact.py",
+        "line": 130,
+        "severity": "non_blocking",
+        "description": "The Artifact class is not a Pydantic model but a regular class with static methods. This means isinstance checks against Artifact will never match (isinstance(tool, Artifact) is False). Users must use isinstance checks against the variant types (ToolArtifact, MCPServerArtifact, SkillArtifact). The test suite correctly uses variant isinstance checks, so this is not a practical issue, but it could be documented."
+      },
+      {
+        "file": "src/grist_mill/registry/__init__.py",
+        "line": 231,
+        "severity": "suggestion",
+        "description": "build_harness_config uses a late import of AgentConfig, EnvironmentConfig, and HarnessConfig inside the method body to avoid circular imports. This works but could be noted in comments for future maintainers. The approach is reasonable given the module structure."
+      },
+      {
+        "file": "src/grist_mill/registry/__init__.py",
+        "line": 242,
+        "severity": "suggestion",
+        "description": "build_harness_config wires artifact names as a flat list of strings into artifact_bindings rather than full artifact data. This is a name-only reference pattern, meaning the consumer must look up the actual artifact from the registry. This is a valid design choice (decoupling) but differs slightly from VAL-FOUND-11's wording about 'automatic injection into the agent's execution context'. The get_agent_context() method does provide the full data, which together satisfies the assertion."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "The backend-worker SKILL.md says to run 'uv run ty check .' (full repo) as a verification step, but AGENTS.md explicitly says to scope to 'uv run ty check src/grist_mill/' because the full repo has pre-existing legacy code issues. The worker correctly scoped to src/grist_mill/. The skill file should be updated to match AGENTS.md.",
+      "evidence": "SKILL.md step 7 says 'uv run ty check .' but AGENTS.md says 'ty check src/grist_mill/'. The worker's handoff shows 'uv run ty check src/grist_mill/' was used and passed."
+    },
+    {
+      "area": "services",
+      "observation": "The worker ran 'uv run pytest tests/test_artifact.py -x -q' and 'uv run pytest tests/test_registry.py -x -q' as individual test commands. The services.yaml already has a comprehensive test_grist_mill command that includes these files. This is not a problem but the worker could have used the services.yaml command instead.",
+      "evidence": "services.yaml has test_grist_mill command listing test_artifact.py and test_registry.py among others. The worker ran them individually."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "The m1-artifact-schema-and-registry feature is well-implemented and passes review. The Artifact discriminated union correctly routes to Tool/MCP/Skill variants via Pydantic v2 discriminated unions (VAL-FOUND-04). The ArtifactRegistry supports dynamic registration, lookup by name/type, duplicate detection with overwrite control, and filtered listing (VAL-FOUND-10). HarnessConfig wiring via build_harness_config() and get_agent_context() satisfies the automatic wiring requirement (VAL-FOUND-09, VAL-FOUND-11). All 65 tests pass. A few non-blocking observations about the Artifact class not being a true Pydantic model and the skill file having an outdated ty check command were noted."
+}

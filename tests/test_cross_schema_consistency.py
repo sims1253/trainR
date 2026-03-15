@@ -149,8 +149,20 @@ class TestNoSchemaRedefinitions:
     def test_all_downstream_modules_import_from_schemas(self) -> None:
         """Verify key downstream modules import from grist_mill.schemas."""
         downstream_modules = {
-            "harness.harness": {"HarnessConfig", "Task", "TaskResult", "ErrorCategory", "TaskStatus"},
-            "agents.api_agent": {"HarnessConfig", "Task", "TaskResult", "ErrorCategory", "TaskStatus"},
+            "harness.harness": {
+                "HarnessConfig",
+                "Task",
+                "TaskResult",
+                "ErrorCategory",
+                "TaskStatus",
+            },
+            "agents.api_agent": {
+                "HarnessConfig",
+                "Task",
+                "TaskResult",
+                "ErrorCategory",
+                "TaskStatus",
+            },
             "optimization.evaluator_adapter": {"Task", "TaskResult", "TaskStatus", "Difficulty"},
             "environments.local_runner": {"ExecutionOutput", "Task"},
             "harness.result_parser": {"TaskResult", "TaskStatus", "ErrorCategory"},
@@ -545,7 +557,9 @@ class TestSchemaRoundTrips:
     def test_manifest_serialization_round_trip(self) -> None:
         """Manifest with tasks round-trips without loss."""
         tasks = [
-            Task(id=f"t{i}", prompt=f"Task {i}", language="python", test_command="pytest", timeout=60)
+            Task(
+                id=f"t{i}", prompt=f"Task {i}", language="python", test_command="pytest", timeout=60
+            )
             for i in range(3)
         ]
         manifest = Manifest(name="bench", version="1.0", tasks=tasks)

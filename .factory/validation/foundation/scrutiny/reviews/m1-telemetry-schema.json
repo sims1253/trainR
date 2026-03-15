@@ -1,0 +1,45 @@
+{
+  "featureId": "m1-telemetry-schema",
+  "reviewedAt": "2026-03-15T06:30:00.000Z",
+  "commitId": "3eb7561",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "The implementation is thorough, clean, and well-documented. All five Pydantic v2 models (TokenUsage, LatencyBreakdown, ToolCallMetrics, TelemetrySchema, TelemetryCollector) are correctly implemented with proper validation constraints, sensible defaults, and comprehensive test coverage (42 tests). The track_phase() context manager correctly accumulates durations via try/finally, ensuring timing is recorded even on exceptions. Forward compatibility is achieved through Pydantic v2's extra='ignore'. All three VAL assertions (VAL-TELEM-01, VAL-TELEM-04, VAL-TELEM-05) are fully satisfied. Code follows project conventions: snake_case naming, proper type annotations, logging via logging module (no print statements), ruff-clean, ty-clean on src/grist_mill/.",
+    "issues": [
+      {
+        "file": "src/grist_mill/schemas/telemetry.py",
+        "line": 64,
+        "severity": "suggestion",
+        "description": "TokenUsage.total does not auto-compute from prompt+completion when not explicitly set. Creating TokenUsage(prompt=10, completion=20) yields total=0, not 30. The TelemetryCollector.record_tokens() handles this manually, so it works end-to-end, but direct TokenUsage construction without an explicit total may be surprising. Consider a model_validator or @computed_field."
+      },
+      {
+        "file": "src/grist_mill/schemas/telemetry.py",
+        "line": 175,
+        "severity": "suggestion",
+        "description": "estimated_cost_usd has no ge=0.0 constraint, so TelemetryCollector.set_estimated_cost(-1.0) would silently accept a negative cost. Consider adding ge=0.0 to the field."
+      },
+      {
+        "file": "src/grist_mill/schemas/__init__.py",
+        "line": 156,
+        "severity": "suggestion",
+        "description": "TaskResult.telemetry is typed as Any | None rather than TelemetrySchema | None. This provides flexibility but loses type safety — consumers can assign any value. Downstream code (harness, agents) correctly passes TelemetrySchema instances, so this is not a runtime issue, but a stricter type would improve developer experience."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "knowledge",
+      "observation": "The telemetry module is placed in src/grist_mill/schemas/telemetry.py rather than src/grist_mill/telemetry/. The architecture diagram in AGENTS.md and library/architecture.md both list a top-level telemetry/ module. The implementation choice is reasonable (keeps schemas together) but diverges from the documented architecture.",
+      "evidence": "AGENTS.md shows 'telemetry/          # Telemetry collection and schemas' as a top-level module. Actual implementation is at src/grist_mill/schemas/telemetry.py."
+    },
+    {
+      "area": "services",
+      "observation": "test_telemetry.py was correctly added to the test_grist_mill command in services.yaml by a subsequent worker. No gap here.",
+      "evidence": ".factory/services.yaml test_grist_mill command includes tests/test_telemetry.py"
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Feature m1-telemetry-schema is PASS. The implementation fully satisfies all three assigned assertions (VAL-TELEM-01, VAL-TELEM-04, VAL-TELEM-05) and all six expectedBehavior criteria. 42 unit tests provide comprehensive coverage. Three non-blocking suggestions for improvement: auto-computing TokenUsage.total, adding ge=0.0 to estimated_cost_usd, and typing TaskResult.telemetry more strictly. The telemetry module location diverges from the architecture diagram (schemas/telemetry.py vs top-level telemetry/ module) but this is a documentation concern, not a code issue."
+}

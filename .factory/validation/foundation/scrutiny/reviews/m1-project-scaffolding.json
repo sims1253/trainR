@@ -1,0 +1,47 @@
+{
+  "featureId": "m1-project-scaffolding",
+  "reviewedAt": "2026-03-15T07:30:00.000Z",
+  "commitId": "8bc48e7",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "The scaffolding implementation is thorough and correctly fulfills all requirements from the feature description and VAL-PKG-01 assertion. The worker transformed the legacy posit-gskill package into a clean grist-mill package with hatchling build, proper src layout, click-based CLI entrypoint, all requested optional extras (optimization, synthesis, providers), dev dependency group (pytest, ruff, ty), and comprehensive tool configuration (ruff, ty, pytest). All 7 verification commands passed with exit code 0. The test suite has 4 focused tests covering version string, semver format, CLI group importability, and --version option presence. The worker followed TDD as prescribed by the skill, and handled reasonable deviations (ty 0.0.x versioning, ty config format, removing .factory/ from .gitignore) with documented justification.",
+    "issues": [
+      {
+        "file": ".factory/skills/backend-worker/SKILL.md",
+        "line": null,
+        "severity": "suggestion",
+        "description": "The skill's verification commands section says 'ty check .' but AGENTS.md explicitly warns this will fail on the full repo due to legacy code. The worker correctly used 'ty check src/grist_mill/' instead. The skill should be updated to match AGENTS.md guidance to prevent future workers from encountering this known issue."
+      },
+      {
+        "file": "pyproject.toml",
+        "line": null,
+        "severity": "suggestion",
+        "description": "The original commit correctly defined the providers extra as [\"openai>=1.0.0\"]. A subsequent commit moved openai and docker into core dependencies. This is a minor semantic concern — the feature description asked for 'optional extras (optimization, synthesis, providers)' which was fulfilled at the time of this commit. The current state is an evolution, not a defect in this feature."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "skills",
+      "observation": "The backend-worker SKILL.md verification commands section says 'ty check .' but AGENTS.md explicitly states that 'ty check .' on the full repo will fail due to pre-existing legacy code. Workers must scope type checking to 'src/grist_mill/' only. The skill should be updated to say 'ty check src/grist_mill/' to match the documented guidance.",
+      "evidence": "SKILL.md line: 'uv run ty check .' in Verification Commands section. AGENTS.md line: 'IMPORTANT: ty check . on the full repo will fail due to pre-existing legacy code in bench/, scripts/, optimization/, and task_generator/. Workers must scope type checking to src/grist_mill/ only.'"
+    },
+    {
+      "area": "knowledge",
+      "observation": "The worker discovered that ty uses 0.0.x versioning (latest is 0.0.23, not 0.1+). The feature template or architecture docs should note this to prevent future workers from specifying incorrect version constraints.",
+      "evidence": "Handoff skillFeedback deviations: 'Changed ty>=0.1 to ty>=0.0.23 because latest ty release is 0.0.23 (0.0.x versioning scheme)'"
+    },
+    {
+      "area": "knowledge",
+      "observation": "The worker discovered that the ty type checker requires python-version to be under [tool.ty] environment section, not at the top level. This config format detail should be documented in library/architecture.md.",
+      "evidence": "Handoff skillFeedback deviations: 'Changed [tool.ty] python-version to [tool.ty] environment.python-version'. The final pyproject.toml shows [tool.ty] with environment.python-version = \"3.10\"."
+    }
+  ],
+  "addressesFailureFrom": null,
+  "assertionsChecked": [
+    "VAL-PKG-01"
+  ],
+  "summary": "The m1-project-scaffolding feature is implemented correctly. All requirements are met: pyproject.toml with hatchling build and grist-mill name, src/grist_mill/ module structure with __init__.py exporting __version__, click-based CLI entrypoint with --version support, dev dependencies (pytest, ruff, ty), optional extras (optimization, synthesis, providers), and passing tests. VAL-PKG-01 is satisfied: uv sync succeeds, grist-mill --version prints '0.1.0' (valid semantic version). The worker followed TDD procedure with documented deviations that were all justified. Three shared state observations noted: skill verification command mismatch for ty check scope, ty's 0.0.x versioning scheme, and ty's environment.python-version config format."
+}

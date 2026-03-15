@@ -19,9 +19,10 @@ Environment variables, external dependencies, and setup notes.
 ## Python Tooling
 
 - **Package manager:** `uv` — all commands use `uv run`, `uv sync`, `uv add`
-- **Type checker:** `ty` with strict settings
+- **Type checker:** `ty` with strict settings. **Important:** ty uses 0.0.x versioning (e.g., 0.0.23, NOT 0.1+). The python-version must go under `[tool.ty]` → `environment.python-version`, NOT at the top level of `[tool.ty]`.
 - **Linter/Formatter:** `ruff check --fix && ruff format`
 - **Test runner:** `pytest` with markers
+- **Click:** `CliRunner(mix_stderr=False)` is NOT compatible with the installed Click version. Use `CliRunner()` without `mix_stderr` parameter.
 
 ## Optional Dependencies
 
