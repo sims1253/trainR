@@ -1,0 +1,38 @@
+{
+  "milestone": "optimization",
+  "round": 1,
+  "status": "pass",
+  "assertionsSummary": {
+    "total": 16,
+    "passed": 16,
+    "failed": 0,
+    "blocked": 0
+  },
+  "passedAssertions": [
+    "VAL-GEPA-01",
+    "VAL-GEPA-02",
+    "VAL-GEPA-03",
+    "VAL-GEPA-04",
+    "VAL-GEPA-05",
+    "VAL-GEPA-06",
+    "VAL-OPT-01",
+    "VAL-OPT-02",
+    "VAL-OPT-03",
+    "VAL-OPT-04",
+    "VAL-OPT-05",
+    "VAL-OPT-06",
+    "VAL-OPT-07",
+    "VAL-OPT-08",
+    "VAL-CROSS-05",
+    "VAL-CROSS-07"
+  ],
+  "failedAssertions": [],
+  "blockedAssertions": [],
+  "flowReports": [
+    ".factory/validation/optimization/user-testing/flows/group-gepa.json",
+    ".factory/validation/optimization/user-testing/flows/group-opt-runtime.json",
+    ".factory/validation/optimization/user-testing/flows/group-cross-opt.json"
+  ],
+  "appliedUpdates": [],
+  "previousRound": null
+}

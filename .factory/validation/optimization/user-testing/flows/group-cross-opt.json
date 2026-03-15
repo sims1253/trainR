@@ -1,0 +1,58 @@
+{
+  "groupId": "group-cross-opt",
+  "milestone": "optimization",
+  "testedAt": "2026-03-15T00:00:00Z",
+  "isolation": {
+    "workingDirectory": "/home/m0hawk/Documents/trainR",
+    "packageManager": "uv",
+    "testFile": "tests/test_cross_optimization.py",
+    "totalTests": 24,
+    "allPassed": true
+  },
+  "toolsUsed": ["pytest"],
+  "assertions": [
+    {
+      "id": "VAL-CROSS-05",
+      "title": "Optimization loop uses stable task dataset and harness",
+      "status": "pass",
+      "evidence": "All 13 tests mapped to VAL-CROSS-05 passed. Verified: (1) task dataset IDs remain constant across all iterations with no drift, (2) train and holdout sets are disjoint, (3) target config (type, seed content) stays constant across iterations, (4) evaluator objective is stable, (5) checkpoint records correct target type matching config, (6) best score is the maximum across all iterations (0.7 achieved from [0.3, 0.5, 0.4, 0.7, 0.6]), (7) Pareto front prevents regression by rejecting worse candidates, (8) trajectory records all iterations with valid score bounds, (9) converging metrics cause early stopping with 'no_improvement' termination, (10-13) export artifacts (best_candidate.json, trajectory.jsonl, pareto front in results, valid JSON export) are all produced with correct schema.",
+      "testNames": [
+        "TestStableTaskDataset::test_task_dataset_ids_are_constant_across_iterations",
+        "TestStableTaskDataset::test_train_and_holdout_are_disjoint",
+        "TestConsistentHarnessConfiguration::test_target_config_remains_constant",
+        "TestConsistentHarnessConfiguration::test_evaluator_objective_is_stable",
+        "TestConsistentHarnessConfiguration::test_checkpoint_target_type_matches_config",
+        "TestMonotonicOrConvergingMetrics::test_best_score_is_best_across_all_iterations",
+        "TestMonotonicOrConvergingMetrics::test_pareto_front_prevents_regression",
+        "TestMonotonicOrConvergingMetrics::test_trajectory_records_all_iterations",
+        "TestMonotonicOrConvergingMetrics::test_converging_metrics_stabilize",
+        "TestOptimizationResultsExportable::test_best_candidate_json_is_valid_report_artifact",
+        "TestOptimizationResultsExportable::test_trajectory_jsonl_is_produced",
+        "TestOptimizationResultsExportable::test_optimization_result_contains_pareto_front",
+        "TestOptimizationResultsExportable::test_export_best_candidate_produces_valid_json"
+      ]
+    },
+    {
+      "id": "VAL-CROSS-07",
+      "title": "Checkpoint and resume across evaluation and optimization",
+      "status": "pass",
+      "evidence": "All 11 tests mapped to VAL-CROSS-07 passed. Verified: (1) checkpoint state contains all required fields (iteration, call_count, best_score, candidates, pareto_front, best_candidate, trajectory, target_type, seed_content, elapsed_s), (2) checkpoint roundtrips through save/load without data loss for all fields, (3) resumed run starts from checkpointed iteration (not from 0) and produces more iterations than the first run, (4) resumed run uses the same task dataset as the original run, (5) with deterministic evaluator, interrupted+resumed run produces identical best_score to uninterrupted run, (6) checkpoint survives across runs (simulating new process by creating new checkpoint manager), (7) budget counter continuity is preserved on resume (total calls respect max_calls budget), (8-10) end-to-end tests confirm full optimization produces valid outputs, target type propagates to all outputs, seed content preserved in checkpoint, and checkpoint/resume works for all target types (skill, system_prompt, tool_policy).",
+      "testNames": [
+        "TestCheckpointResumeConsistency::test_checkpoint_state_is_complete",
+        "TestCheckpointResumeConsistency::test_checkpoint_roundtrip_preserves_values",
+        "TestCheckpointResumeConsistency::test_resumed_run_continues_from_correct_iteration",
+        "TestCheckpointResumeConsistency::test_resumed_run_uses_same_task_dataset",
+        "TestCheckpointResumeConsistency::test_identical_results_with_deterministic_evaluator",
+        "TestCheckpointResumeConsistency::test_checkpoint_survives_across_runs",
+        "TestCheckpointResumeConsistency::test_resume_preserves_budget_counter_continuity",
+        "TestOptimizationEndToEndStability::test_full_optimization_produces_valid_outputs",
+        "TestOptimizationEndToEndStability::test_target_type_propagates_to_output",
+        "TestOptimizationEndToEndStability::test_seed_content_preserved_in_checkpoint",
+        "TestOptimizationEndToEndStability::test_multiple_target_types_with_checkpoint_resume"
+      ]
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "All 24 cross-optimization tests passed. VAL-CROSS-05 (stable task dataset and harness configuration) verified by 13 tests covering stable task IDs, disjoint train/holdout, constant target config, stable evaluator objective, monotonically improving metrics via Pareto front, convergence-based early stopping, and export artifact validity. VAL-CROSS-07 (checkpoint and resume consistency) verified by 11 tests covering complete checkpoint state, roundtrip fidelity, correct iteration resumption, same task dataset on resume, identical results with deterministic evaluator, cross-run checkpoint survival, budget counter continuity, and end-to-end stability across all target types."
+}

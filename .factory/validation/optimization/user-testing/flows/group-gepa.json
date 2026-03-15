@@ -1,0 +1,237 @@
+{
+  "groupId": "group-gepa",
+  "milestone": "optimization",
+  "testedAt": "2026-03-15T12:00:00Z",
+  "isolation": {
+    "workingDirectory": "/home/m0hawk/Documents/trainR",
+    "packageManager": "uv",
+    "testFile": "tests/test_gepa_adapter.py",
+    "testCount": 48,
+    "dockerRequired": false,
+    "apiKeysRequired": false
+  },
+  "toolsUsed": ["pytest"],
+  "assertions": [
+    {
+      "id": "VAL-GEPA-01",
+      "title": "Evaluator adapter captures actionable side information",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run pytest on tests/test_gepa_adapter.py (48 tests)",
+          "expected": "All tests pass",
+          "observed": "48 passed in 0.13s"
+        },
+        {
+          "action": "Verify side_info contains traces field (test_side_info_has_traces)",
+          "expected": "side_info has 'traces' key with list value",
+          "observed": "PASSED — traces extracted from TaskResult.transcript"
+        },
+        {
+          "action": "Verify side_info contains errors field (test_side_info_has_errors)",
+          "expected": "side_info has 'errors' key with error info for failed tasks",
+          "observed": "PASSED — errors extracted from transcript and error_category"
+        },
+        {
+          "action": "Verify side_info contains duration_s field (test_side_info_has_duration_s)",
+          "expected": "side_info has 'duration_s' key with float >= 0",
+          "observed": "PASSED — duration from telemetry latency.total_s, overridden by wall-clock"
+        },
+        {
+          "action": "Verify side_info contains token_usage field (test_side_info_has_token_usage)",
+          "expected": "side_info has 'token_usage' with prompt, completion, total keys",
+          "observed": "PASSED — token_usage dict with all 3 fields"
+        },
+        {
+          "action": "Verify side_info for timeout results (test_side_info_for_timeout)",
+          "expected": "status=TIMEOUT, error_category=None, duration_s >= 0",
+          "observed": "PASSED — all fields correct for timeout"
+        },
+        {
+          "action": "Verify side_info for error results (test_side_info_for_error)",
+          "expected": "status=ERROR, error_category=API_ERROR",
+          "observed": "PASSED — error results captured correctly"
+        },
+        {
+          "action": "Verify null telemetry handled gracefully (test_side_info_null_telemetry)",
+          "expected": "token_usage defaults to 0, no crash",
+          "observed": "PASSED — null telemetry produces defaults"
+        },
+        {
+          "action": "Verify side_info has tool_calls (test_side_info_has_tool_calls)",
+          "expected": "tool_calls dict with total_calls, successful_calls",
+          "observed": "PASSED — tool call metrics extracted correctly"
+        },
+        {
+          "action": "Verify harness exception handling (test_harness_raises_exception)",
+          "expected": "score=0.0, status=ERROR, error message captured",
+          "observed": "PASSED — RuntimeError captured with 'Docker not available' in errors"
+        }
+      ],
+      "evidence": {
+        "testOutput": "48 passed in 0.13s",
+        "sourceVerified": "evaluator_adapter.py _build_side_info() builds all fields: task_id, status, score, difficulty, error_category, errors, traces, duration_s, token_usage, tool_calls, raw_events"
+      },
+      "issues": null,
+      "testNames": [
+        "TestGepaEvaluatorAdapter::test_side_info_has_task_id",
+        "TestGepaEvaluatorAdapter::test_side_info_has_status",
+        "TestGepaEvaluatorAdapter::test_side_info_has_traces",
+        "TestGepaEvaluatorAdapter::test_side_info_has_errors",
+        "TestGepaEvaluatorAdapter::test_side_info_has_duration_s",
+        "TestGepaEvaluatorAdapter::test_side_info_has_token_usage",
+        "TestGepaEvaluatorAdapter::test_side_info_has_error_category",
+        "TestGepaEvaluatorAdapter::test_side_info_for_timeout",
+        "TestGepaEvaluatorAdapter::test_side_info_for_error",
+        "TestGepaEvaluatorAdapter::test_side_info_null_telemetry",
+        "TestGepaEvaluatorAdapter::test_side_info_has_tool_calls",
+        "TestGepaEvaluatorAdapter::test_harness_raises_exception"
+      ]
+    },
+    {
+      "id": "VAL-GEPA-02",
+      "title": "Side information is passed to the reflection model",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Verify side_info has difficulty field for reflection context (test_side_info_has_difficulty)",
+          "expected": "side_info contains task difficulty",
+          "observed": "PASSED — difficulty='HARD' captured in side_info"
+        },
+        {
+          "action": "Verify side_info forwards error messages for reflection (test_side_info_forwards_error_messages)",
+          "expected": "errors list with error_category correlating with failures",
+          "observed": "PASSED — error_category='TEST_FAILURE' and errors extracted from transcript"
+        },
+        {
+          "action": "Verify side_info forwards trace events when enabled (test_side_info_forwards_trace_events)",
+          "expected": "raw_events present when trace_enabled=True",
+          "observed": "PASSED — 2 raw_events captured from telemetry"
+        }
+      ],
+      "evidence": {
+        "testOutput": "All 3 VAL-GEPA-02 tests PASSED",
+        "sourceVerified": "evaluator_adapter.py _build_side_info() includes difficulty, errors (from _extract_errors), and raw_events (from _extract_raw_events when trace_enabled=True). Side info dict is the second element of the return tuple, directly available to GEPA reflection model."
+      },
+      "issues": null,
+      "testNames": [
+        "TestGepaEvaluatorAdapter::test_side_info_has_difficulty",
+        "TestGepaEvaluatorAdapter::test_side_info_forwards_error_messages",
+        "TestGepaEvaluatorAdapter::test_side_info_forwards_trace_events"
+      ]
+    },
+    {
+      "id": "VAL-GEPA-03",
+      "title": "Multi-objective evaluation produces composite scores",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Verify PassRateObjective correctness (6 tests)",
+          "expected": "all-pass=1.0, half-pass=0.5, none-pass=0.0, empty=0.0, deterministic",
+          "observed": "PASSED — all 6 tests pass"
+        },
+        {
+          "action": "Verify CostAdjustedObjective correctness (4 tests)",
+          "expected": "cheap success > expensive success, failure=0.0, deterministic",
+          "observed": "PASSED — all 4 tests pass"
+        },
+        {
+          "action": "Verify DifficultyWeightedObjective correctness (4 tests)",
+          "expected": "hard > easy weight, all-pass=1.0, none-pass=0.0, deterministic",
+          "observed": "PASSED — all 4 tests pass"
+        },
+        {
+          "action": "Verify objective factory creates correct types (4 tests)",
+          "expected": "create() returns correct subclass, raises on unknown, distinct scores",
+          "observed": "PASSED — factory works, invalid name raises ValueError, distinct scores confirmed"
+        },
+        {
+          "action": "Verify objectives produce distinct scores for same results (test_objectives_produce_distinct_scores)",
+          "expected": "pass-rate != cost-adjusted for same results",
+          "observed": "PASSED — cost-adjusted differs from pass-rate due to cost penalty"
+        },
+        {
+          "action": "Verify all objectives are deterministic (test_objectives_deterministic)",
+          "expected": "5 runs produce same score for each objective",
+          "observed": "PASSED — all 3 objectives deterministic"
+        },
+        {
+          "action": "Verify adapter-level objective integration (3 tests)",
+          "expected": "pass-rate, cost-adjusted, difficulty-weighted all work through adapter",
+          "observed": "PASSED — all 3 adapter objective tests pass"
+        }
+      ],
+      "evidence": {
+        "testOutput": "All 17 VAL-GEPA-03 tests PASSED",
+        "sourceVerified": "evaluator_adapter.py defines PassRateObjective, CostAdjustedObjective, DifficultyWeightedObjective (all extending ObjectiveFunction). ObjectiveFunction.create() factory maps names to classes. GepaEvaluatorAdapter.__call__() computes score via _objective_function.compute()."
+      },
+      "issues": null,
+      "testNames": [
+        "TestPassRateObjective::test_all_pass",
+        "TestPassRateObjective::test_half_pass",
+        "TestPassRateObjective::test_none_pass",
+        "TestPassRateObjective::test_empty_results",
+        "TestPassRateObjective::test_single_success",
+        "TestPassRateObjective::test_deterministic",
+        "TestCostAdjustedObjective::test_cheap_success",
+        "TestCostAdjustedObjective::test_expensive_success_lower_score",
+        "TestCostAdjustedObjective::test_failure_zero",
+        "TestCostAdjustedObjective::test_deterministic",
+        "TestDifficultyWeightedObjective::test_hard_success_weighs_more",
+        "TestDifficultyWeightedObjective::test_all_difficulties_pass",
+        "TestDifficultyWeightedObjective::test_none_pass",
+        "TestDifficultyWeightedObjective::test_deterministic",
+        "TestObjectiveFactory::test_create_pass_rate",
+        "TestObjectiveFactory::test_create_cost_adjusted",
+        "TestObjectiveFactory::test_create_difficulty_weighted",
+        "TestObjectiveFactory::test_invalid_objective_raises",
+        "TestObjectiveFactory::test_objectives_produce_distinct_scores",
+        "TestGepaEvaluatorAdapter::test_pass_rate_objective",
+        "TestGepaEvaluatorAdapter::test_cost_adjusted_objective",
+        "TestGepaEvaluatorAdapter::test_difficulty_weighted_objective",
+        "TestGepaEvaluatorAdapter::test_objectives_deterministic"
+      ]
+    },
+    {
+      "id": "VAL-GEPA-06",
+      "title": "Evaluator adapter is pluggable",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Verify load_custom_evaluator wraps callable (test_load_custom_evaluator_wraps_callable)",
+          "expected": "Custom eval function is wrapped and callable",
+          "observed": "PASSED — load_custom_evaluator returns wrapped callable"
+        },
+        {
+          "action": "Verify custom evaluator is called correctly (test_custom_evaluator_called)",
+          "expected": "Custom function receives candidate+example, returns score+side_info",
+          "observed": "PASSED — custom eval called once, returns (0.75, {custom: True})"
+        },
+        {
+          "action": "Verify factory creates adapter from config (test_create_evaluator_adapter_factory)",
+          "expected": "create_evaluator_adapter returns GepaEvaluatorAdapter instance",
+          "observed": "PASSED — factory creates correct type"
+        },
+        {
+          "action": "Verify factory passes custom objective params (test_create_evaluator_adapter_custom_objective_params)",
+          "expected": "cost_per_token=0.002 forwarded to objective",
+          "observed": "PASSED — adapter._objective_function.cost_per_token == 0.002"
+        }
+      ],
+      "evidence": {
+        "testOutput": "All 4 VAL-GEPA-06 tests PASSED",
+        "sourceVerified": "evaluator_adapter.py provides load_custom_evaluator() which wraps any callable conforming to the GEPA evaluator protocol. It validates return types, ensures task_id in side_info, and adds logging. create_evaluator_adapter() factory creates GepaEvaluatorAdapter from config. EvaluatorAdapterConfig supports custom objective params."
+      },
+      "issues": null,
+      "testNames": [
+        "TestGepaEvaluatorAdapter::test_custom_evaluator_called",
+        "TestGepaEvaluatorAdapter::test_load_custom_evaluator_wraps_callable",
+        "TestGepaEvaluatorAdapter::test_create_evaluator_adapter_factory",
+        "TestGepaEvaluatorAdapter::test_create_evaluator_adapter_custom_objective_params"
+      ]
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "Tested 4 assertions (VAL-GEPA-01, VAL-GEPA-02, VAL-GEPA-03, VAL-GEPA-06) using 48 pytest unit tests in tests/test_gepa_adapter.py. All 48 tests passed in 0.13s. All assertions PASS: side_info captures all required fields (traces, errors, duration, token_usage), side_info is forwarded for reflection, multi-objective scoring produces deterministic distinct composite scores, and the evaluator adapter is pluggable via load_custom_evaluator and create_evaluator_adapter factory."
+}
