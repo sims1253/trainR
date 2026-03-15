@@ -32,7 +32,7 @@ from grist_mill.schemas import (
     TaskResult,
     TaskStatus,
 )
-from grist_mill.schemas.telemetry import TelemetryCollector
+from grist_mill.schemas.telemetry import TelemetryCollector, TelemetrySchema
 
 logger = logging.getLogger(__name__)
 
@@ -260,15 +260,19 @@ class Harness:
         # --- Determine final result ---
         if test_result is not None:
             # Test execution gives us the definitive answer
-            # Build final result from test_result but with full telemetry snapshot
-            final_telemetry = collector.build()
+            # Merge harness telemetry (phase timings) with agent telemetry
+            # (tool calls, tokens, cost) so the final result has both.
+            final_telemetry = _merge_harness_and_agent_telemetry(
+                harness_collector=collector,
+                agent_result=agent_result,
+            )
             final_result = TaskResult(
                 task_id=test_result.task_id,
                 status=test_result.status,
                 score=test_result.score,
                 error_category=test_result.error_category,
                 telemetry=final_telemetry,
-                transcript=test_result.transcript,
+                transcript=agent_result.transcript or test_result.transcript,
             )
         else:
             # No test execution (TIMEOUT/SKIPPED) — use agent result with telemetry
@@ -458,6 +462,48 @@ def _merge_telemetry(
         telemetry=telemetry,
         transcript=result.transcript,
     )
+
+
+def _merge_harness_and_agent_telemetry(
+    *,
+    harness_collector: TelemetryCollector,
+    agent_result: TaskResult,
+) -> TelemetrySchema:
+    """Merge the harness collector's phase timings with the agent's telemetry.
+
+    The harness collector records setup/execution/teardown phase durations
+    and raw events. The agent records token usage, tool call metrics, and
+    cost. The merge combines both into a single TelemetrySchema.
+
+    Args:
+        harness_collector: The harness's TelemetryCollector with phase timings.
+        agent_result: The agent's TaskResult containing its telemetry.
+
+    Returns:
+        A merged TelemetrySchema with data from both sources.
+    """
+    harness_telem = harness_collector.build()
+
+    # Start with the harness telemetry (phase timings + raw events)
+    merged = harness_telem.model_copy(deep=True)
+
+    # Overlay agent telemetry data if available
+    agent_telem = agent_result.telemetry
+    if agent_telem is not None:
+        if hasattr(agent_telem, "tokens") and agent_telem.tokens.total > 0:
+            merged.tokens = agent_telem.tokens.model_copy()
+        if hasattr(agent_telem, "tool_calls") and agent_telem.tool_calls.total_calls > 0:
+            merged.tool_calls = agent_telem.tool_calls.model_copy()
+        if (
+            hasattr(agent_telem, "estimated_cost_usd")
+            and agent_telem.estimated_cost_usd is not None
+        ):
+            merged.estimated_cost_usd = agent_telem.estimated_cost_usd
+        # Append agent's raw events after harness events
+        if hasattr(agent_telem, "raw_events") and agent_telem.raw_events:
+            merged.raw_events = list(merged.raw_events) + list(agent_telem.raw_events)
+
+    return merged
 
 
 # ---------------------------------------------------------------------------
