@@ -1,0 +1,179 @@
+{
+  "groupId": "group-harness-telemetry",
+  "testedAt": "2026-03-15T12:00:00Z",
+  "isolation": {
+    "workingDirectory": "/home/m0hawk/Documents/trainR",
+    "environment": "uv sync complete, grist-mill 0.1.0 installed",
+    "testFile": "tests/test_harness.py",
+    "pythonVersion": "3.14.0",
+    "pytestVersion": "9.0.2"
+  },
+  "toolsUsed": ["pytest"],
+  "assertions": [
+    {
+      "id": "VAL-HARNESS-08",
+      "title": "Harness wires task to artifact config to agent execution to result capture",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run pytest on TestHarnessWiring class (6 tests)",
+          "expected": "All tests pass verifying call sequence: env.prepare -> agent.run -> env.execute(test_command) -> cleanup",
+          "observed": "All 6 tests passed. test_harness_calls_prepare_agent_execute_cleanup verifies full call sequence. test_harness_call_order_is_correct verifies exact order (prepare < execute < cleanup). test_harness_guarantees_cleanup_on_exception verifies cleanup on agent crash. test_harness_guarantees_cleanup_on_prepare_exception verifies cleanup on setup failure. test_harness_captures_test_execution_result verifies test result captured in TaskResult. test_harness_with_timeout_on_test_execution verifies timeout handling."
+        }
+      ],
+      "evidence": {
+        "testOutput": "evidence/harness/group-harness-telemetry/pytest-output.txt",
+        "testClass": "TestHarnessWiring",
+        "testCount": 6,
+        "passCount": 6,
+        "keyAssertions": [
+          "env.prepare called before agent.run",
+          "env.execute(test_command) called after agent.run",
+          "env.cleanup always called (even on exceptions)",
+          "TaskResult populated with correct task_id, status, score",
+          "Test execution failure reflected in result with ErrorCategory.TEST_FAILURE"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-HARNESS-09",
+      "title": "Harness supports retry logic on transient failures",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run pytest on TestHarnessRetry and TestTransientErrorDetection classes (16 tests)",
+          "expected": "Retry on RATE_LIMIT/API_ERROR/NETWORK_ERROR; no retry on TEST_FAILURE/TIMEOUT/SKIPPED/SUCCESS; configurable count and delay",
+          "observed": "All 16 tests passed. test_retry_on_rate_limit: agent called 3 times (2 failures + success). test_retry_on_api_error: agent called 2 times. test_retry_on_network_error: agent called 2 times. test_no_retry_on_test_failure: agent called 1 time. test_no_retry_on_timeout: agent called 1 time. test_no_retry_on_success: agent called 1 time. test_no_retry_on_skipped: agent called 1 time. test_retry_exhausts_max_retries: 3 calls (initial + 2 retries). test_retry_delay_is_respected: elapsed >= 0.15s with 2 retries of 0.1s. test_retry_with_zero_max_retries: 1 call only. TransientErrorDetection tests confirm RATE_LIMIT, API_ERROR, NETWORK_ERROR are retriable; TEST_FAILURE, TIMEOUT, UNKNOWN, SYNTAX_ERROR, ENVIRONMENT_ERROR, None are not."
+        }
+      ],
+      "evidence": {
+        "testOutput": "evidence/harness/group-harness-telemetry/pytest-output.txt",
+        "testClasses": ["TestHarnessRetry", "TestTransientErrorDetection"],
+        "testCount": 16,
+        "passCount": 16,
+        "keyAssertions": [
+          "RATE_LIMIT retried (3 attempts, 2 failures + success)",
+          "API_ERROR retried (2 attempts, 1 failure + success)",
+          "NETWORK_ERROR retried (2 attempts, 1 failure + success)",
+          "TEST_FAILURE not retried (1 attempt)",
+          "TIMEOUT not retried (1 attempt)",
+          "SKIPPED not retried (1 attempt)",
+          "SUCCESS not retried (1 attempt)",
+          "max_retries configurable (default=3)",
+          "retry_delay configurable (default=1.0)",
+          "Delay respected between retries (elapsed >= 0.15s with 0.1s delay x 2)"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-TELEM-02",
+      "title": "Telemetry captures latency breakdown by phase",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run test_telemetry_captures_latency_breakdown",
+          "expected": "Telemetry records setup_s, execution_s, teardown_s, total_s; sum of phases approximates total_s within 100ms",
+          "observed": "Test passed. Verifies all phase durations >= 0 and abs(total_s - (setup_s + execution_s + teardown_s)) < 0.1"
+        }
+      ],
+      "evidence": {
+        "testOutput": "evidence/harness/group-harness-telemetry/pytest-output.txt",
+        "testName": "TestHarnessTelemetry::test_telemetry_captures_latency_breakdown",
+        "keyAssertions": [
+          "telemetry.latency.setup_s >= 0",
+          "telemetry.latency.execution_s >= 0",
+          "telemetry.latency.teardown_s >= 0",
+          "telemetry.latency.total_s >= 0",
+          "abs(total_s - sum(phases)) < 0.1 (within 100ms tolerance)"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-TELEM-03",
+      "title": "Telemetry captures tool call metrics",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run test_telemetry_captures_tool_call_metrics",
+          "expected": "ToolCallMetrics records total_calls, successful_calls, failed_calls, by_tool breakdown, total_duration_ms",
+          "observed": "Test passed. Pre-populated collector with 3 tool calls (bash success, editor success, bash failure). Verified: total_calls=3, successful_calls=2, failed_calls=1, by_tool['bash']={calls:2, failures:1}, by_tool['editor']={calls:1}, total_duration_ms≈180.0"
+        }
+      ],
+      "evidence": {
+        "testOutput": "evidence/harness/group-harness-telemetry/pytest-output.txt",
+        "testName": "TestHarnessTelemetry::test_telemetry_captures_tool_call_metrics",
+        "keyAssertions": [
+          "tool_calls.total_calls == 3",
+          "tool_calls.successful_calls == 2",
+          "tool_calls.failed_calls == 1",
+          "by_tool['bash']['calls'] == 2",
+          "by_tool['bash']['failures'] == 1",
+          "by_tool['editor']['calls'] == 1",
+          "total_duration_ms == pytest.approx(180.0)"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-TELEM-06",
+      "title": "Telemetry is attached to every TaskResult",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run 3 telemetry tests covering success, failure, and error (agent exception) cases",
+          "expected": "All TaskResults have non-null telemetry with latency.total_s > 0",
+          "observed": "All 3 tests passed. test_telemetry_attached_on_success: telemetry non-null, isinstance TelemetrySchema, total_s > 0. test_telemetry_attached_on_failure: same assertions pass. test_telemetry_attached_on_error: agent raises RuntimeError, telemetry still non-null with total_s > 0."
+        }
+      ],
+      "evidence": {
+        "testOutput": "evidence/harness/group-harness-telemetry/pytest-output.txt",
+        "testNames": [
+          "TestHarnessTelemetry::test_telemetry_attached_on_success",
+          "TestHarnessTelemetry::test_telemetry_attached_on_failure",
+          "TestHarnessTelemetry::test_telemetry_attached_on_error"
+        ],
+        "keyAssertions": [
+          "result.telemetry is not None on SUCCESS",
+          "result.telemetry is not None on FAILURE",
+          "result.telemetry is not None on ERROR (agent exception)",
+          "isinstance(result.telemetry, TelemetrySchema) in all cases",
+          "result.telemetry.latency.total_s > 0 in all cases"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-TELEM-07",
+      "title": "Telemetry supports raw event audit trail",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run test_raw_events_populated_when_trace_enabled and test_raw_events_empty_when_trace_disabled",
+          "expected": "raw_events non-empty when trace_enabled=True; raw_events empty when trace_enabled=False",
+          "observed": "Both tests passed. With trace_enabled=True: raw_events is non-empty, contains events with phases 'prepare', 'execute', 'cleanup'. With trace_enabled=False: raw_events is empty list."
+        }
+      ],
+      "evidence": {
+        "testOutput": "evidence/harness/group-harness-telemetry/pytest-output.txt",
+        "testNames": [
+          "TestHarnessTelemetry::test_raw_events_populated_when_trace_enabled",
+          "TestHarnessTelemetry::test_raw_events_empty_when_trace_disabled"
+        ],
+        "keyAssertions": [
+          "trace_enabled=True: len(raw_events) > 0",
+          "trace_enabled=True: 'prepare' in event phases",
+          "trace_enabled=True: 'execute' in event phases",
+          "trace_enabled=True: 'cleanup' in event phases",
+          "trace_enabled=False: len(raw_events) == 0"
+        ]
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "Tested 6 assertions across 40 pytest tests: all passed. VAL-HARNESS-08 (6 tests): full harness wiring sequence verified with correct call order and cleanup guarantees. VAL-HARNESS-09 (16 tests): retry on transient errors (RATE_LIMIT, API_ERROR, NETWORK_ERROR), no retry on deterministic failures (TEST_FAILURE, TIMEOUT, SKIPPED), configurable count and delay. VAL-TELEM-02 (1 test): latency breakdown by phase with sum-within-100ms tolerance. VAL-TELEM-03 (1 test): tool call metrics including by_tool breakdown and total duration. VAL-TELEM-06 (3 tests): telemetry non-null on success, failure, and error paths. VAL-TELEM-07 (2 tests): raw_events populated with trace_enabled=True, empty with False. Additional 11 tests cover config defaults, transient error detection, and run_experiment helper."
+}

@@ -1,0 +1,290 @@
+{
+  "groupId": "group-docker-runner",
+  "testedAt": "2026-03-15T12:00:00Z",
+  "isolation": {
+    "workingDirectory": "/home/m0hawk/Documents/trainR",
+    "environment": "uv sync complete, grist-mill 0.1.0, Docker 28.2.2",
+    "missionDir": "/home/m0hawk/.factory/missions/b7be2dff-a627-40c8-868c-e2705d5ca116"
+  },
+  "toolsUsed": ["pytest"],
+  "assertions": [
+    {
+      "id": "VAL-HARNESS-02",
+      "title": "Docker-based runner creates and executes a container for each task",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run test_docker_runner.py (44 tests covering DockerRunner)",
+          "expected": "All tests pass",
+          "observed": "44 passed in 18.46s"
+        },
+        {
+          "action": "Verify container creation: test_prepare_sets_prepared_flag, test_prepare_with_mock",
+          "expected": "Docker container created from configured image via Docker API",
+          "observed": "PASS — mock asserts containers.create called once, container_id stored"
+        },
+        {
+          "action": "Verify container execution: test_execute_simple_command, test_execute_captures_stderr, test_execute_nonzero_exit_code",
+          "expected": "Commands execute inside container, stdout/stderr captured, exit code returned",
+          "observed": "PASS — echo hello produces 'hello', stderr captured separately, exit 42 returns code 42"
+        },
+        {
+          "action": "Verify result returned as TaskResult: test_run_task_success, test_run_task_failure",
+          "expected": "run_task returns TaskResult with status and score",
+          "observed": "PASS — SUCCESS with score=1.0 for passing command; FAILURE/ERROR for exit 1"
+        },
+        {
+          "action": "Verify container removal: test_cleanup_removes_container",
+          "expected": "cleanup() removes Docker container, subsequent get() raises NotFound",
+          "observed": "PASS — container.get(container_id) raises exception after cleanup"
+        }
+      ],
+      "evidence": {
+        "testOutput": "evidence/harness/group-docker-runner/pytest_output.txt",
+        "relevantTests": [
+          "TestDockerRunnerPrepare::test_prepare_sets_prepared_flag",
+          "TestDockerRunnerPrepare::test_prepare_calls_ensure_image",
+          "TestDockerRunnerExecute::test_execute_simple_command",
+          "TestDockerRunnerExecute::test_execute_captures_stderr",
+          "TestDockerRunnerExecute::test_execute_nonzero_exit_code",
+          "TestDockerRunnerCleanup::test_cleanup_removes_container",
+          "TestDockerRunnerRunTask::test_run_task_success",
+          "TestDockerRunnerRunTask::test_run_task_failure",
+          "TestDockerRunnerPythonApi::test_prepare_with_mock",
+          "TestDockerRunnerPythonApi::test_execute_with_mock",
+          "TestDockerRunnerPythonApi::test_cleanup_with_mock"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-HARNESS-03",
+      "title": "Docker runner injects artifacts and agent config into container",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "test_artifacts_injected_into_container: inject hello.txt and subdir/nested.py, verify via cat inside container",
+          "expected": "Artifacts readable at /workspace/hello.txt and /workspace/subdir/nested.py",
+          "observed": "PASS — cat /workspace/hello.txt returns 'Hello, world!'; cat /workspace/subdir/nested.py contains 'nested'"
+        },
+        {
+          "action": "test_artifacts_at_custom_workspace_path: inject test.txt at custom workspace /custom-workspace",
+          "expected": "Artifact readable at /custom-workspace/test.txt",
+          "observed": "PASS — cat /custom-workspace/test.txt returns 'content'"
+        },
+        {
+          "action": "test_prepare_with_artifacts: prepare with artifacts dict",
+          "expected": "No error, artifacts injected during prepare",
+          "observed": "PASS — prepare and cleanup complete without errors"
+        },
+        {
+          "action": "Verify directory structure preserved: nested path subdir/nested.py",
+          "expected": "Subdirectories created automatically",
+          "observed": "PASS — nested.py accessible at correct path inside container"
+        }
+      ],
+      "evidence": {
+        "testOutput": "evidence/harness/group-docker-runner/pytest_output.txt",
+        "relevantTests": [
+          "TestDockerRunnerArtifacts::test_artifacts_injected_into_container",
+          "TestDockerRunnerArtifacts::test_artifacts_at_custom_workspace_path",
+          "TestDockerRunnerPrepare::test_prepare_with_artifacts"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-HARNESS-04",
+      "title": "Docker runner enforces resource limits",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "test_timeout_enforced: execute 'sleep 999' with 2s timeout",
+          "expected": "Container killed, timed_out=True",
+          "observed": "PASS — output.timed_out is True"
+        },
+        {
+          "action": "test_execute_timeout_kills_container: 'sleep 999' with 3s timeout",
+          "expected": "Container killed, timed_out=True, exit_code=-1",
+          "observed": "PASS — timed_out=True, exit_code=-1"
+        },
+        {
+          "action": "test_timeout_returns_partial_output: 'echo before; sleep 999; echo after' with 3s timeout",
+          "expected": "timed_out=True, partial stdout captured",
+          "observed": "PASS — timed_out=True, stdout is not None"
+        },
+        {
+          "action": "test_cpu_limit_applied: container with cpu_limit=0.5 runs 'echo ok'",
+          "expected": "Container runs successfully with limit applied",
+          "observed": "PASS — stdout is 'ok'"
+        },
+        {
+          "action": "test_memory_limit_enforced: container with memory_limit='16m' attempts large allocation",
+          "expected": "OOM killed or completes without hanging",
+          "observed": "PASS — command completes without hanging"
+        },
+        {
+          "action": "test_execute_timeout_with_mock: mock exec_run blocks 10s with 0.5s timeout",
+          "expected": "timed_out=True, container.kill called",
+          "observed": "PASS — timed_out=True, mock_container.kill.assert_called_once()"
+        },
+        {
+          "action": "test_run_task_timeout: run_task with 'sleep 999' and 2s timeout",
+          "expected": "TaskResult with status=TIMEOUT",
+          "observed": "PASS — result.status == TaskStatus.TIMEOUT"
+        }
+      ],
+      "evidence": {
+        "testOutput": "evidence/harness/group-docker-runner/pytest_output.txt",
+        "relevantTests": [
+          "TestDockerRunnerResourceLimits::test_timeout_enforced",
+          "TestDockerRunnerResourceLimits::test_cpu_limit_applied",
+          "TestDockerRunnerResourceLimits::test_memory_limit_enforced",
+          "TestDockerRunnerExecute::test_execute_timeout_kills_container",
+          "TestDockerRunnerExecute::test_timeout_returns_partial_output",
+          "TestDockerRunnerRunTask::test_run_task_timeout",
+          "TestDockerRunnerPythonApi::test_execute_timeout_with_mock"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-HARNESS-05",
+      "title": "Docker runner cleans up containers on success and failure",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "test_cleanup_removes_container: prepare + cleanup, then containers.get(container_id)",
+          "expected": "Container not found after cleanup",
+          "observed": "PASS — containers.get raises exception, container removed"
+        },
+        {
+          "action": "test_cleanup_safe_without_prepare: call cleanup() without prepare()",
+          "expected": "No exception raised",
+          "observed": "PASS — cleanup() completes without error"
+        },
+        {
+          "action": "test_cleanup_idempotent: call cleanup() twice",
+          "expected": "No exception on second call",
+          "observed": "PASS — second cleanup() completes without error"
+        },
+        {
+          "action": "test_cleanup_handles_already_removed_container: mock containers.get raises NotFound",
+          "expected": "cleanup() handles gracefully",
+          "observed": "PASS — no exception raised"
+        },
+        {
+          "action": "test_no_keep_workspace_removes_volume: prepare + cleanup, then volumes.get(volume_name)",
+          "expected": "Volume not found after cleanup",
+          "observed": "PASS — volumes.get raises exception, volume removed"
+        },
+        {
+          "action": "test_keep_workspace_preserves_volume: prepare with keep_workspace=True + cleanup, then volumes.get(volume_name)",
+          "expected": "Volume still exists after cleanup",
+          "observed": "PASS — volume retrieved successfully, cleaned up after assertion"
+        },
+        {
+          "action": "test_cleanup_with_mock: mock cleanup verifies container.remove(force=True) and volume.remove(force=True) called",
+          "expected": "Both container and volume removed",
+          "observed": "PASS — remove called once each, state reset"
+        },
+        {
+          "action": "test_cleanup_with_keep_workspace (mock): verify volume.remove NOT called when keep=True",
+          "expected": "Container removed, volume preserved",
+          "observed": "PASS — container.remove called, volumes.get NOT called"
+        }
+      ],
+      "evidence": {
+        "testOutput": "evidence/harness/group-docker-runner/pytest_output.txt",
+        "relevantTests": [
+          "TestDockerRunnerCleanup::test_cleanup_removes_container",
+          "TestDockerRunnerCleanup::test_cleanup_safe_without_prepare",
+          "TestDockerRunnerCleanup::test_cleanup_idempotent",
+          "TestDockerRunnerKeepWorkspace::test_keep_workspace_preserves_volume",
+          "TestDockerRunnerKeepWorkspace::test_no_keep_workspace_removes_volume",
+          "TestDockerRunnerPythonApi::test_cleanup_with_mock",
+          "TestDockerRunnerPythonApi::test_cleanup_handles_already_removed_container",
+          "TestDockerRunnerPythonApi::test_cleanup_with_keep_workspace"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-ENV-05",
+      "title": "Environment validates Docker daemon availability",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "test_docker_available_success: check_docker_available() with running Docker",
+          "expected": "Returns True",
+          "observed": "PASS — returns True"
+        },
+        {
+          "action": "test_docker_unavailable_raises_clear_error: mock docker.from_env().ping() raises 'Connection refused'",
+          "expected": "check_docker_available() returns False",
+          "observed": "PASS — returns False when daemon unreachable"
+        },
+        {
+          "action": "Verify DockerDaemonError message is clear and actionable",
+          "expected": "Error message mentions Docker daemon and suggests starting it",
+          "observed": "PASS — 'Docker daemon is not available: {message}. Please ensure Docker is installed and running.'"
+        }
+      ],
+      "evidence": {
+        "testOutput": "evidence/harness/group-docker-runner/pytest_output.txt",
+        "relevantTests": [
+          "TestDockerRunnerCheckDockerAvailable::test_docker_available_success",
+          "TestDockerRunnerCheckDockerAvailable::test_docker_unavailable_raises_clear_error",
+          "TestDockerRunnerDaemonError::test_docker_daemon_error_message"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-ENV-07",
+      "title": "Environment handles missing Docker images gracefully",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "test_image_exists_locally: _ensure_image_available() with python:3.12-slim",
+          "expected": "No error, image found or auto-pulled",
+          "observed": "PASS — completes without error"
+        },
+        {
+          "action": "test_image_not_found_auto_pull_enabled: auto_pull=True with alpine:3.19",
+          "expected": "Image pulled automatically",
+          "observed": "PASS — completes without error"
+        },
+        {
+          "action": "test_image_not_found_auto_pull_disabled: auto_pull=False, mock images.list returns []",
+          "expected": "DockerImageError raised with image name",
+          "observed": "PASS — raises DockerImageError matching 'nonexistent-image'"
+        },
+        {
+          "action": "test_error_message_includes_pull_suggestion: auto_pull=False with nonexistent-img",
+          "expected": "Error message includes 'docker pull nonexistent-img'",
+          "observed": "PASS — DockerImageError message contains 'docker pull nonexistent-img'"
+        },
+        {
+          "action": "Verify DockerImageError includes image name and pull command",
+          "expected": "Error message structured with actionable guidance",
+          "observed": "PASS — 'Docker image 'X' is not available: Y. Run 'docker pull X' to download it.'"
+        }
+      ],
+      "evidence": {
+        "testOutput": "evidence/harness/group-docker-runner/pytest_output.txt",
+        "relevantTests": [
+          "TestDockerRunnerImageHandling::test_image_exists_locally",
+          "TestDockerRunnerImageHandling::test_image_not_found_auto_pull_enabled",
+          "TestDockerRunnerImageHandling::test_image_not_found_auto_pull_disabled",
+          "TestDockerRunnerImageHandling::test_error_message_includes_pull_suggestion",
+          "TestDockerRunnerImageError::test_image_error_message"
+        ]
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "Tested 6 assertions across 44 pytest tests: all 6 passed (VAL-HARNESS-02, VAL-HARNESS-03, VAL-HARNESS-04, VAL-HARNESS-05, VAL-ENV-05, VAL-ENV-07). Tests cover container creation/removal, artifact injection with directory structure preservation, resource limits (CPU, memory, timeout), timeout enforcement with partial output capture, cleanup on all outcomes (success/failure/timeout), keep_workspace_on_failure volume preservation, Docker daemon availability check with clear error messages, and missing image handling with auto-pull and actionable error suggestions."
+}

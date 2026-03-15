@@ -1,0 +1,52 @@
+{
+  "groupId": "group-result-parser",
+  "testedAt": "2026-03-15T00:00:00Z",
+  "isolation": {
+    "workingDirectory": "/home/m0hawk/Documents/trainR",
+    "environment": "uv sync complete, grist-mill 0.1.0 installed, Python 3.14.0",
+    "docker": "available and running"
+  },
+  "toolsUsed": ["pytest"],
+  "assertions": [
+    {
+      "id": "VAL-HARNESS-01",
+      "title": "Result parser converts test runner output to TaskResult",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run pytest on tests/test_result_parser.py with -v --tb=short",
+          "expected": "All 44 tests pass",
+          "observed": "All 44 tests passed in 0.12s"
+        }
+      ],
+      "evidence": {
+        "testOutputFile": "evidence/harness/group-result-parser/VAL-HARNESS-01-test-output.txt",
+        "totalTests": 44,
+        "passedTests": 44,
+        "failedTests": 0,
+        "testClasses": [
+          "TestPassingOutput (5 tests): pytest all-passed, pytest no-tests-collected, generic exit-zero, testthat all-passed, shell echo success",
+          "TestFailingOutput (5 tests): pytest failures, pytest single-failure, testthat failures, generic exit-nonzero, exit-code-2",
+          "TestSyntaxErrorOutput (6 tests): Python SyntaxError, Python IndentationError, R syntax error, JavaScript syntax error, Python syntax error in stdout, R parsing error",
+          "TestTimeoutOutput (3 tests): timeout flag with partial output, timeout with stderr, timeout empty output",
+          "TestEmptyOutput (3 tests): empty stdout/stderr exit-0, empty stdout/stderr exit-1, whitespace-only output",
+          "TestErrorPatternDetection (10 tests): import error, environment error, command-not-found, network error, rate limit, API error, generic unknown, memory error, segfault, Python TypeError",
+          "TestResultParserFull (4 tests): task_id propagation, no telemetry from parser, timeout partial output in transcript, error transcript with message",
+          "TestEdgeCases (5 tests): large output, unicode output, negative exit non-timeout, pytest errored tests, long-running success",
+          "TestLanguageSpecificHeuristics (3 tests): Python traceback → TEST_FAILURE, R library loading → ENVIRONMENT_ERROR, TypeScript compilation → SYNTAX_ERROR"
+        ],
+        "coverageSummary": {
+          "passingCases": "pytest exit 0, testthat OK, generic exit 0, shell echo, empty output with exit 0",
+          "failingCases": "pytest exit 1 with failures, pytest single failure, testthat failures, generic exit 1, exit 2",
+          "errorCases": "Python SyntaxError, Python IndentationError, R syntax error, R parsing error, JS syntax error, import error, environment error, command-not-found, rate limit, API error, memory error, segfault",
+          "timeoutCases": "timed_out flag with partial output, timed_out with stderr, timed_out empty output",
+          "errorCategories": "TEST_FAILURE, SYNTAX_ERROR, ENVIRONMENT_ERROR, NETWORK_ERROR, RATE_LIMIT, API_ERROR, UNKNOWN"
+        }
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "VAL-HARNESS-01: PASS — All 44 tests passed. The result parser correctly converts pytest exit codes, testthat output, and generic shell exit codes into structured TaskResult objects with correct status (SUCCESS, FAILURE, ERROR, TIMEOUT), score (0.0 or 1.0), and error_category (TEST_FAILURE, SYNTAX_ERROR, ENVIRONMENT_ERROR, NETWORK_ERROR, RATE_LIMIT, API_ERROR, UNKNOWN). Language-specific heuristics improve categorization for Python, R, and TypeScript. Timeout handling preserves partial output in transcript. Edge cases (unicode, large output, empty output) handled correctly."
+}

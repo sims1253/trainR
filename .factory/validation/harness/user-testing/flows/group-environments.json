@@ -1,0 +1,260 @@
+{
+  "groupId": "group-environments",
+  "testedAt": "2026-03-15T12:00:00Z",
+  "isolation": {
+    "workingDirectory": "/home/m0hawk/Documents/trainR",
+    "dockerAvailable": true,
+    "pythonVersion": "3.14.0",
+    "pytestVersion": "9.0.2"
+  },
+  "toolsUsed": ["pytest"],
+  "assertions": [
+    {
+      "id": "VAL-ENV-01",
+      "title": "Multi-language environment support via configurable Docker images",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "TestLanguageImageConfig: 8 tests verify language-to-image mapping",
+          "expected": "python→python:3.12-slim, r→rocker/r-ver:latest, typescript→node:22-slim",
+          "observed": "All 8 tests passed: default mappings, custom overrides, fallback, case-insensitive lookup"
+        },
+        {
+          "action": "TestDockerRunnerLanguageImageSelection: 8 tests verify DockerRunner uses correct image per language",
+          "expected": "DockerRunner selects correct image based on task language",
+          "observed": "All 8 tests passed: runner construction, create_from_task factory, custom overrides, network_access passthrough"
+        }
+      ],
+      "evidence": {
+        "testOutput": "evidence/harness/group-environments/pytest_output.txt",
+        "testClasses": ["TestLanguageImageConfig (8 tests)", "TestDockerRunnerLanguageImageSelection (8 tests)"],
+        "totalTests": 16,
+        "passed": 16
+      },
+      "details": "LanguageImageConfig provides per-language Docker image mapping with defaults for python, r, typescript. DockerRunner.create_from_task() factory method selects image based on task.language field. Custom overrides and fallback images are supported. Case-insensitive language lookup works correctly."
+    },
+    {
+      "id": "VAL-ENV-02",
+      "title": "Volume mount management for workspace isolation",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "test_unique_workspace_volume_per_prepare: 3 sequential prepare calls",
+          "expected": "Each call creates a unique workspace volume",
+          "observed": "3 unique volume names created and verified"
+        },
+        {
+          "action": "test_concurrent_tasks_isolated_volumes: 5 concurrent threads",
+          "expected": "Each concurrent task gets a different workspace volume",
+          "observed": "All 5 threads produced unique volume names"
+        },
+        {
+          "action": "test_workspace_isolation_real_docker: Two real Docker containers",
+          "expected": "File written in task-1 workspace not visible in task-2 workspace",
+          "observed": "task-2's cat command returns 'file not found' — isolation confirmed"
+        }
+      ],
+      "evidence": {
+        "testOutput": "evidence/harness/group-environments/pytest_output.txt",
+        "testClasses": ["TestVolumeMountIsolation (3 tests)"],
+        "totalTests": 3,
+        "passed": 3
+      },
+      "details": "Each prepare() call creates a unique Docker volume with a unique name. Concurrent tasks using threads each get their own isolated workspace. Real Docker integration test confirmed file leakage does not occur between workspaces."
+    },
+    {
+      "id": "VAL-ENV-03",
+      "title": "Environment preparation installs task dependencies",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "test_setup_failure_sets_error_state: setup_command='exit 1'",
+          "expected": "prepare() raises EnvironmentSetupError with error_category=ENVIRONMENT_ERROR",
+          "observed": "EnvironmentSetupError raised with correct error_category, is_prepared=False"
+        },
+        {
+          "action": "test_setup_success_does_not_raise: setup_command='echo ok'",
+          "expected": "prepare() completes without error, is_prepared=True",
+          "observed": "No exception raised, is_prepared=True"
+        },
+        {
+          "action": "test_no_setup_command_skips_setup: setup_command=None",
+          "expected": "exec_run NOT called, is_prepared=True",
+          "observed": "exec_run assert_not_called passed, is_prepared=True"
+        },
+        {
+          "action": "test_setup_failure_cleans_up_container: setup failure",
+          "expected": "Container removed after setup failure",
+          "observed": "mock_container.remove.assert_called_with(force=True) passed"
+        },
+        {
+          "action": "test_setup_failure_real_docker: real Docker with exit 1",
+          "expected": "EnvironmentSetupError with ENVIRONMENT_ERROR",
+          "observed": "Correct exception raised with proper error_category and message"
+        },
+        {
+          "action": "test_environment_setup_error_has_task_id",
+          "expected": "Error message includes task ID",
+          "observed": "'special-task-42' found in error message"
+        }
+      ],
+      "evidence": {
+        "testOutput": "evidence/harness/group-environments/pytest_output.txt",
+        "testClasses": ["TestSetupCommandFailure (6 tests)"],
+        "totalTests": 6,
+        "passed": 6
+      },
+      "details": "BaseEnvironment.prepare(task) executes setup_command before agent runs. If setup fails, EnvironmentSetupError is raised with error_category=ENVIRONMENT_ERROR. The agent is never called (prepare fails before execute). Cleanup is performed on setup failure (container removed). Task ID is included in error message for debugging."
+    },
+    {
+      "id": "VAL-ENV-04",
+      "title": "Network access control per environment",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "test_default_network_access_is_none",
+          "expected": "Default network_access=False",
+          "observed": "runner.network_access is False"
+        },
+        {
+          "action": "test_network_mode_none_when_disabled",
+          "expected": "network_mode='none' when network_access=False",
+          "observed": "runner.network_mode == 'none'"
+        },
+        {
+          "action": "test_network_mode_empty_when_enabled",
+          "expected": "network_mode=None when network_access=True",
+          "observed": "runner.network_mode is None"
+        },
+        {
+          "action": "test_container_created_with_network_none: mock test",
+          "expected": "containers.create called with network_mode='none'",
+          "observed": "Verified network_mode='none' in create call kwargs"
+        },
+        {
+          "action": "test_container_created_without_network_none_when_enabled: mock test",
+          "expected": "containers.create called without network_mode",
+          "observed": "Verified network_mode is None in create call kwargs"
+        },
+        {
+          "action": "test_network_none_blocks_curl: real Docker with alpine",
+          "expected": "wget fails or returns 'network blocked'",
+          "observed": "wget blocked as expected, exit_code != 0"
+        },
+        {
+          "action": "test_network_enabled_allows_curl: real Docker with alpine",
+          "expected": "wget succeeds with 'network ok'",
+          "observed": "wget succeeded, 'network ok' in stdout or exit_code==0"
+        }
+      ],
+      "evidence": {
+        "testOutput": "evidence/harness/group-environments/pytest_output.txt",
+        "testClasses": ["TestNetworkAccessControl (8 tests)"],
+        "totalTests": 8,
+        "passed": 8
+      },
+      "details": "Default network_access=False produces --network=none on container creation. When network_access=True, no network_mode restriction is applied (default bridge). Real Docker integration tests confirmed: wget to example.com fails with network disabled, succeeds with network enabled."
+    },
+    {
+      "id": "VAL-ENV-06",
+      "title": "Environment supports custom working directory",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "test_default_working_dir_is_workspace",
+          "expected": "Default working_dir=/workspace",
+          "observed": "runner.working_dir == '/workspace'"
+        },
+        {
+          "action": "test_custom_working_dir",
+          "expected": "Custom working_dir stored correctly",
+          "observed": "runner.working_dir == '/app/src'"
+        },
+        {
+          "action": "test_container_created_with_custom_working_dir: mock test",
+          "expected": "containers.create called with working_dir='/app/src'",
+          "observed": "Verified working_dir='/app/src' in create call kwargs"
+        },
+        {
+          "action": "test_working_dir_with_real_container: real Docker with alpine",
+          "expected": "pwd returns /tmp/testdir",
+          "observed": "output.stdout.strip() == '/tmp/testdir'"
+        },
+        {
+          "action": "test_create_from_task_with_working_dir",
+          "expected": "create_from_task passes working_dir to runner",
+          "observed": "runner.working_dir == '/app/code'"
+        }
+      ],
+      "evidence": {
+        "testOutput": "evidence/harness/group-environments/pytest_output.txt",
+        "testClasses": ["TestCustomWorkingDirectory (5 tests)"],
+        "totalTests": 5,
+        "passed": 5
+      },
+      "details": "DockerRunner accepts a working_dir parameter (default: /workspace). The working_dir is passed to containers.create(). Real Docker integration test confirmed that commands execute from the specified directory (pwd output matches configured working_dir)."
+    },
+    {
+      "id": "VAL-ENV-08",
+      "title": "Environment health check returns structured diagnostics",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "test_health_check_is_callable",
+          "expected": "DockerRunner has callable health_check method",
+          "observed": "callable(runner.health_check) is True"
+        },
+        {
+          "action": "test_health_check_returns_structured_result",
+          "expected": "Returns model with docker_available, images_ready, disk_free_gb",
+          "observed": "All three attributes present on returned model"
+        },
+        {
+          "action": "test_health_check_docker_unavailable",
+          "expected": "docker_available=False when Docker down",
+          "observed": "health.docker_available is False"
+        },
+        {
+          "action": "test_health_check_docker_available",
+          "expected": "docker_available=True when Docker up",
+          "observed": "health.docker_available is True"
+        },
+        {
+          "action": "test_health_check_disk_free_gb",
+          "expected": "disk_free_gb is float in expected range",
+          "observed": "69.0 <= disk_free_gb <= 71.0 (70GB configured)"
+        },
+        {
+          "action": "test_health_check_images_ready_true: real Docker",
+          "expected": "images_ready reports correctly for available image",
+          "observed": "docker_available=True for python:3.12-slim"
+        },
+        {
+          "action": "test_health_check_images_ready_false",
+          "expected": "images_ready=False for nonexistent image",
+          "observed": "health.images_ready is False"
+        },
+        {
+          "action": "test_health_check_serialization",
+          "expected": "Model serializes to JSON with required fields",
+          "observed": "JSON contains docker_available, images_ready, disk_free_gb"
+        },
+        {
+          "action": "test_local_runner_health_check",
+          "expected": "LocalRunner also has health_check",
+          "observed": "Returns model with docker_available attribute"
+        }
+      ],
+      "evidence": {
+        "testOutput": "evidence/harness/group-environments/pytest_output.txt",
+        "testClasses": ["TestEnvironmentHealthCheck (9 tests)"],
+        "totalTests": 9,
+        "passed": 9
+      },
+      "details": "env.health_check() returns a structured EnvironmentHealth Pydantic model with docker_available (bool), images_ready (bool), and disk_free_gb (float). Docker availability is checked by pinging the daemon. Disk space is calculated from shutil.disk_usage. Image readiness checks if the configured image exists locally. The model serializes to JSON correctly. Both DockerRunner and LocalRunner support health_check."
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "Tested 6 assertions (VAL-ENV-01, VAL-ENV-02, VAL-ENV-03, VAL-ENV-04, VAL-ENV-06, VAL-ENV-08) using pytest with 47 tests total. All 47 tests passed (16 for VAL-ENV-01, 3 for VAL-ENV-02, 6 for VAL-ENV-03, 8 for VAL-ENV-04, 5 for VAL-ENV-06, 9 for VAL-ENV-08). Test coverage includes: language-to-image mapping, workspace isolation (including concurrent threads and real Docker), setup command execution/failure with ENVIRONMENT_ERROR, network access control (--network=none vs enabled, verified with real wget), custom working directory (verified with pwd in real container), and health check structured output. All assertions PASS."
+}

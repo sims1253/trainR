@@ -1,0 +1,102 @@
+{
+  "groupId": "group-local-runner",
+  "testedAt": "2026-03-15T12:00:00Z",
+  "isolation": {
+    "workingDirectory": "/home/m0hawk/Documents/trainR",
+    "tool": "pytest",
+    "python": "3.14.0",
+    "runner": "LocalRunner with sigkill_delay=0.5"
+  },
+  "toolsUsed": ["pytest"],
+  "assertions": [
+    {
+      "id": "VAL-HARNESS-06",
+      "title": "Local-process runner executes tasks without Docker",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run pytest tests/test_local_runner.py -v --tb=short",
+          "expected": "All tests pass covering basic execution, stdout/stderr capture, exit codes, working directory, result parsing, harness integration",
+          "observed": "40 tests passed in 2.74s. All TestBasicExecution (7 tests), TestResultParsing (5 tests), TestWorkingDirectory (4 tests), TestInterfaceCompliance (4 tests), TestHarnessIntegration (2 tests) passed."
+        },
+        {
+          "action": "Verify echo 'success' produces TaskResult with status=SUCCESS",
+          "expected": "TaskResult with status=SUCCESS, score=1.0",
+          "observed": "test_echo_success_produces_taskresult_success PASSED: runner.run_task(command='echo success') returns TaskResult(status=SUCCESS, score=1.0, task_id=test-local-001)"
+        },
+        {
+          "action": "Verify same interface as Docker runner",
+          "expected": "LocalRunner is BaseEnvironment subclass with prepare/execute/cleanup methods returning ExecutionOutput",
+          "observed": "test_is_base_environment_subclass PASSED: LocalRunner inherits from BaseEnvironment. test_can_be_used_with_base_harness PASSED: LocalRunner works with LocalHarness."
+        },
+        {
+          "action": "Verify stdout/stderr/exit_code capture",
+          "expected": "stdout, stderr captured independently; exit codes correct (0, 1, 42)",
+          "observed": "7 TestBasicExecution tests all PASSED: stdout capture, stderr capture, both channels, nonzero exit (42), exit 1, empty output, unicode"
+        }
+      ],
+      "evidence": {
+        "testFile": "tests/test_local_runner.py",
+        "testOutput": "40 passed in 2.74s",
+        "relevantTestClasses": [
+          "TestBasicExecution (7 tests) — stdout/stderr/exit_code capture",
+          "TestResultParsing (5 tests) — ExecutionOutput → TaskResult conversion",
+          "TestWorkingDirectory (4 tests) — configurable working directory",
+          "TestInterfaceCompliance (4 tests) — BaseEnvironment subclass with correct interface",
+          "TestHarnessIntegration (2 tests) — same interface as Docker runner, echo success → SUCCESS",
+          "TestConstructor (5 tests) — configuration options",
+          "TestEnvironmentLifecycle (7 tests) — prepare/execute/cleanup lifecycle"
+        ]
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-HARNESS-07",
+      "title": "Local runner respects timeout and signal handling",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run pytest tests/test_local_runner.py::TestTimeoutHandling -v",
+          "expected": "All 6 timeout tests pass covering SIGTERM/SIGKILL, partial output, timed_out flag",
+          "observed": "6 TestTimeoutHandling tests all PASSED"
+        },
+        {
+          "action": "Verify timeout marks timed_out=True with sleep 60 and short timeout",
+          "expected": "timed_out is True",
+          "observed": "test_timeout_marks_timed_out_true PASSED: sleep 60 with timeout=0.5 → timed_out=True"
+        },
+        {
+          "action": "Verify partial output captured on timeout",
+          "expected": "stdout contains 'partial' even though process timed out",
+          "observed": "test_timeout_captures_partial_output PASSED: 'echo partial && sleep 60' with timeout=0.5 → timed_out=True, 'partial' in stdout"
+        },
+        {
+          "action": "Verify SIGTERM then SIGKILL signal sequence",
+          "expected": "SIGTERM sent before SIGKILL, both signals recorded",
+          "observed": "test_sigterm_then_sigkill_sequence PASSED: mocked os.killpg records signals_sent=[SIGTERM, SIGKILL], verified SIGTERM index < SIGKILL index"
+        },
+        {
+          "action": "Verify exit code on timeout is -1",
+          "expected": "exit_code == -1 (signal-based termination)",
+          "observed": "test_timeout_exit_code PASSED: exit_code == -1 when timed_out=True"
+        }
+      ],
+      "evidence": {
+        "testFile": "tests/test_local_runner.py",
+        "testOutput": "6 TestTimeoutHandling tests all PASSED",
+        "relevantTests": [
+          "test_timeout_marks_timed_out_true — sleep 60, timeout=0.5 → timed_out=True",
+          "test_timeout_captures_partial_output — 'echo partial && sleep 60' → partial in stdout",
+          "test_timeout_partial_stderr — 'echo err >&2 && sleep 60' → err in stderr",
+          "test_no_timeout_when_fast_command — fast command → timed_out=False",
+          "test_timeout_exit_code — timed out → exit_code=-1",
+          "test_sigterm_then_sigkill_sequence — mocked killpg verifies SIGTERM before SIGKILL"
+        ]
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "Tested 2 assertions: both passed. VAL-HARNESS-06: LocalRunner executes subprocesses capturing stdout/stderr/exit_code, returns TaskResult with same interface as Docker runner (40 total tests cover basic execution, result parsing, working directory, lifecycle, interface compliance, harness integration). VAL-HARNESS-07: Timeout kills process with SIGTERM then SIGKILL, marks timed_out=True, captures partial output (6 dedicated timeout tests including mocked signal sequence verification). All 40 tests passed in 2.74s."
+}
