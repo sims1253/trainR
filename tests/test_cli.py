@@ -13,12 +13,10 @@ from __future__ import annotations
 
 import json
 import textwrap
+
 from click.testing import CliRunner
 
-import pytest
-
 from grist_mill.cli.main import cli
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -320,7 +318,6 @@ class TestVerbosity:
 
     def test_verbose_sets_debug(self, tmp_path, caplog) -> None:
         """--verbose enables DEBUG logging."""
-        import logging
 
         config_path = _write_config(tmp_path, _VALID_CONFIG)
         runner = CliRunner()
