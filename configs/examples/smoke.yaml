@@ -1,0 +1,34 @@
+# Smoke test configuration for grist-mill.
+# Validates the end-to-end evaluation loop:
+# task -> environment preparation -> agent invocation -> test execution -> result capture
+
+agent:
+  model: "stub"
+  provider: "local"
+  max_turns: 1
+  timeout: 30
+
+environment:
+  runner_type: "local"
+  cpu_limit: 1.0
+  network_access: false
+
+telemetry:
+  enabled: true
+  trace_enabled: false
+  output_dir: "./results/telemetry"
+
+tasks:
+  - id: "smoke-echo-pass"
+    prompt: "Verify that echo works correctly."
+    language: "shell"
+    test_command: "echo hello"
+    timeout: 10
+    difficulty: "EASY"
+
+  - id: "smoke-echo-fail"
+    prompt: "This task should fail gracefully."
+    language: "shell"
+    test_command: "exit 1"
+    timeout: 10
+    difficulty: "EASY"

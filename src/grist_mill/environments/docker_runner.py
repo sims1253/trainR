@@ -37,6 +37,7 @@ from grist_mill.environments.language_config import LanguageImageConfig
 from grist_mill.harness.result_parser import ResultParser
 from grist_mill.interfaces import BaseEnvironment
 from grist_mill.schemas import (
+    EnvironmentHealth,
     ErrorCategory,
     ExecutionOutput,
     Task,
@@ -391,8 +392,6 @@ class DockerRunner(BaseEnvironment):
         Returns:
             An ``EnvironmentHealth`` model with structured diagnostics.
         """
-        from grist_mill.schemas import EnvironmentHealth
-
         docker_available = self.check_docker_available()
         images_ready = False
 
