@@ -1,8 +1,0 @@
-# Auto-generated NAMESPACE file
-# Export all public functions
-
-exportPattern("^[[:alpha:]]")
-
-# Import declarations will be added by roxygen2 when needed
-# importFrom(testthat, expect_equal)
-# importFrom(testthat, expect_true)

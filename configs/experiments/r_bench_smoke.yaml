@@ -10,7 +10,7 @@ schema_version: "1.0"
 # Use a single model for quick smoke validation
 models:
   names:
-    - gpt-oss-120b
+    - step-3.5-flash
 
 # Task selection
 tasks:

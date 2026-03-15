@@ -231,4 +231,21 @@ divide-and-conquer-*.Rmd
 .factory/validation/
 design/
 
+# =============================================================================
+# Root-level scratch / infrastructure not part of grist-mill library
+# =============================================================================
+# R dependencies (not a Python package requirement)
+requirements.R
+
+# Docker deployment at repo root (docker/ dir stays for eval sandbox)
+Dockerfile.benchmark
+docker-compose.yml
+.dockerignore
+
+# Root package.json (visualizer/ has its own)
+package.json
+
+# One-off notebooks / planning artifacts
+divide-and-conquer-*.Rmd
+
 .env
