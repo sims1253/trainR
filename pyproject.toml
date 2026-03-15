@@ -40,6 +40,7 @@ dependencies = [
     "pyyaml>=6.0",
     "click>=8.0",
     "docker>=7.1.0",
+    "openai>=1.0.0",
 ]
 
 [project.optional-dependencies]
@@ -48,9 +49,6 @@ optimization = [
 ]
 synthesis = [
     "tree-sitter-language-pack",
-]
-providers = [
-    "openai>=1.0.0",
 ]
 
 [project.scripts]
