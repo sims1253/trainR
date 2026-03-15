@@ -16,6 +16,13 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from grist_mill.schemas.artifact import (
+    Artifact,
+    MCPServerArtifact,
+    SkillArtifact,
+    ToolArtifact,
+)
+
 # ---------------------------------------------------------------------------
 # Enumerations
 # ---------------------------------------------------------------------------
@@ -309,13 +316,17 @@ class Manifest(BaseModel):
 
 __all__ = [
     "AgentConfig",
+    "Artifact",
     "Difficulty",
     "EnvironmentConfig",
     "ErrorCategory",
     "ExecutionOutput",
     "HarnessConfig",
+    "MCPServerArtifact",
     "Manifest",
+    "SkillArtifact",
     "Task",
     "TaskResult",
     "TaskStatus",
+    "ToolArtifact",
 ]
