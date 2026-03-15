@@ -1,0 +1,41 @@
+# Skill optimization workflow.
+# Demonstrates the optimization loop for evolving a skill prompt.
+#
+# Usage:
+#   grist-mill optimize --config configs/examples/skill_optimization.yaml
+#
+# This produces:
+#   - best_candidate.json: The evolved skill prompt
+#   - trajectory.jsonl: Per-iteration score history
+#   - checkpoint.json: State for resuming with --resume
+
+# Target to optimize
+target:
+  type: skill
+  content: |
+    You are a Python test-writing assistant. Given a function implementation,
+    write comprehensive pytest test cases that cover:
+    - Normal inputs and expected outputs
+    - Edge cases (empty inputs, single elements, boundaries)
+    - Error conditions (invalid types, out of range)
+    Each test function should follow the pattern: test_<behavior_description>
+
+# Budget limits
+budget:
+  max_calls: 10
+  timeout_s: 300
+  no_improvement_patience: 5
+  checkpoint_interval: 2
+
+# Evaluator configuration
+evaluator:
+  objective: pass-rate
+  trace_enabled: false
+  cost_per_token: 0.0
+
+# Output configuration
+output_dir: "./results/skill-optimization"
+
+# Task dataset splits
+train_split: train
+holdout_split: holdout

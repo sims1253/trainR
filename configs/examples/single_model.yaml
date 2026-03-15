@@ -1,0 +1,45 @@
+# Single-model benchmark evaluation.
+# Evaluates a single LLM model against a set of tasks using the local runner.
+#
+# Usage:
+#   grist-mill run --config configs/examples/single_model.yaml
+#   grist-mill validate --config configs/examples/single_model.yaml
+
+agent:
+  model: "gpt-4o"
+  provider: "openai"
+  max_turns: 10
+  timeout: 300
+
+environment:
+  runner_type: "local"
+  cpu_limit: 1.0
+  memory_limit: "2g"
+  network_access: false
+
+telemetry:
+  enabled: true
+  trace_enabled: false
+  output_dir: "./results/telemetry"
+
+tasks:
+  - id: "python-fibonacci"
+    prompt: "Implement a fibonacci function that returns the nth number in the sequence."
+    language: "python"
+    test_command: "python -c 'from solution import fibonacci; assert fibonacci(10) == 55'"
+    timeout: 30
+    difficulty: "EASY"
+
+  - id: "python-sort"
+    prompt: "Implement a merge sort function for lists of integers."
+    language: "python"
+    test_command: "python -c 'from solution import merge_sort; assert merge_sort([3,1,2]) == [1,2,3]'"
+    timeout: 30
+    difficulty: "MEDIUM"
+
+  - id: "shell-grep"
+    prompt: "Write a shell script that counts lines matching a pattern in a file."
+    language: "shell"
+    test_command: "bash test_solution.sh"
+    timeout: 15
+    difficulty: "EASY"

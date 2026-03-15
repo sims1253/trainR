@@ -10,7 +10,6 @@ Covers:
 
 from __future__ import annotations
 
-import math
 from datetime import datetime, timezone
 from typing import Any
 
@@ -18,7 +17,6 @@ import pytest
 
 from grist_mill.schemas import (
     ErrorCategory,
-    Task,
     TaskResult,
     TaskStatus,
 )
@@ -28,7 +26,6 @@ from grist_mill.schemas.telemetry import (
     TokenUsage,
     ToolCallMetrics,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -265,9 +262,7 @@ class TestTelemetryAggregation:
         from grist_mill.reports.aggregation import aggregate_telemetry
 
         results_a = _make_experiment_results(model="gpt-4", pass_rate=0.8, n_tasks=10, seed=42)
-        results_b = _make_experiment_results(
-            model="claude-3", pass_rate=0.6, n_tasks=10, seed=99
-        )
+        results_b = _make_experiment_results(model="claude-3", pass_rate=0.6, n_tasks=10, seed=99)
         all_results = results_a + results_b
 
         summaries = aggregate_telemetry(all_results, group_by="model")
@@ -328,9 +323,7 @@ class TestTelemetryAggregation:
         results = _make_experiment_results(model="gpt-4", n_tasks=5, seed=42)
         summaries = aggregate_telemetry(results, group_by="model")
 
-        expected_cost = sum(
-            r["telemetry"].estimated_cost_usd or 0.0 for r in results
-        )
+        expected_cost = sum(r["telemetry"].estimated_cost_usd or 0.0 for r in results)
         # Aggregation rounds to 6 decimal places
         assert abs(summaries[0]["total_cost_usd"] - round(expected_cost, 6)) < 1e-9
 
@@ -496,9 +489,7 @@ class TestErrorTaxonomyBreakdown:
         assert "TEST_FAILURE" in categories
         assert "API_ERROR" in categories
 
-        test_failure_entry = next(
-            e for e in breakdown if e["error_category"] == "TEST_FAILURE"
-        )
+        test_failure_entry = next(e for e in breakdown if e["error_category"] == "TEST_FAILURE")
         assert test_failure_entry["count"] == 3
         assert test_failure_entry["percentage"] > 0
 

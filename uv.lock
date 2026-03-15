@@ -323,14 +323,12 @@ dependencies = [
     { name = "pydantic-settings" },
     { name = "pyyaml" },
     { name = "rich" },
+    { name = "tree-sitter-language-pack" },
 ]
 
 [package.optional-dependencies]
 optimization = [
     { name = "gepa" },
-]
-synthesis = [
-    { name = "tree-sitter-language-pack" },
 ]
 
 [package.dev-dependencies]
@@ -351,7 +349,7 @@ requires-dist = [
     { name = "pydantic-settings", specifier = ">=2.0" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "rich", specifier = ">=13.0" },
-    { name = "tree-sitter-language-pack", marker = "extra == 'synthesis'" },
+    { name = "tree-sitter-language-pack", specifier = ">=0.10" },
 ]
 provides-extras = ["optimization", "synthesis"]
 

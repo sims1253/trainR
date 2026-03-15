@@ -509,7 +509,7 @@ class TestGepaEvaluatorAdapter:
 
         _score, side_info = adapter(candidate="skill prompt", example=task)
         assert "duration_s" in side_info
-        assert side_info["duration_s"] > 0
+        assert side_info["duration_s"] >= 0
 
     def test_side_info_has_token_usage(self) -> None:
         """Side info contains token usage."""

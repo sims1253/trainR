@@ -18,6 +18,8 @@ keywords = [
     "evaluation",
     "optimization",
     "coding-agents",
+    "llm",
+    "mcp",
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -29,6 +31,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Software Development :: Testing",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
@@ -41,15 +44,14 @@ dependencies = [
     "click>=8.0",
     "docker>=7.1.0",
     "openai>=1.0.0",
+    "tree-sitter-language-pack>=0.10",
 ]
 
 [project.optional-dependencies]
 optimization = [
     "gepa",
 ]
-synthesis = [
-    "tree-sitter-language-pack",
-]
+synthesis = []
 
 [project.scripts]
 grist-mill = "grist_mill.cli.main:cli"
@@ -87,11 +89,26 @@ docstring-code-format = true
 [tool.ty]
 environment.python-version = "3.10"
 
+[tool.ty.src]
+include = ["src/grist_mill", "tests"]
+exclude = [
+    "bench",
+    "evaluation",
+    "optimization",
+    "scripts",
+    "task_generator",
+]
+
 [tool.ty.rules]
 possibly-unresolved-reference = "warn"
 invalid-return-type = "warn"
 invalid-argument-type = "warn"
 unresolved-import = "warn"
+unresolved-attribute = "warn"
+invalid-assignment = "warn"
+unsupported-operator = "warn"
+not-subscriptable = "warn"
+unused-type-ignore-comment = "warn"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -101,4 +118,9 @@ addopts = "-v --tb=short"
 markers = [
     "integration_local: Integration tests requiring Docker (skipped if Docker unavailable)",
     "integration_provider: Integration tests requiring real provider credentials",
+]
+# Legacy tests that import from bench/, evaluation/, scripts/, task_generator/, optimization/
+# are excluded — these depend on pre-rewrite code not installed in the grist-mill package.
+filterwarnings = [
+    "ignore::DeprecationWarning",
 ]

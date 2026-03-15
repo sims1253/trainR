@@ -1,280 +1,209 @@
-# trainR
+# grist-mill
 
-> Evolutionary optimization of AI coding skills for R package testing using GEPA
+> Language-agnostic benchmarking framework for evaluating autonomous coding agents.
 
-TrainR automatically improves AI coding skills for R package testing by generating tasks, running agents in Docker, and evolving skill prompts. It also serves as a benchmark harness for comparing model performance on R testing tasks.
-
-## Status: v0.1.0-alpha
-
-Early development release. Core functionality works, but APIs may change.
-
-| Component | Status |
-|-----------|--------|
-| Task Generator | ✅ Done |
-| Evaluation (DockerPiRunner) | ✅ Done |
-| GEPA Integration | ✅ Done |
-| Baseline Comparisons | ✅ Done |
-| PR Mining | ✅ Done |
-| Multi-package Support | ✅ Done (20 packages, 138 tasks) |
+grist-mill evaluates AI coding agents across their full toolchain — tools, MCP servers, skills, and harness configurations — providing extensible task synthesis, multi-provider evaluation, and optimization feedback loops.
 
 ## Quick Start
 
-### 1. Prerequisites
-
-- Python 3.12+
-- Docker
-- [uv](https://docs.astral.sh/uv/) (`curl -LsSf https://astral.sh/uv/install.sh | sh`)
-- [gh CLI](https://cli.github.com/) authenticated (`gh auth login`)
-- API key for at least one provider (OpenRouter, OpenCode, or z.ai)
-
-### 2. Setup
+Get a result in under 5 minutes:
 
 ```bash
-# Clone
-git clone <repo-url>
-cd trainR
-
-# Create local env file (single source of truth for project secrets)
-cp .env.example .env
-
-# Edit .env and set at least one of:
-# OPENROUTER_API_KEY=...
-# OPENCODE_API_KEY=...
-# Z_AI_API_KEY=...
-
-# Install dependencies
+# 1. Clone and install
+git clone https://github.com/grist-mill/grist-mill.git
+cd grist-mill
 uv sync
 
-# Build Docker image
-make docker-build
+# 2. Run the smoke test (no API keys needed)
+uv run grist-mill run --config configs/examples/smoke.yaml
+
+# 3. Validate a configuration
+uv run grist-mill validate --config configs/examples/single_model.yaml
 ```
 
-### 3. Generate Tasks
+That's it — you've just run a benchmark evaluation!
 
-```bash
-# Generate from a single package
-uv run python scripts/generate_tasks.py --package dplyr --num-tasks 10
+## Architecture
 
-# Or use pre-generated tasks (138 tasks from 20 packages)
-ls tasks/train/ tasks/dev/ tasks/held_out/
+```text
+┌─────────────────────────────────────────────────────────────────┐
+│                        CLI (grist-mill)                         │
+│  run  │  validate  │  list  │  optimize  │  report  │  export  │
+└───────┼─────────────┼────────┼────────────┼──────────┼─────────┘
+        │             │        │            │          │
+┌───────▼─────────────▼────────▼────────────▼──────────▼─────────┐
+│                     Configuration Layer                         │
+│         YAML + env vars (GRIST_MILL_*) + CLI args               │
+│         Precedence: CLI > env vars > YAML defaults             │
+└──────────────────────────┬──────────────────────────────────────┘
+                           │
+┌──────────────────────────▼──────────────────────────────────────┐
+│                       Harness Layer                              │
+│                                                                  │
+│  ┌──────────┐     ┌──────────────┐     ┌──────────────┐        │
+│  │  Agent    │────▶│  Environment │────▶│ Result Parser│        │
+│  │ (LLM API) │     │ (Docker/Local)│     │ (TaskResult) │        │
+│  └────┬─────┘     └──────────────┘     └──────────────┘        │
+│       │                                                      │
+│  ┌────▼────────────────────────────────────────────────────┐  │
+│  │              Artifact Registry                            │  │
+│  │     Tools  │  MCP Servers  │  Skills                     │  │
+│  └─────────────────────────────────────────────────────────┘  │
+│       │              │              │                          │
+│       ▼              ▼              ▼                          │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐                   │
+│  │  Tool    │  │Telemetry │  │ Reports  │                   │
+│  │ Registry │  │Collector │  │ & Export │                   │
+│  └──────────┘  └──────────┘  └──────────┘                   │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-### 4. Run Baselines
+### Core Evaluation Loop
 
-```bash
-# Run baseline evaluation with canonical runner
-make benchmark
-
-# Quick smoke test (verifies pipeline works)
-make benchmark-smoke
-
-# Run first benchmark (1 task x 3 providers)
-uv run python scripts/run_experiment.py --config configs/experiments/first_benchmark.yaml
-
-# Run with a specific experiment config
-uv run python scripts/run_experiment.py --config configs/experiments/r_bench_smoke.yaml
-
-# Run with custom output directory and seed
-uv run python scripts/run_experiment.py --config configs/experiments/r_bench_smoke.yaml \
-    --output-dir results/my_run --seed 42
-
-# Capture raw Docker stdout/stderr logs per run (for debugging)
-uv run python scripts/run_experiment.py --config configs/experiments/first_benchmark.yaml \
-    --save-container-logs
+```
+Task → Harness → env.prepare() → agent.run() → env.execute(test_command) → parse → TaskResult
 ```
 
-### 5. Run Optimization
+### Module Structure
 
-```bash
-# Quick test (3 metric calls)
-make optimize-test
-
-# Full optimization (30+ calls)
-make optimize-fresh OPT_MAX_CALLS=30
+```
+src/grist_mill/
+├── schemas/          # Pydantic v2 data models (Task, TaskResult, Artifact, Telemetry)
+├── interfaces.py     # Abstract base classes (BaseAgent, BaseBenchmark, BaseEnvironment)
+├── config.py         # Configuration loading (pydantic-settings, YAML, env vars, CLI)
+├── registry/         # Artifact and agent registries (decorator-based registration)
+├── harness/          # Harness implementation (wires task → env → agent → result)
+├── environments/     # Docker and local-process runners
+├── agents/           # API-backed agent with multi-turn conversation
+├── tools/            # Tool orchestration and registry with capability advertisement
+├── providers/        # Multi-provider LLM resolution (OpenRouter, OpenAI, Anthropic)
+├── optimization/     # GEPA evaluator adapter and optimization runtime
+├── tasks/            # Task synthesis (tree-sitter AST analysis, test mutation)
+├── dataset/          # Dataset management (splitting, versioning, quality gates)
+├── reports/          # Result analysis and comparison
+├── export/           # Export to JSON, CSV, HTML
+└── cli/              # CLI entrypoint and subcommands
 ```
 
-### 6. Mine Tasks from GitHub PRs
+## Features
+
+### 🧪 Benchmarking
+- **Multi-provider support**: OpenRouter, OpenAI, Anthropic, and custom providers via a single config change
+- **Flexible environments**: Local-process runner for fast iteration, Docker runner for isolated execution
+- **Artifact system**: Tools, MCP servers, and skills as first-class pluggable artifacts
+
+### 🔬 Task Synthesis
+- **AST-based analysis**: tree-sitter parsing for Python, R, and TypeScript
+- **Test mutation pipeline**: Automatically generates tasks by introducing controlled bugs
+- **Manual authoring**: Import tasks from YAML/TOML with full metadata validation
+
+### ⚡ Optimization
+- **GEPA integration**: Evolve skills, system prompts, and tool policies through evaluation feedback
+- **Budget management**: Composable stop conditions (max calls, timeout, no-improvement)
+- **Checkpoint/Resume**: Persist and restore optimization state
+
+### 📊 Reporting & Export
+- **Experiment comparison**: Per-task deltas with statistical significance
+- **Telemetry aggregation**: Per-model, per-tool, per-experiment summaries
+- **Multiple formats**: JSON (self-describing), CSV (pandas-compatible), HTML (standalone)
+
+## CLI Usage
 
 ```bash
-# Mine from a single repo
-uv run python scripts/mine_prs.py --repo tidyverse/dplyr --since-days 30
+# Run a benchmark evaluation
+grist-mill run --config experiment.yaml
 
-# Mine from configured repos
-uv run python scripts/mine_prs.py --repos-file configs/repos_to_mine.yaml
+# Preview without executing
+grist-mill run --config experiment.yaml --dry-run
+
+# Validate a configuration
+grist-mill validate --config experiment.yaml
+
+# Generate tasks from source code
+grist-mill tasks generate --repo /path/to/source
+
+# Optimize a skill
+grist-mill optimize --config optimize.yaml
+
+# Compare two experiments
+grist-mill report --type comparison --results exp-a.json --compare-with exp-b.json
+
+# Export results
+grist-mill export --results results.json --format html --output report.html
 ```
 
 ## Configuration
 
+### Example Config
+
+```yaml
+agent:
+  model: "gpt-4o"
+  provider: "openai"
+  max_turns: 10
+  timeout: 300
+
+environment:
+  runner_type: "local"
+
+tasks:
+  - id: "fix-bug-001"
+    prompt: "Fix the null pointer exception in the parser."
+    language: "python"
+    test_command: "pytest tests/ -q"
+    timeout: 60
+    difficulty: "MEDIUM"
+```
+
 ### Environment Variables
 
-trainR automatically loads project-local `.env` values.
-Supported aliases are normalized automatically (for example `ZAI_API_KEY`, `GOOGLE_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `OPENCODE_API_TOKEN`).
+| Variable | Description |
+|----------|-------------|
+| `GRIST_MILL_AGENT_MODEL` | Override the LLM model |
+| `GRIST_MILL_AGENT_PROVIDER` | Override the LLM provider |
+| `OPENAI_API_KEY` | OpenAI API key |
+| `OPENROUTER_API_KEY` | OpenRouter API key |
+| `ANTHROPIC_API_KEY` | Anthropic API key |
 
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `OPENROUTER_API_KEY` | OpenRouter API key | One provider key required |
-| `OPENCODE_API_KEY` | OpenCode API key | One provider key required |
-| `Z_AI_API_KEY` | z.ai API key (canonical) | One provider key required |
-| `ZAI_API_KEY` | z.ai alias (auto-normalized) | Optional |
-| `GITHUB_TOKEN` | GitHub PAT (for PR mining) | Optional (or use gh CLI) |
-| `LLM_MODEL_REFLECTION` | Model for GEPA reflection | Default: from `configs/llm.yaml` |
+### Config Precedence
 
-### Model Selection
+`CLI arguments > Environment variables > YAML defaults`
 
-| Purpose | Default Model | Alternative |
-|---------|---------------|-------------|
-| **Task Agent** | `openrouter/openai/gpt-oss-120b:free` | Any OpenRouter model |
-| **Reflection/Judge** | Same as task agent | Stronger model recommended |
+## Example Configs
 
-## Project Structure
+| Config | Use Case |
+|--------|----------|
+| `configs/examples/smoke.yaml` | Quick smoke test (no API keys needed) |
+| `configs/examples/single_model.yaml` | Single-model benchmark evaluation |
+| `configs/examples/multi_model.yaml` | Multi-model comparison experiment |
+| `configs/examples/provider_setup.yaml` | LLM provider configuration guide |
+| `configs/examples/skill_optimization.yaml` | Skill prompt optimization workflow |
+| `configs/examples/optimize_smoke.yaml` | Optimization loop smoke test |
 
-```
-trainR/
-├── bench/                # Canonical benchmark infrastructure
-│   ├── runner.py         # Canonical execution API
-│   ├── experiments/      # Experiment runner and config
-│   ├── schema/v1/        # Canonical schemas (task, manifest, results)
-│   ├── dataset/          # Dataset management
-│   ├── eval/             # Evaluation utilities
-│   ├── optimize/         # GEPA optimization
-│   └── reports/          # Result reporting
-│
-├── evaluation/           # Docker-based evaluation
-│   ├── pi_runner.py      # DockerPiRunner
-│   └── sandbox.py        # EvaluationSandbox
-│
-├── scripts/              # CLI tools
-│   ├── run_experiment.py # CANONICAL benchmark runner
-│   ├── run_optimize.py   # Optimization runner
-│   ├── generate_tasks.py # Task generation
-│   └── mine_prs.py       # PR mining
-│
-├── configs/              # YAML configs
-│   └── experiments/      # Experiment configs (*.yaml)
-│
-├── tasks/                # Generated tasks (60/20/20 split)
-│   ├── train/            # 83 tasks
-│   ├── dev/              # 28 tasks
-│   ├── held_out/         # 27 tasks
-│   └── kaggle/           # 12 tasks (from 12 competitions)
-│
-├── skills/               # Skill definitions
-├── tests/                # pytest suite
-├── packages/             # Cloned R packages
-├── PACKAGES.md           # Package documentation
-└── PLAN.md               # Project roadmap
-```
-
-## Commands
+## Development
 
 ```bash
-# Setup
-make docker-build       # Build evaluation Docker image
+# Install dependencies
+uv sync
 
-# Tasks
-make generate-tasks     # Generate from package (PACKAGES=dplyr)
+# Run tests
+uv run pytest -m 'not integration_local and not integration_provider' -q
 
-# Benchmark (canonical runner)
-make benchmark          # Run: scripts/run_experiment.py --config configs/experiments/first_benchmark.yaml
-make benchmark-smoke    # Quick smoke test (verifies pipeline)
+# Lint and format
+uv run ruff check --fix && uv run ruff format
 
-# Direct experiment runner
-uv run python scripts/run_experiment.py --config configs/experiments/first_benchmark.yaml
-uv run python scripts/run_experiment.py --config configs/experiments/r_bench_smoke.yaml
-uv run python scripts/run_experiment.py --config configs/experiments/support_pair_smoke.yaml
-
-# Optimization
-make optimize-test      # Quick test (3 calls)
-make optimize-fresh     # Full optimization (uses scripts/run_optimize.py)
-
-# Testing & Linting
-make test               # Run tests
-make lint               # Ruff linter
-make format             # Ruff format
-uv run ty check .       # Type checking
-
-# PR Mining
-uv run python scripts/mine_prs.py --repo tidyverse/dplyr
-./scripts/scheduled_mine.sh  # Scheduled mining
+# Type check
+uv run ty check .
 ```
 
-## Supported Entrypoints
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full development guide.
 
-All benchmark execution must go through the canonical runner API:
+## Requirements
 
-| Entrypoint | Type | Use Case |
-|------------|------|----------|
-| `bench.runner.run()` | Library API | Python code, notebooks, tests |
-| `scripts/run_experiment.py` | CLI | Shell commands, CI pipelines |
+- Python 3.10+
+- [uv](https://docs.astral.sh/uv/) package manager
+- Docker (optional, for containerized evaluation)
 
-Both entrypoints delegate to the same execution path, ensuring consistent behavior.
+## License
 
-```python
-# Library API example
-from bench.runner import run
-
-manifest = run("configs/experiments/smoke.yaml")
-print(f"Pass rate: {manifest.summary.pass_rate:.1%}")
-
-# With overrides
-manifest = run("config.yaml", output_dir="results/custom", seed=42, workers=2)
-```
-
-```bash
-# CLI equivalent
-uv run python scripts/run_experiment.py --config config.yaml \
-    --output-dir results/custom --seed 42 --workers 2
-```
-
-**Important**: Do not create new entrypoints that bypass the canonical runner.
-All execution paths must delegate to `bench.runner.run()` to ensure:
-
-- Consistent artifact generation (manifest.json, results.jsonl, summary.json)
-- Unified telemetry and logging
-- Proper sandbox and credential handling
-- Reproducible fingerprinting and configuration snapshots
-
-## Architecture
-
-```
-  R Packages (20 packages)
-           │
-           ▼
-   Task Generator (tree-sitter) → Tasks
-           │                        │
-           │                        ▼
-           │      ┌────────────────────────────────────┐
-           │      │         EVALUATION LOOP            │
-           │      │                                    │
-           │      │  Skill → pi CLI → Tests (Docker)   │
-           │      │                │                   │
-           │      │          Pass/Fail + Score         │
-           │      │                │                   │
-            │      │     GEPA Evolution (Gateway)      │
-           │      └────────────────────────────────────┘
-           │                        │
-           │                        ▼
-           │                  Evolved Skill
-           │
-           └── Baseline Comparison → Model Report
-```
-
-## Packages
-
-See [PACKAGES.md](PACKAGES.md) for the full list of 20 R packages and rationale for each.
-
-## Development Roadmap
-
-See [PLAN.md](PLAN.md) for the full project roadmap.
-
-## Acknowledgments
-
-- [GEPA](https://github.com/gepa-ai/gepa) - Evolutionary prompt optimization
-- [OpenRouter](https://openrouter.ai) - Multi-provider LLM access
-- [tree-sitter-language-pack](https://github.com/Goldziher/tree-sitter-language-pack) - R parsing
-- [SWE-bench](https://github.com/swe-bench/SWE-bench) - Task collection methodology
-- All R package authors (see PACKAGES.md)
-
-### Historical
-
-- [LiteLLM](https://github.com/BerriAI/litellm) - Previous unified LLM interface (superseded by provider-native inference gateway)
+MIT License — see [LICENSE](LICENSE) for details.

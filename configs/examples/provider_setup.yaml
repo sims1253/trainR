@@ -1,0 +1,51 @@
+# LLM provider configuration examples.
+# Demonstrates how to configure different providers.
+#
+# To switch providers, change the agent.provider and agent.model fields.
+# Set the corresponding API key as an environment variable:
+#   export OPENAI_API_KEY=sk-...
+#   export OPENROUTER_API_KEY=sk-...
+#   export ANTHROPIC_API_KEY=sk-...
+#
+# Usage:
+#   grist-mill validate --config configs/examples/provider_setup.yaml
+#   grist-mill run --config configs/examples/provider_setup.yaml --dry-run
+
+# --- OpenAI ---
+agent:
+  model: "gpt-4o"
+  provider: "openai"
+  max_turns: 10
+  timeout: 300
+
+# --- OpenRouter (alternative: uncomment below, comment above) ---
+# agent:
+#   model: "openai/gpt-4o"
+#   provider: "openrouter"
+#   max_turns: 10
+#   timeout: 300
+
+# --- Anthropic (alternative: uncomment below, comment above) ---
+# agent:
+#   model: "claude-3-haiku-20240307"
+#   provider: "anthropic"
+#   max_turns: 10
+#   timeout: 300
+
+environment:
+  runner_type: "local"
+  cpu_limit: 1.0
+  network_access: false
+
+telemetry:
+  enabled: true
+  trace_enabled: false
+  output_dir: "./results/telemetry"
+
+tasks:
+  - id: "provider-smoke"
+    prompt: "Verify provider connectivity by writing a hello world function."
+    language: "python"
+    test_command: "python -c 'from solution import hello; assert hello() == \"hello\"'"
+    timeout: 30
+    difficulty: "EASY"

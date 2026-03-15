@@ -1,0 +1,47 @@
+# Multi-model comparison experiment.
+# Evaluates multiple LLM providers/models against the same task set.
+#
+# Usage:
+#   grist-mill run --config configs/examples/multi_model.yaml
+#   grist-mill validate --config configs/examples/multi_model.yaml
+#
+# After running, compare results:
+#   grist-mill report --type comparison --results results_exp_a.json --compare-with results_exp_b.json
+
+agent:
+  model: "openrouter/openai/gpt-4o-mini"
+  provider: "openrouter"
+  max_turns: 10
+  timeout: 300
+
+environment:
+  runner_type: "local"
+  cpu_limit: 1.0
+  network_access: false
+
+telemetry:
+  enabled: true
+  trace_enabled: false
+  output_dir: "./results/telemetry"
+
+tasks:
+  - id: "task-001"
+    prompt: "Fix the off-by-one error in the binary search implementation."
+    language: "python"
+    test_command: "python -m pytest tests/test_binary_search.py -q"
+    timeout: 60
+    difficulty: "MEDIUM"
+
+  - id: "task-002"
+    prompt: "Add input validation to the HTTP request handler."
+    language: "python"
+    test_command: "python -m pytest tests/test_handler.py -q"
+    timeout: 60
+    difficulty: "MEDIUM"
+
+  - id: "task-003"
+    prompt: "Implement rate limiting middleware for the API server."
+    language: "python"
+    test_command: "python -m pytest tests/test_rate_limit.py -q"
+    timeout: 60
+    difficulty: "HARD"
