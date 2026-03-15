@@ -1,0 +1,194 @@
+{
+  "groupId": "group-telemetry-cross",
+  "testedAt": "2026-03-15T06:40:00Z",
+  "isolation": {
+    "type": "pytest + ty + rg",
+    "repoRoot": "/home/m0hawk/Documents/trainR",
+    "scope": "telemetry, config, schemas, cross-schema consistency"
+  },
+  "toolsUsed": ["pytest", "ty", "rg"],
+  "assertions": [
+    {
+      "id": "VAL-TELEM-01",
+      "title": "Telemetry captures token usage per run (TokenUsage with prompt/completion/total, default 0)",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run pytest tests/test_telemetry.py -v",
+          "expected": "TokenUsage tests pass, verifying prompt/completion/total fields with default 0",
+          "observed": "All 42 telemetry tests passed. TestTokenUsage::test_defaults_to_zero confirmed prompt=0, completion=0, total=0 defaults. TestTokenUsage::test_explicit_values confirmed explicit prompt/completion/total set correctly. TestTelemetrySchema::test_token_usage_defaults_to_zero confirmed TokenUsage defaults in the Telemetry schema."
+        }
+      ],
+      "evidence": {
+        "testResults": "42 passed in 0.38s",
+        "relevantTests": [
+          "TestTokenUsage::test_defaults_to_zero - PASSED",
+          "TestTokenUsage::test_explicit_values - PASSED",
+          "TestTokenUsage::test_serialization - PASSED",
+          "TestTokenUsage::test_total_is_computed_when_zero - PASSED",
+          "TestTokenUsage::test_negative_values_rejected - PASSED",
+          "TestTelemetrySchema::test_token_usage_defaults_to_zero - PASSED"
+        ],
+        "consoleErrors": "none"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-TELEM-04",
+      "title": "Telemetry schema is versioned and forward-compatible (unknown fields ignored)",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run pytest tests/test_telemetry.py -v",
+          "expected": "Forward compatibility tests pass — unknown fields are ignored when deserializing",
+          "observed": "TestTelemetrySchema::test_version_field_present confirmed version field exists. TestTelemetrySchema::test_forward_compatibility_unknown_fields_ignored confirmed extra fields in JSON don't cause errors. TestTelemetrySchema::test_forward_compat_with_extra_numeric_fields confirmed numeric extra fields also handled. TestTelemetrySchema::test_json_round_trip confirmed serialization preserves version."
+        }
+      ],
+      "evidence": {
+        "testResults": "42 passed in 0.38s",
+        "relevantTests": [
+          "TestTelemetrySchema::test_version_field_present - PASSED",
+          "TestTelemetrySchema::test_serializes_to_json_with_version - PASSED",
+          "TestTelemetrySchema::test_forward_compatibility_unknown_fields_ignored - PASSED",
+          "TestTelemetrySchema::test_forward_compat_with_extra_numeric_fields - PASSED",
+          "TestTelemetrySchema::test_json_round_trip - PASSED"
+        ],
+        "consoleErrors": "none"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-TELEM-05",
+      "title": "TelemetryCollector supports track_phase() context manager for duration tracking",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run pytest tests/test_telemetry.py -v",
+          "expected": "TelemetryCollector track_phase context manager tests pass with duration tracking",
+          "observed": "TestTelemetryCollector::test_track_phase_records_duration confirmed context manager records duration. TestTelemetryCollector::test_track_phase_setup confirmed 'setup' phase. TestTelemetryCollector::test_track_phase_teardown confirmed 'teardown' phase. TestTelemetryCollector::test_phase_accumulation confirmed nesting accumulates. TestTelemetryCollector::test_multiple_phases confirmed sequential phases work. TestTelemetryCollector::test_total_s_is_updated confirmed total_s updates from phases."
+        }
+      ],
+      "evidence": {
+        "testResults": "42 passed in 0.38s",
+        "relevantTests": [
+          "TestTelemetryCollector::test_track_phase_records_duration - PASSED",
+          "TestTelemetryCollector::test_track_phase_setup - PASSED",
+          "TestTelemetryCollector::test_track_phase_teardown - PASSED",
+          "TestTelemetryCollector::test_phase_accumulation - PASSED",
+          "TestTelemetryCollector::test_multiple_phases - PASSED",
+          "TestTelemetryCollector::test_total_s_is_updated - PASSED",
+          "TestTelemetryCollector::test_track_phase_invalid_phase_raises - PASSED",
+          "TestTelemetryCollector::test_phase_uses_start_time - PASSED"
+        ],
+        "consoleErrors": "none"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CROSS-02",
+      "title": "Configuration resolution across all subsystems — single config change propagates correctly",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run pytest tests/test_config.py -v",
+          "expected": "Config tests pass, verifying env var and CLI overrides propagate",
+          "observed": "42 config tests passed. Env var override tests (test_env_var_overrides_yaml_timeout, test_env_var_overrides_yaml_model, etc.) confirmed YAML→env→CLI precedence. Nested validation confirmed error path specificity."
+        },
+        {
+          "action": "Run pytest tests/test_cross_schema_consistency.py::TestConfigResolutionAcrossSubsystems -v",
+          "expected": "Cross-subsystem config resolution tests pass",
+          "observed": "All TestConfigResolutionAcrossSubsystems tests passed: test_config_loads_all_sections, test_config_tasks_use_schema_types, test_config_artifacts_use_schema_types, test_config_change_propagates_to_harness_config, test_env_var_override_propagates_to_subsystems, test_telemetry_config_propagates, test_single_config_multiple_tasks."
+        },
+        {
+          "action": "Run pytest tests/test_cross_schema_consistency.py::TestConfigChangeEffects -v",
+          "expected": "Config change effect tests pass",
+          "observed": "All TestConfigChangeEffects tests passed: test_model_change_affects_harness_config, test_timeout_change_affects_all_subsystems, test_telemetry_trace_flag_propagates."
+        }
+      ],
+      "evidence": {
+        "testResults": "test_config.py: 42 passed in 0.22s; test_cross_schema_consistency.py: 30 passed in 0.35s",
+        "relevantTests": [
+          "TestCliOverrides::test_cli_overrides_env_and_yaml - PASSED",
+          "TestCliOverrides::test_cli_overrides_env_var_when_yaml_differs - PASSED",
+          "TestEnvVarOverrides::test_env_var_overrides_yaml_timeout - PASSED",
+          "TestEnvVarOverrides::test_env_var_overrides_yaml_model - PASSED",
+          "TestConfigResolutionAcrossSubsystems::test_config_change_propagates_to_harness_config - PASSED",
+          "TestConfigResolutionAcrossSubsystems::test_env_var_override_propagates_to_subsystems - PASSED",
+          "TestConfigResolutionAcrossSubsystems::test_telemetry_config_propagates - PASSED",
+          "TestConfigChangeEffects::test_model_change_affects_harness_config - PASSED",
+          "TestConfigChangeEffects::test_timeout_change_affects_all_subsystems - PASSED",
+          "TestConfigChangeEffects::test_telemetry_trace_flag_propagates - PASSED"
+        ],
+        "consoleErrors": "none"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CROSS-03",
+      "title": "Schema consistency — schemas defined in core are used without redefinition by downstream modules",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run rg 'class Task\\b' src/grist_mill/ --type py",
+          "expected": "Only one definition in schemas/__init__.py",
+          "observed": "Only src/grist_mill/schemas/__init__.py:class Task(BaseModel): found"
+        },
+        {
+          "action": "Run rg 'class TaskResult\\b' src/grist_mill/ --type py",
+          "expected": "Only one definition in schemas/__init__.py",
+          "observed": "Only src/grist_mill/schemas/__init__.py:class TaskResult(BaseModel): found"
+        },
+        {
+          "action": "Run rg 'class Manifest\\b' src/grist_mill/ --type py",
+          "expected": "Only one definition in schemas/__init__.py",
+          "observed": "Only src/grist_mill/schemas/__init__.py:class Manifest(BaseModel): found"
+        },
+        {
+          "action": "Run uv run ty check src/grist_mill/",
+          "expected": "Type checking passes with no errors",
+          "observed": "'All checks passed!' — zero type errors"
+        },
+        {
+          "action": "Run pytest tests/test_cross_schema_consistency.py -v",
+          "expected": "Cross-schema consistency tests pass",
+          "observed": "30 tests passed including TestNoSchemaRedefinitions, TestSchemaIdentity, TestSchemaChangePropagation, TestSchemaRoundTrips classes"
+        }
+      ],
+      "evidence": {
+        "typeChecker": "ty check src/grist_mill/ → All checks passed!",
+        "grepResults": {
+          "class Task": "src/grist_mill/schemas/__init__.py (only definition)",
+          "class TaskResult": "src/grist_mill/schemas/__init__.py (only definition)",
+          "class Manifest": "src/grist_mill/schemas/__init__.py (only definition)"
+        },
+        "relevantTests": [
+          "TestNoSchemaRedefinitions::test_no_class_definitions_outside_schemas - PASSED",
+          "TestNoSchemaRedefinitions::test_no_enum_redefinitions_outside_schemas - PASSED",
+          "TestNoSchemaRedefinitions::test_all_downstream_modules_import_from_schemas - PASSED",
+          "TestSchemaIdentity::test_task_class_identity_across_modules - PASSED",
+          "TestSchemaIdentity::test_task_result_identity_across_modules - PASSED",
+          "TestSchemaIdentity::test_task_status_identity_across_modules - PASSED",
+          "TestSchemaIdentity::test_harness_config_identity_across_modules - PASSED",
+          "TestSchemaIdentity::test_telemetry_schema_identity - PASSED",
+          "TestSchemaChangePropagation::test_task_required_fields_enforced_in_harness - PASSED",
+          "TestSchemaChangePropagation::test_task_result_score_bounds_enforced_in_agent - PASSED",
+          "TestSchemaChangePropagation::test_task_result_status_enum_enforced_in_parser - PASSED"
+        ],
+        "consoleErrors": "none"
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "commandsRun": [
+    "uv run pytest tests/test_telemetry.py -v",
+    "uv run ty check src/grist_mill/",
+    "rg 'class Task\\b' src/grist_mill/ --type py",
+    "rg 'class TaskResult\\b' src/grist_mill/ --type py",
+    "rg 'class Manifest\\b' src/grist_mill/ --type py",
+    "uv run pytest tests/test_config.py -v",
+    "uv run pytest tests/test_cross_schema_consistency.py -v"
+  ],
+  "summary": "Tested 5 assertions: all 5 passed. VAL-TELEM-01 (token usage with defaults), VAL-TELEM-04 (versioned forward-compatible schema), VAL-TELEM-05 (track_phase context manager), VAL-CROSS-02 (config resolution across subsystems), VAL-CROSS-03 (schema consistency — no redefinitions outside schemas/, type checking passes, identity tests pass). Total test results: 42 telemetry + 42 config + 30 cross-schema = 114 tests, all passing."
+}

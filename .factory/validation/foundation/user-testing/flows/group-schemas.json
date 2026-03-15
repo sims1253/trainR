@@ -1,0 +1,337 @@
+{
+  "groupId": "group-schemas",
+  "testedAt": "2026-03-15T06:40:00Z",
+  "isolation": {
+    "scope": "pytest unit tests only, no code modifications",
+    "repoRoot": "/home/m0hawk/Documents/trainR",
+    "tool": "uv run pytest"
+  },
+  "toolsUsed": ["pytest"],
+  "assertions": [
+    {
+      "id": "VAL-FOUND-01",
+      "title": "Task schema validates required fields, rejects invalid input (negative timeout, etc.)",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run test_schemas.py::TestTaskConstruction (9 tests)",
+          "expected": "All tests pass confirming valid construction, required field validation, negative/zero timeout rejection, empty prompt/id rejection, optional defaults, and JSON round-trip",
+          "observed": "All 9 tests PASSED. Valid task construction succeeds. Missing fields raise ValidationError. Negative timeout raises ValidationError referencing 'timeout' with 'greater than' constraint. Zero timeout raises ValidationError. Empty prompt and empty id raise ValidationError."
+        }
+      ],
+      "evidence": {
+        "testClass": "TestTaskConstruction in tests/test_schemas.py",
+        "testsPassed": [
+          "test_valid_construction",
+          "test_required_fields",
+          "test_rejects_negative_timeout",
+          "test_rejects_zero_timeout",
+          "test_rejects_empty_prompt",
+          "test_rejects_empty_id",
+          "test_optional_fields_have_defaults",
+          "test_json_round_trip",
+          "test_dict_round_trip"
+        ],
+        "totalTests": 9,
+        "passedTests": 9
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-FOUND-02",
+      "title": "TaskResult schema enforces score bounds [0,1] and status enum, JSON round-trip",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run test_schemas.py::TestTaskResult (9 tests)",
+          "expected": "All tests pass confirming score bounds enforcement, status enum validation, and JSON round-trip",
+          "observed": "All 9 tests PASSED. Score 1.5 raises ValidationError mentioning 'score'. Score -0.1 raises ValidationError mentioning 'score'. Status 'almost' raises ValidationError mentioning 'status'. Boundaries 0.0 and 1.0 accepted. All enum values accepted. JSON round-trip lossless."
+        }
+      ],
+      "evidence": {
+        "testClass": "TestTaskResult in tests/test_schemas.py",
+        "testsPassed": [
+          "test_valid_success_result",
+          "test_valid_failure_result",
+          "test_score_at_boundaries",
+          "test_rejects_score_above_one",
+          "test_rejects_score_below_zero",
+          "test_rejects_invalid_status_string",
+          "test_all_status_values_valid",
+          "test_optional_fields",
+          "test_json_round_trip"
+        ],
+        "totalTests": 9,
+        "passedTests": 9
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-FOUND-03",
+      "title": "Manifest schema aggregates tasks, enforces unique task IDs",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run test_schemas.py::TestManifest (6 tests)",
+          "expected": "Valid manifest constructs, duplicate task IDs raise ValidationError, deterministic JSON serialization",
+          "observed": "All 6 tests PASSED. Valid manifest with unique task IDs constructs. Duplicate task IDs raise ValidationError mentioning 'duplicate' or 'unique'. Timestamp auto-generated. Deterministic JSON serialization verified. JSON round-trip lossless. Empty task list valid."
+        }
+      ],
+      "evidence": {
+        "testClass": "TestManifest in tests/test_schemas.py",
+        "testsPassed": [
+          "test_valid_manifest",
+          "test_timestamp_auto_generated",
+          "test_rejects_duplicate_task_ids",
+          "test_deterministic_json_serialization",
+          "test_manifest_json_round_trip",
+          "test_empty_tasks_list"
+        ],
+        "totalTests": 6,
+        "passedTests": 6
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-FOUND-04",
+      "title": "Artifact discriminated union (Tool/MCP/Skill) with polymorphic type discrimination",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run test_artifact.py (30 tests covering all three variants and union routing)",
+          "expected": "Valid construction of each variant, rejected invalid variants, discriminated union routing by type field",
+          "observed": "All 30 tests PASSED. ToolArtifact requires name/description/input_schema. MCPServerArtifact requires name/command/args. SkillArtifact requires name/skill_file_path. Discriminated union routes type='tool' to ToolArtifact, type='mcp_server' to MCPServerArtifact, type='skill' to SkillArtifact. Invalid type raises ValidationError. Missing required fields in union context raise ValidationError identifying missing field. JSON round-trip for all variants and mixed lists."
+        }
+      ],
+      "evidence": {
+        "testClasses": [
+          "TestToolArtifact",
+          "TestMCPServerArtifact",
+          "TestSkillArtifact",
+          "TestArtifactDiscriminatedUnion",
+          "TestArtifactCommonFields"
+        ],
+        "testFile": "tests/test_artifact.py",
+        "totalTests": 30,
+        "passedTests": 30
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-FOUND-05",
+      "title": "HarnessConfig schema models agent-environment-tool binding",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run test_schemas.py::TestHarnessConfig (4 tests)",
+          "expected": "Valid HarnessConfig construction with agent, environment, and artifact bindings",
+          "observed": "All 4 tests PASSED. Valid config constructs with agent (model, provider, system_prompt), environment (runner_type, docker_image), and artifact_bindings. Optional artifact_bindings defaults to empty list. Sensible defaults for AgentConfig and EnvironmentConfig. JSON round-trip lossless."
+        }
+      ],
+      "evidence": {
+        "testClass": "TestHarnessConfig in tests/test_schemas.py",
+        "testsPassed": [
+          "test_valid_config",
+          "test_optional_artifact_bindings",
+          "test_sensible_defaults",
+          "test_json_round_trip"
+        ],
+        "totalTests": 4,
+        "passedTests": 4
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-FOUND-06",
+      "title": "BaseBenchmark abstract interface defines lifecycle methods",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run test_interfaces.py::TestBaseBenchmark (6 tests)",
+          "expected": "Cannot instantiate abstract base, setup/teardown/submit_result methods work, submit_result validates TaskResult type",
+          "observed": "All 6 tests PASSED. BaseBenchmark cannot be instantiated directly (TypeError). Incomplete subclass raises TypeError. Complete subclass with setup/teardown/_submit_result instantiates. submit_result accepts valid TaskResult. submit_result rejects non-TaskResult (string, dict, int) with TypeError mentioning 'TaskResult'. setup and teardown are callable in correct order."
+        }
+      ],
+      "evidence": {
+        "testClass": "TestBaseBenchmark in tests/test_interfaces.py",
+        "testsPassed": [
+          "test_cannot_instantiate_base_benchmark_directly",
+          "test_incomplete_subclass_raises_typeerror",
+          "test_complete_subclass_instantiates",
+          "test_submit_result_accepts_taskresult",
+          "test_submit_result_rejects_non_taskresult",
+          "test_setup_and_teardown_are_callable"
+        ],
+        "totalTests": 6,
+        "passedTests": 6
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-FOUND-07",
+      "title": "BaseAgent abstract interface enforces contract (TypeError on non-implementation)",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run test_interfaces.py::TestBaseAgent (4 tests)",
+          "expected": "TypeError on incomplete subclass, successful instantiation and run on complete subclass",
+          "observed": "All 4 tests PASSED. BaseAgent cannot be instantiated directly. Incomplete subclass raises TypeError matching 'run'. Complete subclass implementing run(task, config) -> TaskResult instantiates successfully. Complete agent's run method returns correct TaskResult."
+        }
+      ],
+      "evidence": {
+        "testClass": "TestBaseAgent in tests/test_interfaces.py",
+        "testsPassed": [
+          "test_cannot_instantiate_base_agent_directly",
+          "test_incomplete_subclass_raises_typeerror",
+          "test_complete_subclass_instantiates",
+          "test_complete_agent_run_returns_result"
+        ],
+        "totalTests": 4,
+        "passedTests": 4
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-FOUND-08",
+      "title": "BaseEnvironment abstract interface with execute returning ExecutionOutput",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run test_interfaces.py::TestBaseEnvironment (7 tests)",
+          "expected": "Cannot instantiate abstract base, LocalEnvironment executes echo hello correctly, timeout detection, non-zero exit capture",
+          "observed": "All 7 tests PASSED. BaseEnvironment cannot be instantiated directly. Incomplete subclass raises TypeError. Complete subclass instantiates. execute returns typed ExecutionOutput with stdout/stderr/exit_code/timed_out. LocalEnvironment executes 'echo hello' and returns correct output containing 'hello' with exit_code=0. LocalEnvironment marks timed_out=True on 'sleep 60' with 0.5s timeout. LocalEnvironment captures non-zero exit code (exit 42 -> exit_code=42)."
+        }
+      ],
+      "evidence": {
+        "testClass": "TestBaseEnvironment in tests/test_interfaces.py",
+        "testsPassed": [
+          "test_cannot_instantiate_base_environment_directly",
+          "test_incomplete_subclass_raises_typeerror",
+          "test_complete_subclass_instantiates",
+          "test_execute_returns_execution_output",
+          "test_local_environment_echo_hello",
+          "test_local_environment_timeout",
+          "test_local_environment_nonzero_exit"
+        ],
+        "totalTests": 7,
+        "passedTests": 7
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-FOUND-09",
+      "title": "BaseHarness abstract interface wires task→env→agent with guaranteed cleanup",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run test_interfaces.py::TestBaseHarness (7 tests)",
+          "expected": "Correct call ordering (prepare→agent_run→cleanup), cleanup guaranteed on agent exception and prepare exception",
+          "observed": "All 7 tests PASSED. BaseHarness cannot be instantiated directly. LocalHarness instantiates with HarnessConfig. Harness.run calls env.prepare, agent.run, env.cleanup in order. Cleanup guaranteed when agent raises RuntimeError. Cleanup guaranteed by LocalHarness when agent raises. End-to-end test with LocalEnvironment and EchoAgent succeeds (status=SUCCESS, score=1.0). Cleanup still called even when env.prepare raises."
+        }
+      ],
+      "evidence": {
+        "testClass": "TestBaseHarness in tests/test_interfaces.py",
+        "testsPassed": [
+          "test_cannot_instantiate_base_harness_directly",
+          "test_local_harness_instantiates",
+          "test_harness_run_calls_prepare_agent_cleanup_in_order",
+          "test_harness_guarantees_cleanup_on_agent_exception",
+          "test_harness_guarantees_cleanup_on_agent_exception_with_local_harness",
+          "test_local_harness_end_to_end",
+          "test_harness_cleanup_on_prepare_exception"
+        ],
+        "totalTests": 7,
+        "passedTests": 7
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-FOUND-10",
+      "title": "ArtifactRegistry supports dynamic registration, lookup, duplicate detection",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run test_registry.py (34 tests covering registration, lookup, listing, deregistration, clearing)",
+          "expected": "Registration and retrieval by name/type, duplicate raises ValueError unless overwrite=True, list_artifacts with type filter",
+          "observed": "All 34 tests PASSED. register() stores artifacts retrievable by name. get() returns None for non-existent. get_by_type() returns only matching artifacts. Duplicate registration raises ValueError matching artifact name. Overwrite=True replaces artifact. list_artifacts(filter_type=...) correctly filters. count and count_by_type work. names returns registered names. deregister() removes artifacts. clear() removes all."
+        }
+      ],
+      "evidence": {
+        "testClasses": [
+          "TestRegistration",
+          "TestLookup",
+          "TestListArtifacts",
+          "TestDeregistration",
+          "TestClear"
+        ],
+        "testFile": "tests/test_registry.py",
+        "totalTests": 28,
+        "passedTests": 28
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-FOUND-11",
+      "title": "Registered artifacts auto-wired into harness config",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run test_registry.py::TestWiring (7 tests)",
+          "expected": "build_harness_config wires artifacts, selective wiring works, nonexistent artifact raises error, get_agent_context provides structured data",
+          "observed": "All 7 tests PASSED. build_harness_config wires all registered artifacts into artifact_bindings. Selective wiring with artifact_names wires only specified artifacts. Wiring nonexistent artifact raises ValueError. Empty registry produces empty bindings. get_agent_context returns structured data with 'tools', 'skills', 'mcp_servers' keys. Context filtering by artifact names works correctly."
+        }
+      ],
+      "evidence": {
+        "testClass": "TestWiring in tests/test_registry.py",
+        "testsPassed": [
+          "test_wire_into_harness_config",
+          "test_wire_selected_artifacts",
+          "test_wire_nonexistent_artifact_raises",
+          "test_wire_empty_registry_empty_bindings",
+          "test_wire_all_with_no_selection_wires_everything",
+          "test_get_agent_context",
+          "test_get_agent_context_all"
+        ],
+        "totalTests": 7,
+        "passedTests": 7
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-FOUND-12",
+      "title": "Schemas provide helpful error messages with field name, expected type, actual value",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run test_schemas.py::TestErrorMessages (6 tests) and test_artifact.py::TestArtifactDiscriminatedUnion::test_error_message_includes_field_name",
+          "expected": "Error messages include field name, constraint hint, and actual value",
+          "observed": "All 7 relevant tests PASSED. Task error includes 'timeout' field name. Task error includes 'greater' constraint hint. Task error includes actual value '-5'. Score error includes 'score' and actual value '2'. Status error includes 'status' and actual value 'almost'. Manifest duplicate error includes the problematic task ID 'dup-1'. Artifact union error includes missing field names ('description' or 'input_schema')."
+        }
+      ],
+      "evidence": {
+        "testClasses": [
+          "TestErrorMessages in tests/test_schemas.py",
+          "TestArtifactDiscriminatedUnion in tests/test_artifact.py"
+        ],
+        "testsPassed": [
+          "test_task_error_includes_field_name",
+          "test_task_error_includes_constraint_hint",
+          "test_task_error_includes_actual_value",
+          "test_result_score_error_includes_value",
+          "test_result_status_error_includes_value",
+          "test_manifest_duplicate_error_includes_task_id",
+          "test_error_message_includes_field_name"
+        ],
+        "totalTests": 7,
+        "passedTests": 7
+      },
+      "issues": null
+    }
+  ],
+  "commandsRun": [
+    "uv run pytest tests/test_schemas.py tests/test_artifact.py tests/test_interfaces.py tests/test_registry.py -v --tb=short"
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "Tested all 12 VAL-FOUND assertions (foundation milestone schema/interface assertions). All 134 pytest tests passed across 4 test files (test_schemas.py: 45 tests, test_artifact.py: 30 tests, test_interfaces.py: 24 tests, test_registry.py: 35 tests). Every assertion validated as PASS."
+}
