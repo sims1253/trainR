@@ -2,4 +2,21 @@
 
 __version__ = "0.1.0"
 
-__all__ = ["__version__"]
+from grist_mill.interfaces import (
+    BaseAgent,
+    BaseBenchmark,
+    BaseEnvironment,
+    BaseHarness,
+    LocalEnvironment,
+    LocalHarness,
+)
+
+__all__ = [
+    "BaseAgent",
+    "BaseBenchmark",
+    "BaseEnvironment",
+    "BaseHarness",
+    "LocalEnvironment",
+    "LocalHarness",
+    "__version__",
+]
