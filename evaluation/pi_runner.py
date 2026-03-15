@@ -242,7 +242,7 @@ class DockerPiRunner:
     _MAX_OUTPUT_LINE_CHARS = 2_000
     _MAX_ERROR_CHARS = 1000
     _REPEATED_READ_THRESHOLD = 10  # Increased threshold to be less aggressive
-    _REPEATED_PATH_THRESHOLD = 6   # Increased threshold to be less aggressive
+    _REPEATED_PATH_THRESHOLD = 6  # Increased threshold to be less aggressive
 
     def __init__(self, config: DockerPiRunnerConfig | None = None):
         self.config = config or DockerPiRunnerConfig()
@@ -421,8 +421,12 @@ Write the tests now."""
             # R package task: pass repo and patch info
             env_vars["REPO"] = repo
             env_vars["BASE_COMMIT"] = base_commit
-            env_vars["TEST_PATCH"] = base64.b64encode(test_patch.encode()).decode() if test_patch else ""
-            env_vars["GOLD_PATCH"] = base64.b64encode(gold_patch.encode()).decode() if gold_patch else ""
+            env_vars["TEST_PATCH"] = (
+                base64.b64encode(test_patch.encode()).decode() if test_patch else ""
+            )
+            env_vars["GOLD_PATCH"] = (
+                base64.b64encode(gold_patch.encode()).decode() if gold_patch else ""
+            )
             env_vars["FAIL_TO_PASS"] = json.dumps(fail_to_pass)
             env_vars["PASS_TO_PASS"] = json.dumps(pass_to_pass)
 
@@ -961,7 +965,9 @@ Write the tests now."""
         normalized_id = str(tool_call_id).strip() if isinstance(tool_call_id, str) else ""
 
         if normalized_id:
-            if normalized_id not in unique_reads or (unique_reads[normalized_id] is None and path is not None):
+            if normalized_id not in unique_reads or (
+                unique_reads[normalized_id] is None and path is not None
+            ):
                 unique_reads[normalized_id] = path
             return
 

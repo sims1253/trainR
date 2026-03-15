@@ -53,7 +53,6 @@ grist-mill/
 ├── src/grist_mill/         # Main package
 │   ├── schemas/            # Pydantic v2 data models
 │   │   ├── artifact.py     # Artifact discriminated union (Tool, MCP, Skill)
-│   │   ├── task.py         # Task, TaskResult, Manifest
 │   │   └── telemetry.py    # TelemetrySchema, TokenUsage, LatencyBreakdown
 │   ├── interfaces.py       # Abstract base classes (BaseAgent, BaseBenchmark, etc.)
 │   ├── config.py           # Configuration loading (pydantic-settings)

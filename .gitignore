@@ -225,4 +225,10 @@ divide-and-conquer-*.Rmd
 # Track Dockerfile.benchmark
 !Dockerfile.benchmark
 
+# =============================================================================
+# Factory / design artifacts (local, not for version control)
+# =============================================================================
+.factory/validation/
+design/
+
 .env

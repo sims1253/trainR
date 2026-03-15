@@ -72,7 +72,9 @@ def test_convert_harness_result_preserves_non_binary_score_and_tier(tmp_path) ->
 def test_record_result_progress_event_includes_score_and_runtime(tmp_path) -> None:
     """Progress events should include score/runtime for richer TUI metrics."""
     events: list[dict] = []
-    runner = ExperimentRunner(ExperimentConfig(name="progress-payload-test"), progress_callback=events.append)
+    runner = ExperimentRunner(
+        ExperimentConfig(name="progress-payload-test"), progress_callback=events.append
+    )
     results_file = tmp_path / "results.jsonl"
 
     result = ResultV1(

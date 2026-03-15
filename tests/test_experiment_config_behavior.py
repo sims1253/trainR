@@ -36,7 +36,9 @@ def test_generate_run_id_respects_explicit_output_run_id() -> None:
 def test_execution_config_rejects_unregistered_harness() -> None:
     """Execution harness validation should reject names not in registry."""
     with pytest.raises(ValidationError, match="not registered"):
-        ExperimentConfig.model_validate({"name": "invalid-harness", "execution": {"harness": "pi_sdk"}})
+        ExperimentConfig.model_validate(
+            {"name": "invalid-harness", "execution": {"harness": "pi_sdk"}}
+        )
 
 
 def test_execution_config_accepts_provider_parallel_limits() -> None:

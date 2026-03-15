@@ -103,9 +103,8 @@ class DockerCommandBuilder:
             raise ValueError(f"Invalid volume mode '{mode}'. Expected 'ro' or 'rw'.")
 
         if (
-            (self._is_docker_socket(src) or self._is_docker_socket(dest))
-            and not self.policy.allow_docker_socket_mount
-        ):
+            self._is_docker_socket(src) or self._is_docker_socket(dest)
+        ) and not self.policy.allow_docker_socket_mount:
             raise ValueError("Docker socket mounts are not allowed by sandbox policy.")
 
         if (

@@ -133,7 +133,10 @@ class ManifestV1(BaseModel):
 
     # Results reference
     results_path: str | None = Field(default=None, description="Path to results file")
-    results: list[ResultV1] = Field(default_factory=list, description="Individual results (cleared when memory-saving is enabled)")
+    results: list[ResultV1] = Field(
+        default_factory=list,
+        description="Individual results (cleared when memory-saving is enabled)",
+    )
 
     # Additional metadata
     metadata: dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
@@ -193,8 +196,12 @@ class ManifestV1(BaseModel):
         if result.passed:
             model_summary.passed += 1
 
-        model_summary.avg_score = (model_summary.avg_score * old_model_total + result.score) / model_summary.total
-        model_summary.avg_latency_s = (model_summary.avg_latency_s * old_model_total + result.latency_s) / model_summary.total
+        model_summary.avg_score = (
+            model_summary.avg_score * old_model_total + result.score
+        ) / model_summary.total
+        model_summary.avg_latency_s = (
+            model_summary.avg_latency_s * old_model_total + result.latency_s
+        ) / model_summary.total
         model_summary.total_tokens += result.token_usage.total
 
         # Keep model_summaries sorted by model name

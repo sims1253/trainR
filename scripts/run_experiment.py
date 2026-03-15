@@ -132,7 +132,9 @@ def parse_provider_float_limits(raw_limits: list[str], *, arg_name: str) -> dict
     return parsed
 
 
-def print_results_summary(manifest: ManifestV1, model_costs: dict[str, tuple[float, float]] | None = None) -> None:
+def print_results_summary(
+    manifest: ManifestV1, model_costs: dict[str, tuple[float, float]] | None = None
+) -> None:
     """Print a summary table of results."""
     table = Table(title="Experiment Results", show_header=True, header_style="bold")
     table.add_column("Model")
@@ -176,11 +178,7 @@ def print_results_summary(manifest: ManifestV1, model_costs: dict[str, tuple[flo
             f"Avg Score: {manifest.summary.avg_score:.2f}\n"
             f"Avg Latency: {manifest.summary.avg_latency_s:.1f}s\n"
             f"Total Tokens: {manifest.summary.total_tokens:,}\n"
-            + (
-                f"Duration: {manifest.duration_s:.1f}s"
-                if manifest.duration_s
-                else "Duration: N/A"
-            )
+            + (f"Duration: {manifest.duration_s:.1f}s" if manifest.duration_s else "Duration: N/A")
             + cost_line,
             title="Summary",
             border_style="green" if manifest.summary.pass_rate > 0.5 else "red",
@@ -297,7 +295,11 @@ class ExperimentTUI:
             seed = config.determinism.seed or "none"
             workers = config.execution.parallel_workers
             try:
-                sandbox = config.execution.sandbox_profile.value if hasattr(config.execution.sandbox_profile, "value") else str(config.execution.sandbox_profile)
+                sandbox = (
+                    config.execution.sandbox_profile.value
+                    if hasattr(config.execution.sandbox_profile, "value")
+                    else str(config.execution.sandbox_profile)
+                )
             except Exception:
                 sandbox = "?"
             chips = [
@@ -337,8 +339,7 @@ class ExperimentTUI:
                 if self.config_chips:
                     self.config_chips = (
                         f"{len(self.models)} models  "
-                        f"{self.total_tasks} tasks  "
-                        + "  ".join(self.config_chips.split("  ")[1:])
+                        f"{self.total_tasks} tasks  " + "  ".join(self.config_chips.split("  ")[1:])
                     )
             elif etype == "run_start":
                 model = event.get("model", "unknown")
@@ -400,21 +401,23 @@ class ExperimentTUI:
                     self.tool_stats[tool]["time_ms"] += ms
 
                 # Activity feed
-                self.recent_results.append({
-                    "model": model,
-                    "task_id": event.get("task_id", "?"),
-                    "passed": event.get("passed", False),
-                    "score": event.get("score", 0.0),
-                    "cost": result_cost,
-                    "runtime_s": event.get("runtime_s", event.get("latency_s", 0)),
-                    "tokens": event.get("tokens", 0),
-                    "error_category": event.get("error_category"),
-                    "error_message": event.get("error_message"),
-                    "tests_passed": event.get("tests_passed", 0),
-                    "tests_total": event.get("tests_total", 0),
-                })
+                self.recent_results.append(
+                    {
+                        "model": model,
+                        "task_id": event.get("task_id", "?"),
+                        "passed": event.get("passed", False),
+                        "score": event.get("score", 0.0),
+                        "cost": result_cost,
+                        "runtime_s": event.get("runtime_s", event.get("latency_s", 0)),
+                        "tokens": event.get("tokens", 0),
+                        "error_category": event.get("error_category"),
+                        "error_message": event.get("error_message"),
+                        "tests_passed": event.get("tests_passed", 0),
+                        "tests_total": event.get("tests_total", 0),
+                    }
+                )
                 if len(self.recent_results) > self.MAX_ACTIVITY_LINES:
-                    self.recent_results = self.recent_results[-self.MAX_ACTIVITY_LINES:]
+                    self.recent_results = self.recent_results[-self.MAX_ACTIVITY_LINES :]
 
                 # Update model status
                 completed = s["completed"]
@@ -505,9 +508,7 @@ class ExperimentTUI:
 
     def build_progress_bar(self) -> Panel:
         """Build the overall progress bar panel."""
-        total_completed = sum(
-            self.stats.get(m, {}).get("completed", 0) for m in self.models
-        )
+        total_completed = sum(self.stats.get(m, {}).get("completed", 0) for m in self.models)
         total_expected = (
             sum(self.model_totals.values())
             if self.model_totals
@@ -559,8 +560,13 @@ class ExperimentTUI:
             s = self.stats.get(
                 model,
                 {
-                    "completed": 0, "passed": 0, "tokens": 0,
-                    "latency": 0.0, "runtime": 0.0, "score": 0.0, "cost": 0.0,
+                    "completed": 0,
+                    "passed": 0,
+                    "tokens": 0,
+                    "latency": 0.0,
+                    "runtime": 0.0,
+                    "score": 0.0,
+                    "cost": 0.0,
                 },
             )
             completed = s["completed"]
@@ -583,7 +589,11 @@ class ExperimentTUI:
             bar_width = 12
             filled_full = int(bar_width * pct)
             half = (bar_width * pct) - filled_full >= 0.5
-            bar_chars = "█" * filled_full + ("▌" if half else "") + "░" * (bar_width - filled_full - (1 if half else 0))
+            bar_chars = (
+                "█" * filled_full
+                + ("▌" if half else "")
+                + "░" * (bar_width - filled_full - (1 if half else 0))
+            )
             bar = f"[green]{bar_chars}[/green] {int(pct * 100):3d}%"
 
             status = self.model_status.get(model, "waiting")
@@ -638,9 +648,9 @@ class ExperimentTUI:
         if not self.tool_stats:
             return None
         # Top 6 tools by call count
-        sorted_tools = sorted(
-            self.tool_stats.items(), key=lambda kv: kv[1]["calls"], reverse=True
-        )[:6]
+        sorted_tools = sorted(self.tool_stats.items(), key=lambda kv: kv[1]["calls"], reverse=True)[
+            :6
+        ]
         parts = [f"{name}:{int(info['calls'])}" for name, info in sorted_tools]
         return Panel(
             Text.from_markup(f"[bold]Tools[/bold]  {'  '.join(parts)}"),
@@ -688,10 +698,7 @@ class ExperimentTUI:
                 lines.append(line)
 
             # Show currently running tasks in dim at bottom
-            running = [
-                m for m in self.models
-                if self.active_runs.get(m, 0) > 0
-            ]
+            running = [m for m in self.models if self.active_runs.get(m, 0) > 0]
             if running:
                 run_line = Text()
                 run_line.append(" ...  ", style="dim")
@@ -817,8 +824,7 @@ Examples:
         default=[],
         metavar="PROVIDER=RPS",
         help=(
-            "Maximum run starts per second for a provider. Repeatable, e.g. "
-            "--provider-rps zai=0.5"
+            "Maximum run starts per second for a provider. Repeatable, e.g. --provider-rps zai=0.5"
         ),
     )
     parser.add_argument(
@@ -994,9 +1000,7 @@ Examples:
     root_logger.setLevel(original_level)
 
     if live_failed:
-        console.print(
-            "[yellow]Live dashboard failed; showing final summary when done.[/yellow]"
-        )
+        console.print("[yellow]Live dashboard failed; showing final summary when done.[/yellow]")
 
     # Wait for thread to finish
     try:

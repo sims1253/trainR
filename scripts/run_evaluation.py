@@ -76,8 +76,7 @@ def main() -> None:
     # Check API key is in environment
     if not get_env_var("Z_AI_API_KEY"):
         console.print(
-            "[red]Z_AI_API_KEY not set in environment. "
-            "Set it in .env or shell config.[/red]"
+            "[red]Z_AI_API_KEY not set in environment. Set it in .env or shell config.[/red]"
         )
         sys.exit(1)
 

@@ -16,6 +16,7 @@ import textwrap
 
 from click.testing import CliRunner
 
+from grist_mill import __version__
 from grist_mill.cli.main import cli
 
 # ---------------------------------------------------------------------------
@@ -579,7 +580,7 @@ class TestEndToEndWorkflow:
         runner = CliRunner()
         result = runner.invoke(cli, ["--version"])
         assert result.exit_code == 0
-        assert "0.1.0" in result.output
+        assert __version__ in result.output
 
     def test_help_exits_zero_for_all_commands(self) -> None:
         """All --help invocations exit with code 0."""

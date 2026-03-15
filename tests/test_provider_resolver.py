@@ -9,7 +9,10 @@ def test_resolver_builds_litellm_model_with_separator() -> None:
     resolver = ProviderResolver("configs/llm.yaml")
 
     assert resolver.get_litellm_model("zai/glm-5") == "openai/glm-5"
-    assert resolver.get_litellm_model("qwen3-next-80b-a3b") == "openrouter/qwen/qwen3-next-80b-a3b-instruct:free"
+    assert (
+        resolver.get_litellm_model("qwen3-next-80b-a3b")
+        == "openrouter/qwen/qwen3-next-80b-a3b-instruct:free"
+    )
 
 
 def test_llm_config_defaults_preserve_provider_prefixes() -> None:

@@ -26,12 +26,8 @@ def _telemetry_fields(telemetry: TelemetryCollector) -> _TelemetryFields:
     """Extract flat tool metrics for EvaluationResult payloads."""
     schema = telemetry.collect(model=None, harness="evaluation_sandbox")
     return {
-        "tool_call_counts": {
-            str(tool): int(count) for tool, count in schema.tools.by_tool.items()
-        },
-        "tool_errors": {
-            str(tool): int(count) for tool, count in schema.tools.errors.items()
-        },
+        "tool_call_counts": {str(tool): int(count) for tool, count in schema.tools.by_tool.items()},
+        "tool_errors": {str(tool): int(count) for tool, count in schema.tools.errors.items()},
         "tool_total_time_ms": dict(schema.tools.duration_ms_by_tool),
     }
 

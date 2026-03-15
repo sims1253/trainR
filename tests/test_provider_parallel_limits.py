@@ -199,28 +199,36 @@ def test_interleave_runs_by_model_round_robin() -> None:
         ExperimentRun(
             run_index=0,
             task=TaskSpec(task_id="t1", task_path="tasks/dev/task-1.json"),
-            model=ModelSpec(name="model-a", litellm_model="openrouter/model-a", provider="openrouter"),
+            model=ModelSpec(
+                name="model-a", litellm_model="openrouter/model-a", provider="openrouter"
+            ),
             repeat_index=0,
             fingerprint="fp-0",
         ),
         ExperimentRun(
             run_index=1,
             task=TaskSpec(task_id="t2", task_path="tasks/dev/task-2.json"),
-            model=ModelSpec(name="model-a", litellm_model="openrouter/model-a", provider="openrouter"),
+            model=ModelSpec(
+                name="model-a", litellm_model="openrouter/model-a", provider="openrouter"
+            ),
             repeat_index=0,
             fingerprint="fp-1",
         ),
         ExperimentRun(
             run_index=2,
             task=TaskSpec(task_id="t1", task_path="tasks/dev/task-1.json"),
-            model=ModelSpec(name="model-b", litellm_model="openrouter/model-b", provider="openrouter"),
+            model=ModelSpec(
+                name="model-b", litellm_model="openrouter/model-b", provider="openrouter"
+            ),
             repeat_index=0,
             fingerprint="fp-2",
         ),
         ExperimentRun(
             run_index=3,
             task=TaskSpec(task_id="t2", task_path="tasks/dev/task-2.json"),
-            model=ModelSpec(name="model-b", litellm_model="openrouter/model-b", provider="openrouter"),
+            model=ModelSpec(
+                name="model-b", litellm_model="openrouter/model-b", provider="openrouter"
+            ),
             repeat_index=0,
             fingerprint="fp-3",
         ),

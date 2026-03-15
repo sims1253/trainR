@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "grist-mill"
-version = "0.1.0"
+version = "0.2.0"
 description = "Language-agnostic benchmarking framework for evaluating autonomous coding agents"
 readme = "README.md"
 license = "MIT"

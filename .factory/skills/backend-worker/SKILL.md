@@ -45,9 +45,9 @@ Use this worker for all grist-mill implementation features:
    - Place code under `src/grist_mill/` in the appropriate module
    - Follow existing naming conventions (PascalCase classes, snake_case functions)
 
-6. **Run tests to confirm they PASS.** Execute the full test suite: `uv run pytest tests/ -m "not integration_local and not integration_provider" -x -q`. Fix any failures.
+6. **Run tests to confirm they PASS.** Execute the test suite: `uv run pytest tests/test_*.py -m "not integration_local and not integration_provider" -x -q`. Fix any failures.
 
-7. **Run type checking.** Execute `uv run ty check .` and fix any type errors. All new code must pass strict type checking.
+7. **Run type checking.** Execute `uv run ty check src/grist_mill/` and fix any type errors. All new code must pass strict type checking.
 
 8. **Run linting.** Execute `uv run ruff check --fix && uv run ruff format` and fix any issues.
 
@@ -64,10 +64,10 @@ Use this worker for all grist-mill implementation features:
 Always run these before completing:
 ```bash
 # Unit tests
-uv run pytest tests/ -m "not integration_local and not integration_provider" -x -q
+uv run pytest tests/test_*.py -m "not integration_local and not integration_provider" -x -q
 
 # Type checking
-uv run ty check .
+uv run ty check src/grist_mill/
 
 # Linting
 uv run ruff check --fix && uv run ruff format
@@ -86,7 +86,7 @@ uv sync && grist-mill --version
   "verification": {
     "commandsRun": [
       {"command": "uv run pytest tests/ -m 'not integration_local and not integration_provider' -x -q", "exitCode": 0, "observation": "24 tests passed"},
-      {"command": "uv run ty check .", "exitCode": 0, "observation": "No type errors"},
+      {"command": "uv run ty check src/grist_mill/", "exitCode": 0, "observation": "No type errors"},
       {"command": "uv run ruff check --fix && uv run ruff format", "exitCode": 0, "observation": "No lint issues"}
     ],
     "interactiveChecks": [

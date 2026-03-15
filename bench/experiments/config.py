@@ -364,7 +364,13 @@ class RetryConfig(BaseModel):
         description="Maximum delay in seconds",
     )
     retry_on: list[str] = Field(
-        default_factory=lambda: ["TIMEOUT", "LLM_ERROR", "SANDBOX_ERROR", "AUTH_ERROR", "RATE_LIMIT"],
+        default_factory=lambda: [
+            "TIMEOUT",
+            "LLM_ERROR",
+            "SANDBOX_ERROR",
+            "AUTH_ERROR",
+            "RATE_LIMIT",
+        ],
         description="Error categories to retry on",
     )
 

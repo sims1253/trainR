@@ -4,6 +4,38 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.2.0] - 2026-03-15
+
+### Added
+
+#### grist-mill Core Library (M2 Rewrite)
+- Complete `src/grist_mill/` package with CLI (`grist-mill` command)
+- Subcommands: `run`, `validate`, `list`, `optimize`, `report`, `export`
+- Pydantic v2 schemas (Artifact, Telemetry, Manifest)
+- Abstract interfaces (BaseAgent, BaseBenchmark, BaseEnvironment, BaseHarness)
+- Configuration system with pydantic-settings, YAML, env vars, CLI precedence
+- Artifact and agent registries with decorator-based registration
+- Harness layer wiring task -> env -> agent -> result
+- Local and Docker environment runners
+- Multi-provider LLM resolution (OpenRouter, OpenAI, Anthropic) with retry, rate limiting, and cost estimation
+- Tool orchestration and capability advertisement
+- GEPA evaluator adapter and optimization runtime with budget management
+- Task synthesis module (tree-sitter AST analysis, mutation pipeline)
+- Dataset management (splitting, versioning, quality gates)
+- Reporting module with per-task deltas and statistical comparison
+- Export to JSON, CSV, HTML formats
+- Comprehensive cross-module test suite (60+ test files, 2000+ tests)
+
+#### Task Dataset Expansion
+- 207 tasks total across 20 R packages (up from 138)
+- Additional splits: kaggle (13 tasks), mined (29 tasks)
+- Expanded held_out split to 33 tasks
+
+### Changed
+- Expanded dataset: 207 tasks from 100 train / 33 dev / 33 held_out / 13 kaggle / 29 mined
+- Updated README.md to reflect dual library/application architecture
+- Updated CONTRIBUTING.md project structure
+
 ## [0.1.0-alpha] - 2026-02-22
 
 ### Added

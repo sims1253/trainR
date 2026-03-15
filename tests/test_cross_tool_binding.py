@@ -526,9 +526,7 @@ class TestToolBindingEnvironmentIsolation:
         )
 
         # Both configs have the same artifact bindings
-        assert sorted(docker_config.artifact_bindings) == sorted(
-            local_config.artifact_bindings
-        )
+        assert sorted(docker_config.artifact_bindings) == sorted(local_config.artifact_bindings)
         assert "docker_skill" in docker_config.artifact_bindings
         assert "docker_tool" in docker_config.artifact_bindings
 
@@ -945,9 +943,7 @@ class TestConsistentToolTraces:
         )
 
         # Artifact bindings are the same
-        assert sorted(local_config.artifact_bindings) == sorted(
-            docker_config.artifact_bindings
-        )
+        assert sorted(local_config.artifact_bindings) == sorted(docker_config.artifact_bindings)
 
         # Agent context from registry is the same
         context = artifact_registry.get_agent_context()
