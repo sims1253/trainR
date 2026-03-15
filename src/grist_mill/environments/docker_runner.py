@@ -7,13 +7,21 @@ captures output, and cleans up containers on success/failure/timeout.
 Supports volume mounts for workspace isolation. Verifies Docker daemon
 availability before execution. Handles missing images (auto-pull or error).
 
-Validates VAL-HARNESS-02, VAL-HARNESS-03, VAL-HARNESS-04, VAL-ENV-05, VAL-ENV-07.
+Multi-language support: configurable Docker images per language (python, r,
+typescript). Network access control (--network=none by default). Custom
+working directory. Environment health check with structured diagnostics.
+Setup command runs before agent; failure marks task ERROR.
+
+Validates VAL-HARNESS-02, VAL-HARNESS-03, VAL-HARNESS-04, VAL-ENV-01,
+VAL-ENV-02, VAL-ENV-03, VAL-ENV-04, VAL-ENV-05, VAL-ENV-06, VAL-ENV-07,
+VAL-ENV-08.
 """
 
 from __future__ import annotations
 
 import contextlib
 import logging
+import shutil
 import threading
 import uuid
 from pathlib import Path
@@ -25,9 +33,11 @@ import docker.models.images
 import docker.models.volumes
 
 import docker
+from grist_mill.environments.language_config import LanguageImageConfig
 from grist_mill.harness.result_parser import ResultParser
 from grist_mill.interfaces import BaseEnvironment
 from grist_mill.schemas import (
+    ErrorCategory,
     ExecutionOutput,
     Task,
     TaskResult,
@@ -63,6 +73,27 @@ class DockerImageError(Exception):
         )
 
 
+class EnvironmentSetupError(Exception):
+    """Raised when the environment setup command fails.
+
+    Indicates that the task should be marked as ERROR with
+    error_category=ENVIRONMENT_ERROR without invoking the agent.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        error_category: ErrorCategory = ErrorCategory.ENVIRONMENT_ERROR,
+        task_id: str = "",
+    ) -> None:
+        self.error_category = error_category
+        self.task_id = task_id
+        super().__init__(
+            f"Environment setup failed for task '{task_id}': {message}. "
+            f"Error category: {error_category.value}. The agent will NOT be invoked."
+        )
+
+
 # ---------------------------------------------------------------------------
 # DockerRunner
 # ---------------------------------------------------------------------------
@@ -78,6 +109,9 @@ class DockerRunner(BaseEnvironment):
     injected into the container's workspace before execution.  Resource
     limits (CPU, memory, timeout) are enforced at the container level.
 
+    Supports multi-language image selection, network access control,
+    custom working directories, and structured health checks.
+
     Args:
         image: Docker image to use (default ``"python:3.12-slim"``).
         cpu_limit: CPU limit in cores (default ``1.0``).
@@ -87,6 +121,10 @@ class DockerRunner(BaseEnvironment):
             for debugging (default ``False``).
         workspace_path: Path inside the container for the workspace
             (default ``"/workspace"``).
+        working_dir: Working directory inside the container for command execution
+            (default ``workspace_path``).
+        network_access: If ``False`` (default), run with ``--network=none``.
+            If ``True``, allow full network access.
         artifacts: Mapping of ``{relative_path: content}`` to inject into the
             workspace before execution.
         result_parser: Optional ``ResultParser`` for converting execution output
@@ -115,6 +153,8 @@ class DockerRunner(BaseEnvironment):
         auto_pull: bool = True,
         keep_workspace_on_failure: bool = False,
         workspace_path: str = "/workspace",
+        working_dir: str | None = None,
+        network_access: bool = False,
         artifacts: dict[str, str] | None = None,
         result_parser: ResultParser | None = None,
     ) -> None:
@@ -124,6 +164,8 @@ class DockerRunner(BaseEnvironment):
         self._auto_pull: bool = auto_pull
         self._keep_workspace_on_failure: bool = keep_workspace_on_failure
         self._workspace_path: str = workspace_path
+        self._working_dir: str = working_dir if working_dir is not None else workspace_path
+        self._network_access: bool = network_access
         self._artifacts: dict[str, str] = artifacts or {}
         self._result_parser: ResultParser = result_parser or ResultParser()
 
@@ -168,6 +210,23 @@ class DockerRunner(BaseEnvironment):
         return self._workspace_path
 
     @property
+    def working_dir(self) -> str:
+        """Working directory inside the container for command execution."""
+        return self._working_dir
+
+    @property
+    def network_access(self) -> bool:
+        """Whether network access is enabled (True) or disabled (False)."""
+        return self._network_access
+
+    @property
+    def network_mode(self) -> str | None:
+        """Docker network mode. ``'none'`` when network_access=False, ``None`` otherwise."""
+        if not self._network_access:
+            return "none"
+        return None
+
+    @property
     def artifacts(self) -> dict[str, str]:
         """Artifact mapping to inject into the workspace."""
         return dict(self._artifacts)
@@ -181,6 +240,55 @@ class DockerRunner(BaseEnvironment):
     def is_prepared(self) -> bool:
         """Whether ``prepare()`` has been called without a matching ``cleanup()``."""
         return self._prepared
+
+    # ------------------------------------------------------------------
+    # Factory method: create_from_task (VAL-ENV-01)
+    # ------------------------------------------------------------------
+
+    @classmethod
+    def create_from_task(
+        cls,
+        task: Task,
+        *,
+        language_overrides: dict[str, str] | None = None,
+        network_access: bool = False,
+        working_dir: str | None = None,
+        cpu_limit: float = 1.0,
+        memory_limit: str = "4g",
+        auto_pull: bool = True,
+        artifacts: dict[str, str] | None = None,
+    ) -> DockerRunner:
+        """Create a DockerRunner configured for a specific task's language.
+
+        Uses the task's ``language`` field to select the appropriate Docker
+        image via ``LanguageImageConfig``.
+
+        Args:
+            task: The task to create a runner for.
+            language_overrides: Custom language-to-image mappings.
+            network_access: Whether to enable network access.
+            working_dir: Custom working directory inside the container.
+            cpu_limit: CPU limit in cores.
+            memory_limit: Memory limit string.
+            auto_pull: Whether to auto-pull missing images.
+            artifacts: Artifacts to inject into the workspace.
+
+        Returns:
+            A ``DockerRunner`` configured with the correct image for the
+            task's language.
+        """
+        lang_config = LanguageImageConfig(overrides=language_overrides or {})
+        image = lang_config.get_image(task.language)
+
+        return cls(
+            image=image,
+            cpu_limit=cpu_limit,
+            memory_limit=memory_limit,
+            auto_pull=auto_pull,
+            network_access=network_access,
+            working_dir=working_dir,
+            artifacts=artifacts,
+        )
 
     # ------------------------------------------------------------------
     # Docker client management
@@ -269,6 +377,48 @@ class DockerRunner(BaseEnvironment):
             )
 
     # ------------------------------------------------------------------
+    # Health check (VAL-ENV-08)
+    # ------------------------------------------------------------------
+
+    def health_check(self) -> EnvironmentHealth:
+        """Check the health of the Docker environment.
+
+        Returns a structured ``EnvironmentHealth`` result with:
+        - ``docker_available``: Whether the Docker daemon is reachable.
+        - ``images_ready``: Whether the configured image is available locally.
+        - ``disk_free_gb``: Free disk space in gigabytes.
+
+        Returns:
+            An ``EnvironmentHealth`` model with structured diagnostics.
+        """
+        from grist_mill.schemas import EnvironmentHealth
+
+        docker_available = self.check_docker_available()
+        images_ready = False
+
+        if docker_available:
+            try:
+                client = self._get_client()
+                images = client.images.list(name=self._image)
+                images_ready = len(images) > 0
+            except Exception:
+                images_ready = False
+
+        # Get disk free space
+        disk_free_gb = 0.0
+        try:
+            usage = shutil.disk_usage("/")
+            disk_free_gb = round(usage.free / (1024**3), 2)
+        except Exception:
+            disk_free_gb = 0.0
+
+        return EnvironmentHealth(
+            docker_available=docker_available,
+            images_ready=images_ready,
+            disk_free_gb=disk_free_gb,
+        )
+
+    # ------------------------------------------------------------------
     # BaseEnvironment implementation
     # ------------------------------------------------------------------
 
@@ -277,6 +427,10 @@ class DockerRunner(BaseEnvironment):
 
         Ensures the configured image is available, creates an isolated
         workspace volume, injects artifacts, and creates the container.
+        If the task has a ``setup_command``, it is executed.  A failing
+        setup command raises ``EnvironmentSetupError`` with
+        ``error_category=ENVIRONMENT_ERROR``, and the container is
+        cleaned up without invoking the agent (VAL-ENV-03).
 
         Args:
             task: The task to prepare the environment for.
@@ -284,6 +438,7 @@ class DockerRunner(BaseEnvironment):
         Raises:
             DockerDaemonError: If Docker daemon is unreachable.
             DockerImageError: If the image is missing and auto-pull is disabled.
+            EnvironmentSetupError: If the setup command fails (VAL-ENV-03).
         """
         if self._prepared:
             logger.warning("DockerRunner already prepared, skipping")
@@ -313,19 +468,27 @@ class DockerRunner(BaseEnvironment):
         # 4. Create the main execution container
         container_name = f"{_CONTAINER_NAME_PREFIX}{task.id}-{uuid.uuid4().hex[:8]}"
 
+        # Build container creation kwargs
+        create_kwargs: dict[str, Any] = {
+            "image": self._image,
+            "name": container_name,
+            "volumes": {volume_name: {"bind": self._workspace_path, "mode": "rw"}},
+            "working_dir": self._working_dir,
+            "mem_limit": self._memory_limit,
+            "nano_cpus": int(self._cpu_limit * 1e9),
+            "detach": True,
+            "stdin_open": True,
+            "tty": False,
+        }
+
+        # 5. Apply network access control (VAL-ENV-04)
+        network_mode = self.network_mode
+        if network_mode is not None:
+            create_kwargs["network_mode"] = network_mode
+
         try:
             container: docker.models.containers.Container = client.containers.create(
-                image=self._image,
-                name=container_name,
-                volumes={
-                    volume_name: {"bind": self._workspace_path, "mode": "rw"},
-                },
-                working_dir=self._workspace_path,
-                mem_limit=self._memory_limit,
-                nano_cpus=int(self._cpu_limit * 1e9),
-                detach=True,
-                stdin_open=True,
-                tty=False,
+                **create_kwargs,
             )
             self._container_id = container.id
         except Exception as exc:
@@ -336,23 +499,31 @@ class DockerRunner(BaseEnvironment):
 
         self._prepared = True
         logger.info(
-            "Prepared Docker container '%s' (image=%s, cpu=%.1f, mem=%s, workspace=%s)",
+            "Prepared Docker container '%s' (image=%s, cpu=%.1f, mem=%s, "
+            "workspace=%s, working_dir=%s, network=%s)",
             container_name,
             self._image,
             self._cpu_limit,
             self._memory_limit,
             self._workspace_path,
+            self._working_dir,
+            "none" if self.network_mode == "none" else "default",
         )
 
-        # 5. Run setup_command if specified
+        # 6. Run setup_command if specified (VAL-ENV-03)
         if task.setup_command:
-            logger.info("Running setup command: %s", task.setup_command)
+            logger.info("Running setup command for task '%s': %s", task.id, task.setup_command)
             output = self.execute(task.setup_command, timeout=float(task.timeout))
             if output.exit_code != 0:
-                logger.warning(
-                    "Setup command exited with code %d: %s",
-                    output.exit_code,
-                    output.stderr[:200] if output.stderr else "(no stderr)",
+                stderr_preview = output.stderr[:200] if output.stderr else "(no stderr)"
+                msg = f"Setup command exited with code {output.exit_code}: {stderr_preview}"
+                logger.error(msg)
+                # Clean up container and volume before raising
+                self.cleanup()
+                raise EnvironmentSetupError(
+                    message=msg,
+                    error_category=ErrorCategory.ENVIRONMENT_ERROR,
+                    task_id=task.id,
                 )
 
     def execute(self, command: str, timeout: float) -> ExecutionOutput:
@@ -401,7 +572,7 @@ class DockerRunner(BaseEnvironment):
             try:
                 result = container.exec_run(
                     cmd=["/bin/sh", "-c", command],
-                    workdir=self._workspace_path,
+                    workdir=self._working_dir,
                     demux=True,
                 )
                 exec_result_holder.append(result)
@@ -652,5 +823,15 @@ class DockerRunner(BaseEnvironment):
         return (
             f"DockerRunner(image={self._image!r}, cpu_limit={self._cpu_limit!r}, "
             f"memory_limit={self._memory_limit!r}, auto_pull={self._auto_pull!r}, "
+            f"network_access={self._network_access!r}, "
+            f"working_dir={self._working_dir!r}, "
             f"keep_workspace_on_failure={self._keep_workspace_on_failure!r})"
         )
+
+
+__all__ = [
+    "DockerDaemonError",
+    "DockerImageError",
+    "DockerRunner",
+    "EnvironmentSetupError",
+]

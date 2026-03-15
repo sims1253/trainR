@@ -311,6 +311,40 @@ class Manifest(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# EnvironmentHealth (VAL-ENV-08)
+# ---------------------------------------------------------------------------
+
+
+class EnvironmentHealth(BaseModel):
+    """Structured diagnostics from an environment health check.
+
+    Returned by ``env.health_check()`` to report the readiness of the
+    execution environment.
+
+    Attributes:
+        docker_available: Whether the Docker daemon is reachable.
+        images_ready: Whether the required Docker images are present locally.
+        disk_free_gb: Free disk space in gigabytes.
+    """
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    docker_available: bool = Field(
+        ...,
+        description="Whether the Docker daemon is reachable.",
+    )
+    images_ready: bool = Field(
+        default=False,
+        description="Whether the required Docker images are present locally.",
+    )
+    disk_free_gb: float = Field(
+        default=0.0,
+        ge=0.0,
+        description="Free disk space in gigabytes.",
+    )
+
+
+# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
@@ -319,6 +353,7 @@ __all__ = [
     "Artifact",
     "Difficulty",
     "EnvironmentConfig",
+    "EnvironmentHealth",
     "ErrorCategory",
     "ExecutionOutput",
     "HarnessConfig",

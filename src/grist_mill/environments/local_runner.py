@@ -6,7 +6,7 @@ Supports configurable working directory.
 
 This is the primary runner for fast development iteration — no Docker overhead.
 
-Validates VAL-HARNESS-06, VAL-HARNESS-07.
+Validates VAL-HARNESS-06, VAL-HARNESS-07, VAL-ENV-08.
 """
 
 from __future__ import annotations
@@ -14,6 +14,7 @@ from __future__ import annotations
 import contextlib
 import logging
 import os
+import shutil
 import signal
 import subprocess
 import threading
@@ -22,6 +23,7 @@ from typing import IO
 from grist_mill.harness.result_parser import ResultParser
 from grist_mill.interfaces import BaseEnvironment
 from grist_mill.schemas import (
+    EnvironmentHealth,
     ExecutionOutput,
     Task,
     TaskResult,
@@ -250,6 +252,44 @@ class LocalRunner(BaseEnvironment):
         if self._prepared:
             logger.debug("Cleaning up local environment")
             self._prepared = False
+
+    # ------------------------------------------------------------------
+    # Health check (VAL-ENV-08)
+    # ------------------------------------------------------------------
+
+    def health_check(self) -> EnvironmentHealth:
+        """Check the health of the local environment.
+
+        For a local runner, Docker availability is not required, so
+        ``docker_available`` reports whether Docker *happens* to be
+        running on this host (informational only).
+
+        Returns:
+            An ``EnvironmentHealth`` model with structured diagnostics.
+        """
+        docker_available = False
+        try:
+            import docker
+
+            client = docker.from_env()
+            client.ping()
+            docker_available = True
+        except Exception:
+            pass
+
+        # Get disk free space
+        disk_free_gb = 0.0
+        try:
+            usage = shutil.disk_usage("/")
+            disk_free_gb = round(usage.free / (1024**3), 2)
+        except Exception:
+            disk_free_gb = 0.0
+
+        return EnvironmentHealth(
+            docker_available=docker_available,
+            images_ready=True,  # No images needed for local execution
+            disk_free_gb=disk_free_gb,
+        )
 
     # ------------------------------------------------------------------
     # Convenience methods
