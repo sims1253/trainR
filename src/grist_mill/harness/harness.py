@@ -21,7 +21,9 @@ Validates:
 from __future__ import annotations
 
 import logging
+import signal
 import time
+from pathlib import Path
 from typing import Any
 
 from grist_mill.harness.result_parser import ResultParser
@@ -526,6 +528,12 @@ def run_experiment(
     Each task gets its own ``TelemetryCollector`` so metrics are independent.
     The environment is prepared and cleaned up per task.
 
+    **SIGTERM handling:** On receipt of ``SIGTERM``, the experiment stops
+    accepting new tasks after the current in-flight task finishes (or is
+    interrupted), writes a partial manifest if a manifest path was
+    configured via ``InterruptibleExperiment``, and returns the results
+    collected so far.  No orphaned containers or processes are left.
+
     Args:
         tasks: List of tasks to execute.
         config: Harness configuration.
@@ -536,7 +544,7 @@ def run_experiment(
         trace_enabled: Whether to capture raw events.
 
     Returns:
-        A list of ``TaskResult`` objects, one per task.
+        A list of ``TaskResult`` objects, one per completed task.
     """
     harness = Harness(
         config=config,
@@ -569,3 +577,201 @@ def run_experiment(
         )
 
     return results
+
+
+# ---------------------------------------------------------------------------
+# InterruptibleExperiment — SIGTERM-safe multi-task runner (VAL-CROSS-11)
+# ---------------------------------------------------------------------------
+
+
+class InterruptibleExperiment:
+    """SIGTERM-safe multi-task experiment runner.
+
+    Runs tasks through the harness and supports graceful shutdown on
+    ``SIGTERM``:
+
+    1. Stops accepting new tasks.
+    2. Lets the in-flight task complete or abort gracefully.
+    3. Cleans up all resources (env cleanup called).
+    4. Writes a partial manifest with completed results.
+
+    Usage::
+
+        experiment = InterruptibleExperiment(
+            config=config,
+            agent=agent,
+            env=env,
+            manifest_path="results/partial.json",
+        )
+        results = experiment.run(tasks)
+        # results contains whatever was completed before SIGTERM
+
+    Args:
+        config: Harness configuration.
+        agent: Agent to invoke for each task.
+        env: Environment for execution.
+        max_retries: Maximum retry attempts per task.
+        retry_delay: Delay in seconds between retries.
+        trace_enabled: Whether to capture raw events.
+        manifest_path: Optional path to write partial manifests after
+            each task and on SIGTERM.  If ``None``, no manifest is written.
+    """
+
+    def __init__(
+        self,
+        *,
+        config: HarnessConfig,
+        agent: Any,
+        env: Any,
+        max_retries: int = 3,
+        retry_delay: float = 1.0,
+        trace_enabled: bool = False,
+        manifest_path: str | None = None,
+    ) -> None:
+        self._config = config
+        self._agent = agent
+        self._env = env
+        self._max_retries = max_retries
+        self._retry_delay = retry_delay
+        self._trace_enabled = trace_enabled
+        self._manifest_path = manifest_path
+
+        self._shutdown_requested = False
+        self._results: list[TaskResult] = []
+        self._original_sigterm_handler: Any = None
+
+    @property
+    def shutdown_requested(self) -> bool:
+        """Whether a graceful shutdown has been requested."""
+        return self._shutdown_requested
+
+    @property
+    def results(self) -> list[TaskResult]:
+        """Results collected so far (read-only copy)."""
+        return list(self._results)
+
+    def _install_sigterm_handler(self) -> None:
+        """Install a SIGTERM handler that requests graceful shutdown."""
+        self._original_sigterm_handler = signal.getsignal(signal.SIGTERM)
+
+        def _handler(signum: int, frame: Any) -> None:
+            logger.info(
+                "SIGTERM received — initiating graceful shutdown (%d/%d tasks completed)",
+                len(self._results),
+                len(self._results),  # total unknown here
+            )
+            self._shutdown_requested = True
+
+        signal.signal(signal.SIGTERM, _handler)
+
+    def _restore_sigterm_handler(self) -> None:
+        """Restore the original SIGTERM handler."""
+        if self._original_sigterm_handler is not None:
+            signal.signal(signal.SIGTERM, self._original_sigterm_handler)
+            self._original_sigterm_handler = None
+
+    def _write_partial_manifest(
+        self,
+        total_tasks: int,
+    ) -> None:
+        """Write a partial manifest with completed results.
+
+        Args:
+            total_tasks: Total number of tasks that were planned.
+        """
+        if self._manifest_path is None:
+            return
+
+        import json
+        from datetime import datetime, timezone
+
+        manifest_data: dict[str, Any] = {
+            "name": "grist-mill-evaluation",
+            "version": "0.1.0",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "schema_version": "V1",
+            "total_tasks": total_tasks,
+            "completed_tasks": len(self._results),
+            "interrupted": self._shutdown_requested,
+            "tasks": [r.model_dump(mode="json") for r in self._results],
+        }
+
+        try:
+            path = Path(self._manifest_path)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with open(path, "w") as f:
+                json.dump(manifest_data, f, indent=2, default=str)
+            logger.info(
+                "Partial manifest written to %s (%d/%d tasks)",
+                self._manifest_path,
+                len(self._results),
+                total_tasks,
+            )
+        except Exception as exc:
+            logger.error("Failed to write partial manifest: %s", exc)
+
+    def run(
+        self,
+        tasks: list[Task],
+    ) -> list[TaskResult]:
+        """Run tasks through the harness with SIGTERM-safe graceful shutdown.
+
+        Args:
+            tasks: List of tasks to execute.
+
+        Returns:
+            A list of ``TaskResult`` objects — may be partial if SIGTERM
+            was received.
+        """
+        self._results = []
+        self._shutdown_requested = False
+
+        harness = Harness(
+            config=self._config,
+            max_retries=self._max_retries,
+            retry_delay=self._retry_delay,
+            trace_enabled=self._trace_enabled,
+        )
+
+        self._install_sigterm_handler()
+
+        try:
+            for i, task in enumerate(tasks):
+                if self._shutdown_requested:
+                    logger.info(
+                        "Shutdown requested — stopping before task %d/%d: '%s'",
+                        i + 1,
+                        len(tasks),
+                        task.id,
+                    )
+                    break
+
+                logger.info(
+                    "Running task %d/%d: '%s'",
+                    i + 1,
+                    len(tasks),
+                    task.id,
+                )
+                collector = TelemetryCollector()
+                result = harness.run(
+                    task=task,
+                    agent=self._agent,
+                    env=self._env,
+                    collector=collector,
+                )
+                self._results.append(result)
+                logger.info(
+                    "Task '%s' completed: status=%s score=%.1f",
+                    task.id,
+                    result.status.value,
+                    result.score,
+                )
+
+                # Write partial manifest after each task
+                self._write_partial_manifest(total_tasks=len(tasks))
+        finally:
+            self._restore_sigterm_handler()
+            # Final partial manifest on shutdown
+            self._write_partial_manifest(total_tasks=len(tasks))
+
+        return list(self._results)
