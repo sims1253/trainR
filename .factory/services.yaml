@@ -1,0 +1,11 @@
+# grist-mill services and commands manifest
+# Single source of truth for all commands and services
+
+commands:
+  test: uv run pytest tests/test_package.py -v
+  test_all: uv run pytest tests/ -m "not integration_local and not integration_provider" -x -q
+  lint: uv run ruff check --fix && uv run ruff format
+  typecheck: uv run ty check src/grist_mill/
+  version: uv run grist-mill --version
+
+services: {}
