@@ -1,0 +1,91 @@
+{
+  "milestone": "harness",
+  "round": 1,
+  "status": "pass",
+  "validatorsRun": {
+    "test": {
+      "passed": true,
+      "command": "uv run pytest tests/ -m \"not integration_local and not integration_provider\" -x -q",
+      "exitCode": 0,
+      "observation": "1203 passed, 1 skipped in 62.66s"
+    },
+    "typecheck": {
+      "passed": true,
+      "command": "uv run ty check src/grist_mill/",
+      "exitCode": 0,
+      "observation": "All checks passed!"
+    },
+    "lint": {
+      "passed": true,
+      "command": "uv run ruff check src/grist_mill/",
+      "exitCode": 0,
+      "observation": "All checks passed!"
+    },
+    "format": {
+      "passed": true,
+      "command": "uv run ruff format --check src/grist_mill/",
+      "exitCode": 0,
+      "observation": "65 files already formatted"
+    }
+  },
+  "reviewsSummary": {
+    "total": 7,
+    "passed": 7,
+    "failed": 0,
+    "failedFeatures": []
+  },
+  "blockingIssues": [],
+  "appliedUpdates": [
+    {
+      "target": "services.yaml",
+      "description": "Added tests/test_cross_tool_binding.py to test_grist_mill command — file was missing from the explicit file list despite being part of the test suite.",
+      "sourceFeature": "m2-cross-tool-binding-isolation (reviewer observation)"
+    }
+  ],
+  "suggestedGuidanceUpdates": [
+    {
+      "target": "AGENTS.md",
+      "suggestion": "Add an exception to the 'Never catch bare Exception' rule for health check and diagnostic methods that must always return a result rather than raising. Specify that health_check() methods should catch bare Exception as a safety-net pattern.",
+      "evidence": "Both DockerRunner.health_check() and LocalRunner.health_check() catch bare Exception in multiple places (disk_usage, Docker ping, images.list). Reviewer for m2-multi-language-environments noted this as a convention violation, but it's a valid pattern for diagnostics.",
+      "isSystemic": true
+    },
+    {
+      "target": "AGENTS.md",
+      "suggestion": "Add guidance that services.yaml test_grist_mill explicit file list must be updated whenever a new test file is added. Alternatively, consider deprecating the explicit list in favor of the marker-based test_all command to reduce maintenance burden.",
+      "evidence": "Three cross-validation test files (test_cross_tool_binding.py from m2-cross-tool-binding-isolation, plus earlier ones) were added without updating services.yaml. Multiple reviewers flagged this gap. The explicit list is error-prone for a growing codebase.",
+      "isSystemic": true
+    }
+  ],
+  "rejectedObservations": [
+    {
+      "observation": "Worker's skill deviation for m2-local-runner (background reader threads instead of subprocess.run) — reviewer noted it as a shared state observation",
+      "reason": "This is a feature-specific engineering decision, not a shared state concern. The skill already accommodates this via the deviations mechanism."
+    },
+    {
+      "observation": "ErrorCategory does not include TIMEOUT variant — TIMEOUT is expressed via TaskStatus.TIMEOUT with None error_category",
+      "reason": "Already documented: this is a schema design decision visible in the source code. The reviewer for m2-harness-implementation noted it and it's discoverable by reading the schemas."
+    },
+    {
+      "observation": "DockerRunner has grown beyond original m2-docker-runner scope to include features from later milestones",
+      "reason": "Already known — this is how the milestone system works (later features build on earlier ones). Not a shared state concern."
+    },
+    {
+      "observation": "Test naming: test_timeout_is_not_transient tests None but name says TIMEOUT",
+      "reason": "This is a non-blocking code quality observation specific to one test. Already captured in the review report."
+    },
+    {
+      "observation": "CLI manifest output doesn't include actual task results (status, score)",
+      "reason": "This is a non-blocking limitation noted in the m2-harness-implementation review. It's already captured in the review report and doesn't warrant a guidance update."
+    }
+  ],
+  "reviewFiles": [
+    ".factory/validation/harness/scrutiny/reviews/m2-result-parser.json",
+    ".factory/validation/harness/scrutiny/reviews/m2-local-runner.json",
+    ".factory/validation/harness/scrutiny/reviews/m2-docker-runner.json",
+    ".factory/validation/harness/scrutiny/reviews/m2-multi-language-environments.json",
+    ".factory/validation/harness/scrutiny/reviews/m2-harness-implementation.json",
+    ".factory/validation/harness/scrutiny/reviews/m2-cross-eval-export.json",
+    ".factory/validation/harness/scrutiny/reviews/m2-cross-tool-binding-isolation.json"
+  ],
+  "previousRound": null
+}
