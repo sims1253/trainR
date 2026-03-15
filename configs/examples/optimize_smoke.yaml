@@ -1,0 +1,30 @@
+# Smoke test configuration for the optimization runtime.
+# Validates the end-to-end optimization loop:
+# config -> budget enforcement -> checkpoint -> best candidate export
+#
+# Usage:
+#   grist-mill optimize --config configs/examples/optimize_smoke.yaml
+
+# Target to optimize
+target:
+  type: skill
+  content: "You are a test-writing assistant for Python code."
+
+# Budget limits (smoke test: very limited)
+budget:
+  max_calls: 4
+  timeout_s: 60
+  no_improvement_patience: 5
+  checkpoint_interval: 1
+
+# Evaluator configuration
+evaluator:
+  objective: pass-rate
+  trace_enabled: false
+
+# Output configuration
+output_dir: "./results/optimization-smoke"
+
+# Split configuration
+train_split: train
+holdout_split: holdout

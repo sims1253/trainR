@@ -83,6 +83,7 @@ def cli(ctx: click.Context, verbose: bool, quiet: bool) -> None:
 def _register_subcommands() -> None:
     """Attach subcommand modules to the CLI group."""
     from grist_mill.cli.list_cmd import list_cmd
+    from grist_mill.cli.optimize_cmd import optimize
     from grist_mill.cli.run_cmd import run
     from grist_mill.cli.tasks_cmd import tasks
     from grist_mill.cli.validate_cmd import validate
@@ -91,6 +92,7 @@ def _register_subcommands() -> None:
     cli.add_command(validate, name="validate")
     cli.add_command(list_cmd, name="list")
     cli.add_command(tasks, name="tasks")
+    cli.add_command(optimize, name="optimize")
 
 
 # Register subcommands on import
