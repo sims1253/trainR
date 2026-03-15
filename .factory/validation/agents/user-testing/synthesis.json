@@ -1,0 +1,54 @@
+{
+  "milestone": "agents",
+  "round": 1,
+  "status": "pass",
+  "assertionsSummary": {
+    "total": 19,
+    "passed": 19,
+    "failed": 0,
+    "blocked": 0
+  },
+  "passedAssertions": [
+    "VAL-AGENT-01",
+    "VAL-AGENT-02",
+    "VAL-AGENT-03",
+    "VAL-AGENT-04",
+    "VAL-AGENT-05",
+    "VAL-AGENT-06",
+    "VAL-AGENT-07",
+    "VAL-TOOL-01",
+    "VAL-TOOL-02",
+    "VAL-TOOL-03",
+    "VAL-TOOL-04",
+    "VAL-TOOL-05",
+    "VAL-TOOL-06",
+    "VAL-BIND-01",
+    "VAL-BIND-02",
+    "VAL-BIND-03",
+    "VAL-BIND-04",
+    "VAL-BIND-05",
+    "VAL-BIND-06",
+    "VAL-CROSS-04"
+  ],
+  "failedAssertions": [],
+  "blockedAssertions": [],
+  "flowReports": [
+    ".factory/validation/agents/user-testing/flows/group-agent-conversation.json",
+    ".factory/validation/agents/user-testing/flows/group-tool-orchestration.json",
+    ".factory/validation/agents/user-testing/flows/group-artifact-binding.json",
+    ".factory/validation/agents/user-testing/flows/group-cross-agent-telemetry.json"
+  ],
+  "appliedUpdates": [],
+  "testSummary": {
+    "totalTests": 150,
+    "passedTests": 150,
+    "failedTests": 0,
+    "testFiles": {
+      "tests/test_agent.py": "42 passed",
+      "tests/test_tools.py": "43 passed",
+      "tests/test_binding.py": "41 passed",
+      "tests/test_cross_agent_telemetry.py": "24 passed"
+    }
+  },
+  "previousRound": null
+}

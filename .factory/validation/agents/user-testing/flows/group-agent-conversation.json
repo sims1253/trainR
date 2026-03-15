@@ -1,0 +1,258 @@
+{
+  "groupId": "agent-conversation",
+  "testedAt": "2026-03-15T00:00:00Z",
+  "isolation": {
+    "workingDirectory": "/home/m0hawk/Documents/trainR",
+    "testFile": "tests/test_agent.py",
+    "testingTool": "pytest",
+    "noExternalServices": true,
+    "mockProviders": true
+  },
+  "toolsUsed": ["pytest", "ty"],
+  "assertions": [
+    {
+      "id": "VAL-AGENT-01",
+      "title": "API-backed agent supports multi-turn conversation with tool use",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run pytest tests/test_agent.py::TestAPIAgentMultiTurn -v",
+          "expected": "All multi-turn tests pass",
+          "observed": "4 tests passed: test_single_turn_conversation, test_multi_turn_with_tool_calls, test_multiple_tool_calls_in_single_response, test_tool_call_failure_continues"
+        },
+        {
+          "action": "Verify single turn completes with final answer",
+          "expected": "Agent returns SUCCESS with correct task_id",
+          "observed": "PASSED: result.status == TaskStatus.SUCCESS, result.task_id == 'test-1'"
+        },
+        {
+          "action": "Verify tool calls dispatched and results fed back",
+          "expected": "Tool handler called with correct arguments, result continues conversation",
+          "observed": "PASSED: tool_handler.call_count == 1, call_args tool_name == 'read_file'"
+        },
+        {
+          "action": "Verify multiple tool calls in single response",
+          "expected": "Both tools dispatched in order",
+          "observed": "PASSED: call_log == ['tool_a', 'tool_b']"
+        },
+        {
+          "action": "Verify tool call failure continues conversation",
+          "expected": "Error captured and passed back to LLM, conversation continues",
+          "observed": "PASSED: 'Tool execution failed!' in tool_results[0]['content'], result.status == SUCCESS"
+        }
+      ],
+      "evidence": {
+        "testOutput": "4/4 tests in TestAPIAgentMultiTurn passed",
+        "keyAssertions": "tool_handler called with correct tool_name, multiple tools dispatched in order, tool errors passed back to LLM"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-AGENT-02",
+      "title": "Provider-agnostic agent routing",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run pytest tests/test_agent.py::TestAPIAgentProviderAgnostic -v",
+          "expected": "Both provider tests pass",
+          "observed": "2 tests passed: test_same_agent_different_providers, test_provider_error_handling"
+        },
+        {
+          "action": "Verify same agent type works with different providers",
+          "expected": "Agent routes to different providers without code changes",
+          "observed": "PASSED: provider A returns 'From provider A', provider B returns 'From provider B', both via APIAgent"
+        },
+        {
+          "action": "Verify provider error handling",
+          "expected": "Agent handles provider errors gracefully",
+          "observed": "PASSED: RuntimeError from provider -> result.status == ERROR, error_category == API_ERROR"
+        }
+      ],
+      "evidence": {
+        "testOutput": "2/2 tests in TestAPIAgentProviderAgnostic passed",
+        "keyAssertions": "APIAgent accepts any BaseProvider, provider errors mapped to ERROR/API_ERROR"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-AGENT-03",
+      "title": "Agent enforces max-turns limit",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run pytest tests/test_agent.py::TestAPIAgentMaxTurns -v",
+          "expected": "All max-turns tests pass",
+          "observed": "3 tests passed: test_max_turns_exceeded_returns_error, test_max_turns_includes_partial_output, test_exact_max_turns_completes"
+        },
+        {
+          "action": "Verify max turns exceeded returns ERROR/MAX_TURNS_EXCEEDED",
+          "expected": "result.status == ERROR, error_category == MAX_TURNS_EXCEEDED",
+          "observed": "PASSED with max_turns=3, provider always returns tool calls -> status=ERROR, error_category=MAX_TURNS_EXCEEDED"
+        },
+        {
+          "action": "Verify partial output preserved",
+          "expected": "transcript non-empty with partial conversation",
+          "observed": "PASSED: result.transcript is not None, len(result.transcript) > 0"
+        },
+        {
+          "action": "Verify exact max_turns completes",
+          "expected": "Agent succeeds when finishing exactly at limit",
+          "observed": "PASSED: 3 responses (2 tool calls + 1 final) with max_turns=3 -> SUCCESS"
+        }
+      ],
+      "evidence": {
+        "testOutput": "3/3 tests in TestAPIAgentMaxTurns passed",
+        "keyAssertions": "status=ERROR + error_category=MAX_TURNS_EXCEEDED when exceeded; partial transcript preserved; exact max_turns succeeds"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-AGENT-04",
+      "title": "Agent enforces timeout on total execution time",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run pytest tests/test_agent.py::TestAPIAgentTimeout -v",
+          "expected": "Both timeout tests pass",
+          "observed": "2 tests passed: test_timeout_returns_timeout_status, test_timeout_includes_partial_transcript"
+        },
+        {
+          "action": "Verify timeout returns TIMEOUT status",
+          "expected": "result.status == TIMEOUT when wall-clock exceeds config",
+          "observed": "PASSED: provider with delay=0.2s, timeout=0.5s, 100 responses -> result.status == TIMEOUT"
+        },
+        {
+          "action": "Verify partial transcript on timeout",
+          "expected": "transcript non-empty with partial conversation",
+          "observed": "PASSED: result.status == TIMEOUT, transcript is not None, len(transcript) > 0"
+        }
+      ],
+      "evidence": {
+        "testOutput": "2/2 tests in TestAPIAgentTimeout passed",
+        "keyAssertions": "status=TIMEOUT when wall-clock exceeds limit; partial transcript preserved on timeout"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-AGENT-05",
+      "title": "Agent implementations are pluggable via registry",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run pytest tests/test_agent.py::TestAgentRegistry -v",
+          "expected": "All registry tests pass",
+          "observed": "7 tests passed: test_register_and_retrieve_agent, test_duplicate_registration_fails, test_duplicate_registration_with_overwrite, test_list_registered_agents, test_retrieving_unregistered_agent_raises, test_builtin_api_agent_registered, test_custom_agent_selected_by_config"
+        },
+        {
+          "action": "Verify register and retrieve",
+          "expected": "Custom agent registered by name, retrieved and runnable",
+          "observed": "PASSED: registry.register('custom_agent', factory), registry.create returns BaseAgent, result.status == SUCCESS"
+        },
+        {
+          "action": "Verify duplicate registration fails",
+          "expected": "ValueError on duplicate without overwrite",
+          "observed": "PASSED: ValueError matching 'already registered'"
+        },
+        {
+          "action": "Verify overwrite replaces existing",
+          "expected": "overwrite=True replaces, new agent used",
+          "observed": "PASSED: agent.max_turns == 2 after overwrite"
+        },
+        {
+          "action": "Verify list and builtin registration",
+          "expected": "All agents listed, 'api' pre-registered",
+          "observed": "PASSED: 'agent_a', 'agent_b', 'api' in list_agents()"
+        },
+        {
+          "action": "Verify custom agent selectable by name",
+          "expected": "Custom agent created from registry and runs correctly",
+          "observed": "PASSED: registry.create('custom-v1') returns CustomAgent, call_log == ['custom-v1']"
+        }
+      ],
+      "evidence": {
+        "testOutput": "7/7 tests in TestAgentRegistry passed",
+        "keyAssertions": "Register/retrieve by name, duplicate ValueError, overwrite=True works, builtin 'api' pre-registered, custom agents selectable by name"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-AGENT-06",
+      "title": "Agent captures full conversation transcript",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run pytest tests/test_agent.py::TestAPIAgentTranscript -v",
+          "expected": "All transcript tests pass",
+          "observed": "3 tests passed: test_transcript_captures_all_turns, test_transcript_content_preserved, test_transcript_with_system_prompt"
+        },
+        {
+          "action": "Verify all messages in transcript in order",
+          "expected": "user, assistant, tool, assistant sequence",
+          "observed": "PASSED: roles == ['user', 'assistant', 'tool', 'assistant']"
+        },
+        {
+          "action": "Verify content preserved",
+          "expected": "Original content of each message preserved",
+          "observed": "PASSED: transcript[0]['content'] == 'What is 2+2?', transcript[1]['content'] == 'Thinking about it...'"
+        },
+        {
+          "action": "Verify system prompt in transcript",
+          "expected": "System prompt appears as first message",
+          "observed": "PASSED: transcript[0]['role'] == 'system', transcript[0]['content'] == 'You are a helpful assistant.'"
+        }
+      ],
+      "evidence": {
+        "testOutput": "3/3 tests in TestAPIAgentTranscript passed",
+        "keyAssertions": "All messages preserved in order with correct roles, content preserved, system prompt included as first message"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-AGENT-07",
+      "title": "Agent token counting is accurate per turn",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run pytest tests/test_agent.py::TestAPIAgentTokenCounting -v",
+          "expected": "All token counting tests pass",
+          "observed": "3 tests passed: test_per_turn_token_counts_recorded, test_token_counts_sum_to_total, test_zero_tokens_when_not_reported"
+        },
+        {
+          "action": "Verify per-turn token counts recorded",
+          "expected": "Each assistant message has token_usage with prompt/completion",
+          "observed": "PASSED: each assistant message has 'token_usage' with 'prompt_tokens' and 'completion_tokens'"
+        },
+        {
+          "action": "Verify token counts sum to total",
+          "expected": "Per-turn sum matches telemetry total",
+          "observed": "PASSED: telemetry.tokens.prompt == total_prompt, telemetry.tokens.completion == total_completion, telemetry.tokens.total == sum"
+        },
+        {
+          "action": "Verify zero tokens when not reported",
+          "expected": "Telemetry defaults to 0 when provider reports 0",
+          "observed": "PASSED: telemetry.tokens.total >= 0"
+        }
+      ],
+      "evidence": {
+        "testOutput": "3/3 tests in TestAPIAgentTokenCounting passed",
+        "keyAssertions": "Per-turn token_usage on all assistant messages, sums match telemetry totals, zero-token case handled"
+      },
+      "issues": null
+    }
+  ],
+  "commandsRun": [
+    {
+      "command": "uv run pytest tests/test_agent.py -x -v 2>&1",
+      "exitCode": 0,
+      "output": "42 passed in 2.02s — all tests across 12 test classes passed: TestConversationModel (9), TestMockProvider (3), TestAPIAgentMultiTurn (4), TestAPIAgentMaxTurns (3), TestAPIAgentTimeout (2), TestAPIAgentTranscript (3), TestAPIAgentTokenCounting (3), TestAPIAgentProviderAgnostic (2), TestAgentRegistry (7), TestAPIAgentIsBaseAgent (2), TestAPIAgentTelemetry (4)"
+    },
+    {
+      "command": "uv run ty check src/grist_mill/agents/ 2>&1",
+      "exitCode": 0,
+      "output": "All checks passed!"
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "All 7 assertions (VAL-AGENT-01 through VAL-AGENT-07) passed. 42 pytest tests passed covering multi-turn conversation, provider-agnostic routing, max-turns limit, timeout enforcement, pluggable registry, full conversation transcript, and per-turn token counting. Type checking with ty also passed with zero errors."
+}

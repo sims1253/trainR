@@ -1,0 +1,64 @@
+{
+  "groupId": "tool-orchestration",
+  "testedAt": "2026-03-15T12:00:00Z",
+  "isolation": {
+    "workingDirectory": "/home/m0hawk/Documents/trainR",
+    "testFile": "tests/test_tools.py",
+    "testingTool": "pytest (via uv run pytest)",
+    "externalServices": "none — tests use mock tools"
+  },
+  "toolsUsed": ["pytest", "ty"],
+  "assertions": {
+    "VAL-TOOL-01": {
+      "status": "pass",
+      "title": "Tool registry supports capability advertisement",
+      "evidence": "7 tests in TestToolRegistryCapabilityAdvertisement class all PASSED. Tests verify: registered tool declares name, description, input_schema, output_schema; get_capabilities() returns all registered tools; get_capability() returns single tool capabilities; nonexistent tools return None; handler is NOT exposed in capabilities; timeout is advertised; get_tool_definitions_for_agent() formats tools for LLM discovery.",
+      "details": "All aspects of capability advertisement confirmed: name/description/schemas exposed, handler hidden, timeout advertised, agent discovery formatting works."
+    },
+    "VAL-TOOL-02": {
+      "status": "pass",
+      "title": "Tool registry supports dynamic registration at runtime",
+      "evidence": "7 tests in TestToolRegistryDynamicRegistration class all PASSED. Tests verify: tools registered after initial setup appear in discovery; duplicate registration raises ToolRegistrationError; overwrite=True succeeds; deregister removes tool; deregister nonexistent raises ToolNotFoundError; register_from_tool_artifact works; clear() removes all tools.",
+      "details": "Full dynamic registration lifecycle confirmed: add, overwrite, deregister, clear, artifact-based registration."
+    },
+    "VAL-TOOL-03": {
+      "status": "pass",
+      "title": "Tool invocation routes through the registry",
+      "evidence": "8 tests in TestToolInvocationRouting class all PASSED. Tests verify: successful invocation returns result; input validated against input_schema (missing required field rejected); output validated against output_schema (wrong field rejected); nonexistent tool returns error; tools without output_schema skip output validation; tools without input_schema skip input validation; handler exceptions caught and returned as error; telemetry recorded per invocation.",
+      "details": "Full routing pipeline confirmed: lookup → input validation → execution → output validation → result return. Edge cases (missing schemas, handler exceptions, nonexistent tools) all handled."
+    },
+    "VAL-TOOL-04": {
+      "status": "pass",
+      "title": "Tool invocation timeout is enforced per-call",
+      "evidence": "4 tests in TestToolInvocationTimeout class all PASSED. Tests verify: tool exceeding timeout (0.5s for a 5s sleep) returns error with 'timeout' in message; invocation timeout can be overridden per-call (default 10s overridden to 0.5s); timed-out tools recorded as failures in telemetry; tools completing within timeout succeed normally.",
+      "details": "Per-call timeout enforcement confirmed with configurable timeout, override per-invocation, and telemetry integration."
+    },
+    "VAL-TOOL-05": {
+      "status": "pass",
+      "title": "Per-tool telemetry is captured",
+      "evidence": "4 tests in TestPerToolTelemetry class all PASSED. Tests verify: multiple tool calls across different tools recorded (total_calls=3, correct per-tool breakdown); failed tool invocations recorded (failed_calls=1); duration recorded per call (total_duration_ms > 0); invoker works without telemetry collector (no error).",
+      "details": "Per-tool telemetry confirmed: total_calls, successful_calls, failed_calls, by_tool breakdown with per-tool call counts, total_duration_ms. Collector is optional."
+    },
+    "VAL-TOOL-06": {
+      "status": "pass",
+      "title": "MCP server lifecycle management",
+      "evidence": "10 tests in TestMCPServerLifecycle class all PASSED. Tests verify: MCP server started as subprocess (echo command); server stopped after execution (sleep 30 killed); stop_all stops all running servers; stdout/stderr captured from subprocess; list_running returns names; get_server returns MCPServerInfo; nonexistent server returns None; stopping nonexistent server is graceful (no error); server env vars passed to subprocess; context manager cleanup (with statement stops servers).",
+      "details": "Full MCP server lifecycle confirmed: start, stop, stop_all, stdout/stderr capture, listing, info retrieval, env vars, context manager cleanup."
+    }
+  },
+  "commandsRun": [
+    {
+      "command": "uv run pytest tests/test_tools.py -x -v 2>&1",
+      "exitCode": 0,
+      "output": "43 passed in 20.63s — all tests across 7 test classes (VAL-TOOL-01 through VAL-TOOL-06 plus integration) passed."
+    },
+    {
+      "command": "uv run ty check src/grist_mill/tools/ 2>&1",
+      "exitCode": 0,
+      "output": "All checks passed!"
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "Tested 6 assertions (VAL-TOOL-01 through VAL-TOOL-06): all 6 passed. 43 unit/integration tests in tests/test_tools.py all passed. Type checking with ty on src/grist_mill/tools/ passed with zero errors. No frictions or blockers encountered."
+}

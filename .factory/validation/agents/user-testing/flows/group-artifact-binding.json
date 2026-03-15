@@ -1,0 +1,65 @@
+{
+  "groupId": "artifact-binding",
+  "testedAt": "2026-03-15T12:00:00Z",
+  "isolation": {
+    "workingDirectory": "/home/m0hawk/Documents/trainR",
+    "testFile": "tests/test_binding.py",
+    "testingTool": "pytest",
+    "runner": "uv run pytest",
+    "note": "No external services needed — tests use mock artifacts (tmp_path fixtures, subprocess mocks via sleep/echo)"
+  },
+  "toolsUsed": ["pytest", "ty"],
+  "assertions": {
+    "VAL-BIND-01": {
+      "status": "pass",
+      "title": "SKILL.md files are injected as agent context",
+      "evidence": "5 tests in TestSkillInjection class all passed: test_single_skill_content_injected verifies skill content appears in agent context dict; test_skill_content_in_system_prompt_extension verifies content appears in system prompt extension string; test_multiple_skills_concatenated verifies multiple skills are all injected; test_no_skills_returns_empty verifies empty case; test_skill_contents_accessible_as_property verifies property access. SkillArtifact content is correctly read from file and injected into both build_agent_context() (skills list with name/content) and build_system_prompt_extension() (formatted text).",
+      "details": "All 5 TestSkillInjection tests passed. The binder reads SKILL.md files, extracts content, and provides it through both the structured context dict (context['skills']) and a system prompt extension string."
+    },
+    "VAL-BIND-02": {
+      "status": "pass",
+      "title": "MCP server config is translated to running server",
+      "evidence": "5 tests in TestMCPServerBinding class all passed: test_mcp_server_started_as_subprocess verifies MCP server started as subprocess with valid PID and alive status; test_mcp_url_injected_into_context verifies URL 'stdio://test_server' appears in agent context mcp_servers list; test_mcp_url_accessible_as_property verifies mcp_urls property; test_mcp_server_stopped_on_cleanup verifies server stopped after cleanup; test_multiple_mcp_servers_coexist verifies multiple servers tracked. MCPServerArtifact with command/args starts a subprocess and the URL is injected into agent tool configuration.",
+      "details": "All 5 TestMCPServerBinding tests passed. The binder starts MCP servers as subprocesses, tracks their PIDs, injects stdio:// URLs into the agent context, and stops them on cleanup."
+    },
+    "VAL-BIND-03": {
+      "status": "pass",
+      "title": "CLI tool definitions are made available as executable commands",
+      "evidence": "4 tests in TestToolVerification class all passed: test_available_command_passes_validation verifies 'echo' tool appears in context; test_tool_registered_in_tool_registry verifies tool registered in ToolRegistry during setup and deregistered on cleanup; test_tool_without_command_passes verifies placeholder tools without commands pass; test_tool_command_with_args_verified verifies commands with arguments validate correctly. ToolArtifact commands are verified as available in the execution environment before agent runs.",
+      "details": "All 4 TestToolVerification tests passed. The binder validates that CLI commands exist (using shutil.which), registers them in the ToolRegistry, and deregisters on cleanup. Placeholder tools without commands are also supported."
+    },
+    "VAL-BIND-04": {
+      "status": "pass",
+      "title": "Multiple artifact types coexist without conflict",
+      "evidence": "4 tests in TestCoexistence class all passed: test_all_three_types_bound verifies skills, MCP servers, and tools all appear in context simultaneously; test_same_name_different_types_no_conflict verifies separate internal namespaces prevent conflicts; test_multiple_of_each_type verifies 2 of each type (6 total) all bound correctly; test_binding_specific_artifact_names verifies selective binding by name. All artifact types coexist without naming conflicts.",
+      "details": "All 4 TestCoexistence tests passed. Skills, MCP servers, and tools use separate internal namespaces (_skill_contents, _mcp_urls, _registered_tool_names), preventing any naming conflicts. Selective binding by artifact_names is also supported."
+    },
+    "VAL-BIND-05": {
+      "status": "pass",
+      "title": "Artifact validation fails early with actionable errors",
+      "evidence": "9 tests in TestEarlyValidation class all passed: test_missing_skill_file_raises_error verifies ArtifactValidationError with artifact name and 'does not exist' message; test_missing_skill_file_mentions_path verifies file path in error; test_skill_directory_not_file_raises_error verifies 'not a file' error; test_missing_tool_command_raises_error verifies command unavailability error; test_missing_mcp_command_raises_error verifies MCP command error; test_nonexistent_artifact_name_raises_error verifies ValueError for unknown names; test_error_before_agent_runs verifies error occurs in setup() not during agent execution; test_error_has_artifact_name_attribute verifies artifact_name attribute on exception; test_tool_name_conflict_raises_error verifies conflict detection. All errors are actionable and occur before agent execution.",
+      "details": "All 9 TestEarlyValidation tests passed. The binder validates artifacts during setup() with specific, actionable error messages: missing file paths, unavailable commands, directory-instead-of-file, unknown artifact names, and tool name conflicts are all caught early with ArtifactValidationError containing the artifact name and specific issue."
+    },
+    "VAL-BIND-06": {
+      "status": "pass",
+      "title": "Artifact cleanup happens after execution regardless of outcome",
+      "evidence": "7 tests in TestCleanup class all passed: test_mcp_servers_cleaned_up_on_success verifies MCP servers stopped after normal context manager exit; test_mcp_servers_cleaned_up_on_exception verifies MCP servers stopped even when RuntimeError raised inside context manager; test_tools_deregistered_on_cleanup verifies tools deregistered from ToolRegistry; test_tools_deregistered_on_exception verifies tools deregistered on exception; test_cleanup_safe_without_setup verifies cleanup is safe without prior setup; test_cleanup_idempotent verifies multiple cleanup calls don't error; test_context_manager_cleans_up_all_resources verifies all resource types (skills content, MCP servers, tools, state flags) cleaned up. Cleanup is guaranteed via context manager __exit__ with try/finally.",
+      "details": "All 7 TestCleanup tests passed. The ArtifactBinder uses a context manager pattern with __exit__ calling cleanup() in a try/finally block, guaranteeing all resources (MCP server subprocesses, ToolRegistry registrations, skill contents, state flags) are cleaned up regardless of whether an exception occurred."
+    }
+  },
+  "commandsRun": [
+    {
+      "command": "uv run pytest tests/test_binding.py -x -v 2>&1",
+      "exitCode": 0,
+      "output": "41 passed in 0.29s — all TestSkillInjection (5), TestMCPServerBinding (5), TestToolVerification (4), TestCoexistence (4), TestEarlyValidation (9), TestCleanup (7), TestEdgeCases (7) tests passed"
+    },
+    {
+      "command": "uv run ty check src/grist_mill/tools/binding.py 2>&1",
+      "exitCode": 0,
+      "output": "All checks passed!"
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "Tested 6 assertions (VAL-BIND-01 through VAL-BIND-06): all 6 passed. 41 tests passed with 0 failures. Type checking on binding module also passed. The artifact binding system correctly handles skill injection, MCP server lifecycle, CLI tool verification, multi-type coexistence, early validation with actionable errors, and guaranteed cleanup."
+}
