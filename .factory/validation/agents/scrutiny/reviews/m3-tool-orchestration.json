@@ -1,0 +1,55 @@
+{
+  "featureId": "m3-tool-orchestration",
+  "reviewedAt": "2026-03-15T03:30:00.000Z",
+  "commitId": "66eaedaea2732df2753446528fd045aee0af36c1",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "The tool orchestration layer is well-implemented with clean separation of concerns across 6 modules: exceptions.py (custom hierarchy), models.py (ToolDefinition/ToolInvocationResult dataclasses), registry.py (ToolRegistry with dynamic registration and capability advertisement), invocation.py (ToolInvoker with input/output validation, ThreadPoolExecutor-based timeout, telemetry integration), mcp.py (MCPServerManager with subprocess lifecycle, stdout/stderr capture, context manager), and __init__.py (public API). All 43 tests pass, ty check is clean, and ruff is clean. The implementation covers all expected behaviors and all 6 validation assertions (VAL-TOOL-01 through VAL-TOOL-06).",
+    "issues": [
+      {
+        "file": "src/grist_mill/tools/models.py",
+        "line": 44,
+        "severity": "non_blocking",
+        "description": "handler field uses `Any` type instead of a more specific Callable type. AGENTS.md says 'Avoid Any — use specific types or Unknown from typing-extensions.' A comment explains the reason (avoiding complex Protocol), but this could use `typing.Callable[..., dict[str, Any]]` for better type safety without requiring a Protocol."
+      },
+      {
+        "file": "src/grist_mill/tools/invocation.py",
+        "line": 237,
+        "severity": "non_blocking",
+        "description": "ToolInvoker.invoke catches bare `Exception` from handler execution. AGENTS.md says 'Never catch bare Exception — catch specific exceptions.' However, this is justified because the handler is user-supplied code and could raise anything; the ToolTimeoutError is already caught separately above. This is an acceptable safety net pattern for a tool routing layer, but worth noting the convention tension."
+      },
+      {
+        "file": "src/grist_mill/tools/invocation.py",
+        "line": 35,
+        "severity": "non_blocking",
+        "description": "The inline JSON schema validator supports only a subset of JSON Schema keywords (type, required, properties, minimum, maximum, minLength). It does not support common keywords like `additionalProperties`, `pattern`, `maxLength`, `enum`, `$ref`, `allOf`, `anyOf`, `oneOf`, or nested array/object item validation. For the current use case this is sufficient, but real-world tools with complex schemas may need validation gaps filled. The comment in the docstring is transparent about this limitation."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "services",
+      "observation": "Worker correctly added tests/test_tools.py to the test_grist_mill command in services.yaml. The services.yaml is already up to date.",
+      "evidence": ".factory/services.yaml line with test_grist_mill command includes tests/test_tools.py"
+    },
+    {
+      "area": "conventions",
+      "observation": "The worker followed AGENTS.md conventions well: uv package manager, ruff formatting, ty type checking scoped to src/grist_mill/, Python logging module (no print statements), proper docstrings, PascalCase/snake_case naming. The two minor deviations (Any type, bare Exception catch) are both justified by context and non-blocking.",
+      "evidence": "Code review of all 6 source files and test file"
+    },
+    {
+      "area": "conventions",
+      "observation": "AGENTS.md says 'All new code must be type-annotated' and 'Avoid Any'. The handler: Any in ToolDefinition is acknowledged but could be improved. The AGENTS.md guidance on this topic could be clarified for cases where Callable types are complex.",
+      "evidence": "src/grist_mill/tools/models.py:44 — handler: Any with comment explaining the choice"
+    },
+    {
+      "area": "skills",
+      "observation": "Worker followed the backend-worker skill procedure: TDD approach (tests before implementation), verification with pytest + ty + ruff, clean commit with proper message format.",
+      "evidence": "Handoff shows followedProcedure: true, no deviations recorded"
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Feature m3-tool-orchestration passes review. The implementation delivers a complete tool orchestration layer with ToolRegistry (capability advertisement, dynamic registration, agent discovery formatting), ToolInvoker (input/output JSON schema validation, per-call timeout via ThreadPoolExecutor, per-tool telemetry via TelemetryCollector), MCPServerManager (subprocess lifecycle, stdout/stderr capture, SIGTERM/SIGKILL cleanup, context manager), and a clean exception hierarchy. All 6 assertions (VAL-TOOL-01 through VAL-TOOL-06) are covered by 43 well-structured tests across 6 test classes plus integration tests. Three non-blocking issues noted: Any type for handler field, bare Exception catch in invoker (justified), and limited JSON schema validator (transparently documented). No blocking issues found."
+}

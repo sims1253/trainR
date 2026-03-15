@@ -14,7 +14,7 @@ Architectural decisions, patterns, and conventions for grist-mill.
 
 4. **Config precedence**: CLI args > environment variables (`GRIST_MILL_*`) > YAML defaults.
 
-5. **Telemetry everywhere**: Every execution produces telemetry with token usage, latency breakdown, and tool call metrics.
+5. **Telemetry everywhere**: Every execution produces telemetry with token usage, latency breakdown, and tool call metrics. The harness merges two telemetry sources: agent-level telemetry (tool calls, tokens, cost from the agent/provider) and harness-level telemetry (setup/execution/teardown phase timings). The `_merge_harness_and_agent_telemetry` function in `harness.py` combines these sources. Note: the TIMEOUT/SKIPPED code path replaces agent telemetry entirely with harness telemetry (known limitation).
 
 ## Module Structure
 

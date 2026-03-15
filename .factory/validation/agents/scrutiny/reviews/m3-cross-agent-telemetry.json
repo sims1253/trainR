@@ -1,0 +1,44 @@
+{
+  "featureId": "m3-cross-agent-telemetry",
+  "reviewedAt": "2026-03-15T06:30:00.000Z",
+  "commitId": "8cea4a2",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "The implementation is solid. 24 tests thoroughly cover VAL-CROSS-04 across 5 areas: agent registration via AgentRegistry, tool invocation telemetry in TaskResult, telemetry rendering in JSON/CSV/HTML exports, consumption by aggregation/reporting modules, and a full end-to-end pipeline. The harness fix for merging agent telemetry with harness telemetry is correct and well-documented. All 24 tests pass, all 40 existing harness tests pass with no regressions, and type checking is clean.",
+    "issues": [
+      {
+        "file": "src/grist_mill/harness/harness.py",
+        "line": 501,
+        "severity": "non_blocking",
+        "description": "Redundant hasattr checks: agent_telem is typed as TelemetrySchema (non-optional after the None guard), so hasattr(agent_telem, 'tokens') etc. is always True. The checks are not harmful but add unnecessary noise. A future cleanup could use direct attribute access."
+      },
+      {
+        "file": "src/grist_mill/harness/harness.py",
+        "line": 280,
+        "severity": "non_blocking",
+        "description": "The else branch (TIMEOUT/SKIPPED) still uses _merge_telemetry which replaces agent telemetry entirely with harness telemetry, losing agent tool calls and tokens. This is a pre-existing issue not introduced by this commit, but it means TIMEOUT/SKIPPED results from agents will have empty tool_calls and zero tokens. The new tests correctly avoid this path (test_telemetry_on_error_result uses ERROR status which goes through the test_result branch). This should be fixed in a future iteration."
+      }
+    ]
+  },
+  "sharedStateObservations": [
+    {
+      "area": "services",
+      "observation": "The new test file tests/test_cross_agent_telemetry.py is not included in the test_grist_mill command in .factory/services.yaml. Previous cross-eval test files (test_cross_eval_export.py) are also missing from this command. Running test_grist_mill will not exercise these cross-area validation tests.",
+      "evidence": ".factory/services.yaml:test_grist_mill command lists individual test files but omits test_cross_agent_telemetry.py and test_cross_eval_export.py"
+    },
+    {
+      "area": "knowledge",
+      "observation": "The harness had a bug where agent telemetry (tool calls, tokens, cost) was discarded during final result merge. This was discovered by the worker during test implementation. The fix (_merge_harness_and_agent_telemetry) now properly combines harness phase timings with agent metrics. This architectural knowledge about telemetry merging is worth documenting in .factory/library/architecture.md under the 'Telemetry everywhere' principle.",
+      "evidence": "src/grist_mill/harness/harness.py:464-507 — new _merge_harness_and_agent_telemetry function with docstring explaining the two-source merge strategy"
+    },
+    {
+      "area": "conventions",
+      "observation": "The test file uses a _MockEnvironment class (with underscore prefix) as a test helper. This follows the convention from other test files (e.g., test_harness.py). The helper functions (_make_task, _make_config, _make_mock_provider_with_tool_calls, _result_to_export_dict) are well-factored and reused across all 24 tests, which is good practice.",
+      "evidence": "tests/test_cross_agent_telemetry.py:89-97 — _MockEnvironment class; lines 44-176 — shared helper functions"
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "VAL-CROSS-04 implementation is complete and correct. 24 tests verify the full pipeline from custom agent registration through evaluation harness to telemetry in reports. A genuine bug was discovered and fixed in the harness: agent telemetry (tool calls, tokens, cost) was being discarded when merging with harness phase timings. The fix is clean and backward-compatible. All tests pass, no regressions, type checking clean. Two non-blocking observations noted: redundant hasattr checks in the merge function and the pre-existing telemetry loss on the TIMEOUT/SKIPPED code path."
+}

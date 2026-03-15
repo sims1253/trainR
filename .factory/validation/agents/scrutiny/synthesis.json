@@ -1,0 +1,95 @@
+{
+  "milestone": "agents",
+  "round": 1,
+  "status": "pass",
+  "validatorsRun": {
+    "test": {
+      "passed": true,
+      "command": "uv run pytest tests/ -m \"not integration_local and not integration_provider\" -x -q",
+      "exitCode": 0,
+      "observation": "1078 passed, 1 skipped in 62.91s"
+    },
+    "typecheck": {
+      "passed": true,
+      "command": "uv run ty check src/grist_mill/",
+      "exitCode": 0,
+      "observation": "All checks passed!"
+    },
+    "lint": {
+      "passed": true,
+      "command": "uv run ruff check src/grist_mill/",
+      "exitCode": 0,
+      "observation": "All checks passed!"
+    }
+  },
+  "reviewsSummary": {
+    "total": 4,
+    "passed": 4,
+    "failed": 0,
+    "failedFeatures": []
+  },
+  "blockingIssues": [],
+  "appliedUpdates": [
+    {
+      "target": "services.yaml",
+      "description": "Added test_cross_eval_export.py, test_cross_schema_consistency.py, and test_cross_agent_telemetry.py to test_grist_mill command",
+      "sourceFeature": "m3-cross-agent-telemetry"
+    },
+    {
+      "target": "library",
+      "description": "Added telemetry merge documentation to architecture.md: harness combines agent-level telemetry (tool calls, tokens, cost) with harness-level phase timings via _merge_harness_and_agent_telemetry. Noted TIMEOUT/SKIPPED limitation.",
+      "sourceFeature": "m3-cross-agent-telemetry"
+    }
+  ],
+  "suggestedGuidanceUpdates": [
+    {
+      "target": "AGENTS.md",
+      "suggestion": "Clarify the 'Never catch bare Exception' rule: allow bare Exception catches in two specific cases: (1) top-level agent/runner safety nets that log and return structured errors, and (2) cleanup/teardown code where robustness is prioritized over precision. These patterns were used consistently across m3-api-agent, m3-tool-orchestration, and m3-artifact-binding.",
+      "evidence": "Bare except Exception found in api_agent.py:260 (agent run safety net), invocation.py:237 (tool handler safety net), binding.py:465 (cleanup deregister loop). All three features in the agents milestone use this pattern.",
+      "isSystemic": true
+    }
+  ],
+  "rejectedObservations": [
+    {
+      "observation": "handler: Any type in ToolDefinition could use Callable[..., dict[str, Any]] instead",
+      "reason": "Already acknowledged by the worker with a comment explaining the choice. Minor type annotation preference, not a defect."
+    },
+    {
+      "observation": "hasattr-based duck typing in api_agent.py _to_provider_messages",
+      "reason": "Works correctly for the known message types. Could use isinstance but not a defect or blocking issue."
+    },
+    {
+      "observation": "test_token_counts_sum_to_total doesn't exercise multi-turn summation",
+      "reason": "Non-blocking test quality issue. Per-turn tokens are tested elsewhere (test_per_turn_token_counts_recorded). No assertion gap that would cause a false pass."
+    },
+    {
+      "observation": "No-op line in conversation.py to_provider_messages",
+      "reason": "Harmless redundant assignment, not a defect."
+    },
+    {
+      "observation": "_default_api_agent_factory ignores config parameter",
+      "reason": "Expected behavior — documented as placeholder until providers module (m6). Not a defect."
+    },
+    {
+      "observation": "JSON schema validator in invocation.py is limited to a subset of JSON Schema keywords",
+      "reason": "Documented limitation, sufficient for current use case. Transparent in docstring."
+    },
+    {
+      "observation": "Redundant hasattr checks in harness _merge_harness_and_agent_telemetry",
+      "reason": "Code clarity preference, not a defect."
+    },
+    {
+      "observation": "TIMEOUT/SKIPPED code path loses agent telemetry in harness merge",
+      "reason": "Pre-existing issue not introduced by agents milestone features. Already documented in applied library update."
+    },
+    {
+      "observation": "Worker followed backend-worker skill procedure correctly",
+      "reason": "Informational, not actionable."
+    },
+    {
+      "observation": "MCPServerManager per-instance in ArtifactBinder",
+      "reason": "Correct isolation behavior, not a defect."
+    }
+  ],
+  "previousRound": null
+}
